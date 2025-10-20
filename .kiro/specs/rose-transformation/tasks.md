@@ -53,14 +53,16 @@
   - Set default to 'audio' for voice interactions
   - _Requirements: 2.3, 6.4_
 
-- [-] 2.3 Update edges.py select_workflow function
+- [x] 2.3 Update edges.py select_workflow function
+
 
 
   - Remove image workflow routing logic
   - Ensure only conversation and audio paths are active
   - _Requirements: 6.4_
 
-- [ ] 2.4 Verify memory nodes work with Rose's therapeutic context
+- [-] 2.4 Verify memory nodes work with Rose's therapeutic context
+
 
   - Test memory extraction with grief counseling conversations
   - Verify memory injection provides relevant therapeutic context
