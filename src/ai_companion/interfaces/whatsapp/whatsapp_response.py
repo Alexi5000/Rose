@@ -20,7 +20,7 @@ speech_to_text = SpeechToText()
 text_to_speech = TextToSpeech()
 image_to_text = ImageToText()
 
-# Router for WhatsApp respo
+# Router for WhatsApp responses
 whatsapp_router = APIRouter()
 
 # WhatsApp API credentials
@@ -188,9 +188,7 @@ async def send_response(
             "text": {"body": response_text},
         }
 
-    print(headers)
-    print(json_data)
-
+    
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages",
