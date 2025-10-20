@@ -249,7 +249,6 @@
 
 - [x] 8. Configure deployment for Railway
 
-
 - [x] 8.1 Create railway.json configuration file
 
   - Define build command (install Python deps + build React frontend)
@@ -282,8 +281,10 @@
   - Add validation for required variables
   - _Requirements: 7.2_
 
-- [ ] 9. Update project configuration and dependencies
-- [ ] 9.1 Update pyproject.toml dependencies
+- [x] 9. Update project configuration and dependencies
+
+
+- [x] 9.1 Update pyproject.toml dependencies
 
   - Mark image generation dependencies as optional
   - Ensure all required dependencies are listed
@@ -291,7 +292,7 @@
   - Add python-multipart for file uploads
   - _Requirements: 6.5_
 
-- [ ] 9.2 Update .env.example with Rose-specific variables
+- [x] 9.2 Update .env.example with Rose-specific variables
 
   - Add ROSE_VOICE_ID for TTS configuration
   - Mark WhatsApp variables as optional
@@ -299,7 +300,7 @@
   - Add deployment-specific variables (PORT)
   - _Requirements: 7.2, 8.1_
 
-- [ ] 9.3 Update README.md with Rose project information
+- [x] 9.3 Update README.md with Rose project information
 
   - Replace Ava references with Rose
   - Update project description for grief counseling focus
@@ -308,7 +309,7 @@
   - Add deployment guide
   - _Requirements: 7.5_
 
-- [ ] 9.4 Update Makefile commands for new workflow
+- [x] 9.4 Update Makefile commands for new workflow
 
   - Update rose-run command (replace ava-run)
   - Remove or update Docker Compose if needed
