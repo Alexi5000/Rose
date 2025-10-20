@@ -32,7 +32,8 @@
   - Replace with simple "available for healing sessions" context
   - _Requirements: 1.1_
 
-- [-] 2. Simplify LangGraph workflow
+- [x] 2. Simplify LangGraph workflow
+
 
 
 
@@ -61,7 +62,8 @@
   - Ensure only conversation and audio paths are active
   - _Requirements: 6.4_
 
-- [-] 2.4 Verify memory nodes work with Rose's therapeutic context
+- [x] 2.4 Verify memory nodes work with Rose's therapeutic context
+
 
 
   - Test memory extraction with grief counseling conversations
