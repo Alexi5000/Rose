@@ -34,16 +34,17 @@ class BackupManager:
         try:
             if db_path is None:
                 from ai_companion.settings import settings
+
                 db_path = settings.SHORT_TERM_MEMORY_DB_PATH
-            
+
             db_path = Path(db_path)
 
             if not db_path.exists():
                 logger.warning(f"Database file not found: {db_path}")
                 return None
 
-            # Create backup filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Create backup filename with timestamp (including microseconds for uniqueness)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             backup_filename = f"memory_backup_{timestamp}.db"
             backup_path = self.backup_dir / backup_filename
 
@@ -69,9 +70,7 @@ class BackupManager:
         try:
             # Get all backup files sorted by modification time (newest first)
             backup_files = sorted(
-                self.backup_dir.glob("memory_backup_*.db"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True
+                self.backup_dir.glob("memory_backup_*.db"), key=lambda p: p.stat().st_mtime, reverse=True
             )
 
             # Remove old backups beyond the limit
@@ -91,17 +90,17 @@ class BackupManager:
         try:
             backups = []
             for backup_file in sorted(
-                self.backup_dir.glob("memory_backup_*.db"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True
+                self.backup_dir.glob("memory_backup_*.db"), key=lambda p: p.stat().st_mtime, reverse=True
             ):
                 stat = backup_file.stat()
-                backups.append({
-                    "filename": backup_file.name,
-                    "path": str(backup_file),
-                    "size_bytes": stat.st_size,
-                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
+                backups.append(
+                    {
+                        "filename": backup_file.name,
+                        "path": str(backup_file),
+                        "size_bytes": stat.st_size,
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                )
             return backups
 
         except Exception as e:
@@ -127,8 +126,9 @@ class BackupManager:
 
             if db_path is None:
                 from ai_companion.settings import settings
+
                 db_path = settings.SHORT_TERM_MEMORY_DB_PATH
-            
+
             db_path = Path(db_path)
 
             # Create a backup of current database before restoring

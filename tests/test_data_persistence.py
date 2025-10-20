@@ -62,9 +62,13 @@ class TestBackupManager:
 
     def test_cleanup_old_backups(self, backup_manager, temp_db_file):
         """Test that old backups are cleaned up correctly."""
-        # Create 10 backups
-        for _ in range(10):
+        import time
+
+        # Create 10 backups with small delays to ensure different timestamps
+        for i in range(10):
             backup_manager.backup_database(db_path=temp_db_file)
+            if i < 9:  # Don't sleep after last backup
+                time.sleep(0.01)
 
         # Verify only max_backups are kept (default 7)
         backup_files = list(backup_manager.backup_dir.glob("memory_backup_*.db"))
@@ -72,8 +76,11 @@ class TestBackupManager:
 
     def test_list_backups(self, backup_manager, temp_db_file):
         """Test listing backups returns correct information."""
-        # Create a few backups
+        import time
+
+        # Create a few backups with small delay to ensure different timestamps
         backup_manager.backup_database(db_path=temp_db_file)
+        time.sleep(0.01)
         backup_manager.backup_database(db_path=temp_db_file)
 
         backups = backup_manager.list_backups()
