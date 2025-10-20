@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # Rose-specific configuration
     ROSE_VOICE_ID: str | None = None  # Optional: Override ELEVENLABS_VOICE_ID for Rose's specific voice
 
+    # WhatsApp integration (optional - frozen for future release)
+    WHATSAPP_PHONE_NUMBER_ID: str | None = None
+    WHATSAPP_TOKEN: str | None = None
+    WHATSAPP_VERIFY_TOKEN: str | None = None
+
     MEMORY_TOP_K: int = 3
     ROUTER_MESSAGES_TO_ANALYZE: int = 3
     TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 20

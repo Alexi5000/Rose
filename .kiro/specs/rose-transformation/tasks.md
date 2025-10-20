@@ -143,7 +143,6 @@
 
 - [x] 5. Configure TTS for Rose's voice
 
-
 - [x] 5.1 Update TextToSpeech module for Rose's voice profile
 
   - Configure ElevenLabs voice_id for warm, calming female voice
@@ -166,22 +165,15 @@
 
 - [x] 6. Build React frontend for voice interface
 
-
-
-
-
-
 - [x] 6.1 Initialize React project with TypeScript
-
 
   - Create frontend/ directory in project root
   - Set up React with Vite or Create React App
-  - Configure TypeScript  ``
+  - Configure TypeScript ``
   - Install dependencies: react, framer-motion or gsap, axios
   - _Requirements: 5.1, 5.2_
 
 - [x] 6.2 Create VoiceButton component with state management
-
 
   - Implement push-to-talk button with hold-to-record functionality
   - Create visual states: idle, listening, processing, speaking, error
@@ -191,16 +183,13 @@
 
 - [x] 6.3 Implement useVoiceRecording hook for audio capture
 
-
   - Use Web Audio API to capture microphone input
   - Record audio while button is pressed
   - Convert audio to appropriate format (WAV or WebM)
   - Handle browser permissions for microphone access
   - _Requirements: 2.2_
 
-
 - [x] 6.4 Implement useAudioPlayback hook for response playback
-
 
   - Automatically play audio responses from backend
   - Show visual feedback during playback
@@ -209,59 +198,50 @@
 
 - [x] 6.5 Create API client service for backend communication
 
-
   - Implement POST /api/session/start call
   - Implement POST /api/voice/process with audio upload
   - Handle multipart/form-data for audio files
   - Manage session_id across requests
   - _Requirements: 2.2, 2.3_
 
-
-
 - [x] 6.6 Implement error handling and user feedback in UI
-
 
   - Display error messages for failed requests
   - Show retry options for recoverable errors
   - Implement loading states and spinners
   - _Requirements: 9.2, 9.3_
 
-
 - [x] 6.7 Add responsive design and mobile support
-
 
   - Ensure button works on touch devices
   - Optimize layout for mobile and desktop
   - Test on various screen sizes
   - _Requirements: 5.5_
 
-
 - [x] 6.8 Implement audio visualizer component
-
 
   - Show waveform or visual feedback during recording
   - Animate during Rose's response playback
   - Use canvas or SVG for visualizations
   - _Requirements: 5.3_
 
-
 - [x] 6.9 Configure build process and output
-
 
   - Set up production build configuration
   - Configure output directory for FastAPI static serving
   - Optimize bundle size
   - _Requirements: 7.3_
 
-- [ ] 7. Disable WhatsApp integration
-- [ ] 7.1 Comment out WhatsApp route registration in FastAPI
+- [x] 7. Disable WhatsApp integration
+
+- [x] 7.1 Comment out WhatsApp route registration in FastAPI
 
   - Keep WhatsApp code files intact
   - Don't register WhatsApp endpoints in main app
   - Add comments indicating feature is frozen for future
   - _Requirements: 6.2, 6.3_
 
-- [ ] 7.2 Remove WhatsApp environment variables from required settings
+- [x] 7.2 Remove WhatsApp environment variables from required settings
 
   - Make WHATSAPP\_\* variables optional in settings.py
   - Update .env.example to mark as optional
@@ -274,6 +254,7 @@
   - Define start command (uvicorn server)
   - Configure health check path
   - Set restart policy
+
   - _Requirements: 7.1, 7.4_
 
 - [ ] 8.2 Update Dockerfile for production deployment
