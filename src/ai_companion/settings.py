@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     PORT: int = 8080
     HOST: str = "0.0.0.0"
 
+    # Security configuration
+    ALLOWED_ORIGINS: str = "*"  # Comma-separated list of allowed origins, or "*" for all
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 10  # Requests per minute per IP
+    ENABLE_SECURITY_HEADERS: bool = True
+
     @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
     @classmethod
     def validate_required_fields(cls, v: str, info) -> str:
@@ -53,6 +59,12 @@ class Settings(BaseSettings):
         if not v or v.strip() == "":
             raise ValueError(f"{info.field_name} is required and cannot be empty")
         return v
+    
+    def get_allowed_origins(self) -> list[str]:
+        """Parse ALLOWED_ORIGINS into a list."""
+        if self.ALLOWED_ORIGINS == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 
 def load_settings() -> Settings:

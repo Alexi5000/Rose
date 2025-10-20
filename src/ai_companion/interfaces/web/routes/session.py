@@ -4,12 +4,19 @@ import logging
 import uuid
 from typing import Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 class SessionStartResponse(BaseModel):
@@ -20,7 +27,8 @@ class SessionStartResponse(BaseModel):
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
-async def start_session() -> SessionStartResponse:
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def start_session(request: Request) -> SessionStartResponse:
     """Initialize a new healing session.
 
     Generates a unique session_id that will be used to track conversation

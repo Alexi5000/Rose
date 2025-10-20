@@ -1,16 +1,20 @@
 """Voice processing endpoints."""
 
 import logging
+import os
+import stat
 import tempfile
 import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ai_companion.graph.graph import create_workflow_graph
 from ai_companion.modules.speech.speech_to_text import SpeechToText
@@ -20,6 +24,9 @@ from ai_companion.settings import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Initialize speech modules
 stt = SpeechToText()
@@ -42,7 +49,9 @@ class VoiceProcessResponse(BaseModel):
 
 
 @router.post("/voice/process", response_model=VoiceProcessResponse)
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def process_voice(
+    request: Request,
     audio: UploadFile = File(...),
     session_id: str = Form(...),
 ) -> VoiceProcessResponse:
@@ -138,14 +147,20 @@ async def process_voice(
                 },
             )
 
-        # Save audio file temporarily
+        # Save audio file temporarily with secure permissions
         audio_id = str(uuid.uuid4())
         audio_path = AUDIO_DIR / f"{audio_id}.mp3"
 
         try:
-            with open(audio_path, "wb") as f:
-                f.write(audio_bytes)
-            logger.info(f"Saved audio to {audio_path}")
+            # Create file with secure permissions (owner read/write only)
+            fd = os.open(
+                str(audio_path),
+                os.O_CREAT | os.O_WRONLY | os.O_EXCL,
+                stat.S_IRUSR | stat.S_IWUSR
+            )
+            os.write(fd, audio_bytes)
+            os.close(fd)
+            logger.info(f"Saved audio to {audio_path} with secure permissions")
         except Exception as e:
             logger.error(f"Failed to save audio file: {e}")
             raise HTTPException(status_code=500, detail="Failed to save audio response")

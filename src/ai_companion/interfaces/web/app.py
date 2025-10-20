@@ -7,11 +7,16 @@ from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from ai_companion.core.backup import backup_manager
+from ai_companion.interfaces.web.middleware import SecurityHeadersMiddleware
 from ai_companion.interfaces.web.routes import health, session, voice
+from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +75,33 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS
+    # Configure CORS with environment-based origins
+    allowed_origins = settings.get_allowed_origins()
+    logger.info(f"Configuring CORS with allowed origins: {allowed_origins}")
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Authorization"],
     )
+    
+    # Add security headers middleware
+    if settings.ENABLE_SECURITY_HEADERS:
+        app.add_middleware(SecurityHeadersMiddleware)
+        logger.info("Security headers middleware enabled")
+    
+    # Configure rate limiting
+    if settings.RATE_LIMIT_ENABLED:
+        limiter = Limiter(key_func=get_remote_address)
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+        logger.info(f"Rate limiting enabled: {settings.RATE_LIMIT_PER_MINUTE} requests/minute per IP")
+    else:
+        # Create a no-op limiter if rate limiting is disabled
+        app.state.limiter = None
+        logger.info("Rate limiting disabled")
 
     # Register API routes
     app.include_router(health.router, prefix="/api", tags=["health"])

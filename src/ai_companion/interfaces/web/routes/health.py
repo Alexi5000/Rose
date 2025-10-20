@@ -3,14 +3,19 @@
 import logging
 from typing import Dict, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 class HealthCheckResponse(BaseModel):
@@ -22,7 +27,8 @@ class HealthCheckResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthCheckResponse)
-async def health_check() -> HealthCheckResponse:
+@limiter.limit("60/minute")  # Higher limit for health checks
+async def health_check(request: Request) -> HealthCheckResponse:
     """Check system health and connectivity to external services.
 
     Returns:
