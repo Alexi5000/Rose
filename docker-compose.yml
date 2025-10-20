@@ -24,6 +24,12 @@ services:
       - ./short_term_memory:/app/data
     depends_on:
       - qdrant
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
   whatsapp:
     build:
       context: .
@@ -42,3 +48,9 @@ services:
       - ./short_term_memory:/app/data
     depends_on:
       - qdrant
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M

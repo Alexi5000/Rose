@@ -9,6 +9,7 @@ This guide covers deploying Rose the Healer Shaman to various cloud platforms.
   - [Render](#render)
   - [Fly.io](#flyio)
 - [Environment Variables](#environment-variables)
+- [Data Persistence](#data-persistence)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -46,7 +47,16 @@ Railway provides the simplest deployment experience with automatic builds and ze
      - Start the FastAPI server
    - Wait for the deployment to complete (usually 3-5 minutes)
 
-4. **Access Your Application**
+4. **Configure Persistent Volume** (Critical!)
+   - In the Railway dashboard, go to your service
+   - Navigate to the "Variables" tab
+   - Scroll to "Volumes" section and click "+ New Volume"
+   - Set mount path to `/app/data` and size to 1GB minimum
+   - Redeploy the service to apply the volume
+   - **Important**: Without this step, all conversation data will be lost on restart!
+   - See [Data Persistence Guide](DATA_PERSISTENCE.md) for detailed instructions
+
+5. **Access Your Application**
    - Railway will provide a public URL (e.g., `https://your-app.up.railway.app`)
    - Visit the URL to interact with Rose
 
@@ -254,6 +264,46 @@ These variables are for features currently disabled:
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_TOKEN`
 - `WHATSAPP_VERIFY_TOKEN`
+
+---
+
+## Data Persistence
+
+**Critical**: The application requires persistent storage to retain conversation data and memories across deployments.
+
+### Railway Volume Setup
+
+Railway uses ephemeral storage by default. You **must** configure a persistent volume:
+
+1. In Railway dashboard, navigate to your service
+2. Go to "Variables" tab → "Volumes" section
+3. Click "+ New Volume"
+4. Configure:
+   - **Mount Path**: `/app/data`
+   - **Size**: 1GB minimum (recommended)
+5. Redeploy service to apply changes
+
+### Automatic Backups
+
+The application includes automatic backup features:
+
+- **Database Backups**: Daily at 2:00 AM (keeps 7 days)
+- **Audio Cleanup**: Hourly cleanup of temporary files older than 24 hours
+- **Backup Location**: `/app/data/backups/`
+
+### Detailed Documentation
+
+For comprehensive information about data persistence, backups, and disaster recovery, see:
+
+**[Data Persistence Guide](DATA_PERSISTENCE.md)**
+
+This guide covers:
+- Step-by-step Railway volume configuration
+- Automatic backup system details
+- Manual backup and restore procedures
+- Disaster recovery strategies
+- Storage requirements and optimization
+- Troubleshooting common issues
 
 ---
 

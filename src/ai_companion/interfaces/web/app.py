@@ -4,11 +4,13 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from ai_companion.core.backup import backup_manager
 from ai_companion.interfaces.web.routes import health, session, voice
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,41 @@ FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent.parent.parent / "fronte
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     logger.info("Starting Rose the Healer Shaman web interface")
+    
+    # Initialize scheduler for background jobs
+    scheduler = AsyncIOScheduler()
+    
+    # Schedule automatic audio file cleanup (runs every hour)
+    scheduler.add_job(
+        voice.cleanup_old_audio_files,
+        'interval',
+        hours=1,
+        args=[24],  # Clean files older than 24 hours
+        id='audio_cleanup',
+        name='Cleanup old audio files',
+        replace_existing=True
+    )
+    
+    # Schedule automatic database backups (runs daily at 2 AM)
+    scheduler.add_job(
+        backup_manager.backup_database,
+        'cron',
+        hour=2,
+        minute=0,
+        args=[7],  # Keep 7 days of backups
+        id='database_backup',
+        name='Daily database backup',
+        replace_existing=True
+    )
+    
+    # Start the scheduler
+    scheduler.start()
+    logger.info("Background scheduler started - audio cleanup and database backup jobs scheduled")
+    
     yield
+    
+    # Shutdown scheduler
+    scheduler.shutdown()
     logger.info("Shutting down Rose the Healer Shaman web interface")
 
 

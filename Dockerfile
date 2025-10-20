@@ -51,11 +51,14 @@ ENV VIRTUAL_ENV=/app/.venv \
 # Install the package in editable mode
 RUN uv pip install -e .
 
-# Create data directory for memory databases
-RUN mkdir -p /app/data
+# Create data directories for memory databases and backups
+RUN mkdir -p /app/data /app/data/backups
 
 # Define volumes
 VOLUME ["/app/data"]
+
+# Set memory limit environment variable (can be overridden at runtime)
+ENV MEMORY_LIMIT=512m
 
 # Expose the port (configurable via PORT env var)
 EXPOSE 8080
