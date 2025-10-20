@@ -1,9 +1,12 @@
+import logging
 import os
 from typing import Optional
 
 from ai_companion.core.exceptions import TextToSpeechError
 from ai_companion.settings import settings
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
+
+logger = logging.getLogger(__name__)
 
 
 class TextToSpeech:
@@ -30,11 +33,12 @@ class TextToSpeech:
             self._client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
         return self._client
 
-    async def synthesize(self, text: str) -> bytes:
+    async def synthesize(self, text: str, voice_id: Optional[str] = None) -> bytes:
         """Convert text to speech using ElevenLabs.
 
         Args:
             text: Text to convert to speech
+            voice_id: Optional voice ID to override default (useful for Rose-specific voice)
 
         Returns:
             bytes: Audio data
@@ -49,12 +53,20 @@ class TextToSpeech:
         if len(text) > 5000:  # ElevenLabs typical limit
             raise ValueError("Input text exceeds maximum length of 5000 characters")
 
+        # Use Rose-specific voice if configured, otherwise use default
+        selected_voice_id = voice_id or settings.ROSE_VOICE_ID or settings.ELEVENLABS_VOICE_ID
+
+        logger.info(f"Synthesizing speech: {len(text)} chars, voice_id={selected_voice_id}")
+
         try:
             audio_generator = self.client.generate(
                 text=text,
                 voice=Voice(
-                    voice_id=settings.ELEVENLABS_VOICE_ID,
-                    settings=VoiceSettings(stability=0.5, similarity_boost=0.5),
+                    voice_id=selected_voice_id,
+                    settings=VoiceSettings(
+                        stability=0.6,  # Higher stability for calming effect
+                        similarity_boost=0.5,
+                    ),
                 ),
                 model=settings.TTS_MODEL_NAME,
             )
@@ -64,7 +76,13 @@ class TextToSpeech:
             if not audio_bytes:
                 raise TextToSpeechError("Generated audio is empty")
 
+            logger.info(f"Successfully generated {len(audio_bytes)} bytes of audio")
             return audio_bytes
 
+        except ValueError:
+            # Re-raise validation errors
+            logger.error(f"TTS validation error: {text[:50]}...")
+            raise
         except Exception as e:
+            logger.error(f"TTS conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
             raise TextToSpeechError(f"Text-to-speech conversion failed: {str(e)}") from e

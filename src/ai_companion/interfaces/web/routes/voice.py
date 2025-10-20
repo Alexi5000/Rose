@@ -80,9 +80,17 @@ async def process_voice(
         try:
             transcribed_text = await stt.transcribe(audio_data)
             logger.info(f"Transcribed text: {transcribed_text}")
+        except ValueError as e:
+            # Validation errors (bad audio format, empty file, etc.)
+            logger.error(f"Audio validation failed: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid audio: {str(e)}")
         except Exception as e:
-            logger.error(f"Speech-to-text failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to transcribe audio")
+            # API or processing errors
+            logger.error(f"Speech-to-text failed: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=503,
+                detail="I couldn't hear that clearly. Could you try again?",
+            )
 
         # Process through LangGraph workflow
         try:
@@ -106,16 +114,29 @@ async def process_voice(
             logger.info(f"Generated response: {response_text[:100]}...")
 
         except Exception as e:
-            logger.error(f"LangGraph workflow failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate response")
+            logger.error(f"LangGraph workflow failed: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=503,
+                detail="Rose is having trouble connecting. Please try again in a moment.",
+            )
 
         # Generate audio response
         try:
             audio_bytes = await tts.synthesize(response_text)
             logger.info(f"Generated audio: {len(audio_bytes)} bytes")
         except Exception as e:
-            logger.error(f"Text-to-speech failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+            logger.error(f"Text-to-speech failed: {e}", exc_info=True)
+            # Return text-only response as fallback
+            logger.warning("Falling back to text-only response due to TTS failure")
+            raise HTTPException(
+                status_code=200,
+                detail={
+                    "text": response_text,
+                    "audio_url": None,
+                    "session_id": session_id,
+                    "error": "I'm having trouble with my voice right now, but I'm here.",
+                },
+            )
 
         # Save audio file temporarily
         audio_id = str(uuid.uuid4())

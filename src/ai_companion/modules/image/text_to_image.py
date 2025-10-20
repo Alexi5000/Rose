@@ -94,7 +94,8 @@ class TextToImage:
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,
                 temperature=0.4,
-                max_retries=2,
+                timeout=30.0,
+                max_retries=3,
             )
 
             structured_llm = llm.with_structured_output(ScenarioPrompt)
@@ -124,7 +125,8 @@ class TextToImage:
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,
                 temperature=0.25,
-                max_retries=2,
+                timeout=30.0,
+                max_retries=3,
             )
 
             structured_llm = llm.with_structured_output(EnhancedPrompt)

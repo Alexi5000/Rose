@@ -29,7 +29,7 @@ class ImageToText:
     def client(self) -> Groq:
         """Get or create Groq client instance using singleton pattern."""
         if self._client is None:
-            self._client = Groq(api_key=settings.GROQ_API_KEY)
+            self._client = Groq(api_key=settings.GROQ_API_KEY, timeout=60.0, max_retries=3)
         return self._client
 
     async def analyze_image(self, image_data: Union[str, bytes], prompt: str = "") -> str:

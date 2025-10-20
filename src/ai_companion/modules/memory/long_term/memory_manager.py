@@ -31,7 +31,8 @@ class MemoryManager:
             model=settings.SMALL_TEXT_MODEL_NAME,
             api_key=settings.GROQ_API_KEY,
             temperature=0.1,
-            max_retries=2,
+            timeout=30.0,  # 30 second timeout
+            max_retries=3,  # Consistent retry strategy
         ).with_structured_output(MemoryAnalysis)
 
     async def _analyze_memory(self, message: str) -> MemoryAnalysis:

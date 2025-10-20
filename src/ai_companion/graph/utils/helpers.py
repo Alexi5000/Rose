@@ -10,10 +10,20 @@ from ai_companion.settings import settings
 
 
 def get_chat_model(temperature: float = 0.7):
+    """Get ChatGroq model with retry and timeout configuration.
+
+    Args:
+        temperature: Model temperature for response generation
+
+    Returns:
+        ChatGroq: Configured chat model with retry logic
+    """
     return ChatGroq(
         api_key=settings.GROQ_API_KEY,
         model_name=settings.TEXT_MODEL_NAME,
         temperature=temperature,
+        timeout=30.0,  # 30 second timeout for LLM calls
+        max_retries=3,  # Built-in retry mechanism
     )
 
 
