@@ -4,7 +4,6 @@
 
 - [x] 1. Update character profile and prompts
 
-
 - [x] 1.1 Replace Ava's character card with Rose's healer shaman profile in CHARACTER_CARD_PROMPT
 
   - Define Rose as a grief counselor and healer trained in ancient healing traditions
@@ -35,11 +34,7 @@
 - [x] 2. Simplify LangGraph workflow
 
 
-
-
-
 - [x] 2.1 Update graph.py to disable image workflow path
-
 
   - Remove image_node from conditional edges in select_workflow
   - Keep image_node code but don't add to graph
@@ -48,15 +43,11 @@
 
 - [x] 2.2 Update router_node to only return 'conversation' or 'audio'
 
-
-
   - Modify router logic to exclude 'image' option
   - Set default to 'audio' for voice interactions
   - _Requirements: 2.3, 6.4_
 
 - [x] 2.3 Update edges.py select_workflow function
-
-
 
   - Remove image workflow routing logic
   - Ensure only conversation and audio paths are active
@@ -64,13 +55,14 @@
 
 - [x] 2.4 Verify memory nodes work with Rose's therapeutic context
 
-
-
   - Test memory extraction with grief counseling conversations
   - Verify memory injection provides relevant therapeutic context
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 3. Create FastAPI web interface backend
+- [-] 3. Create FastAPI web interface backend
+
+
+
 - [ ] 3.1 Create new web interface module structure
 
   - Create src/ai_companion/interfaces/web/ directory
