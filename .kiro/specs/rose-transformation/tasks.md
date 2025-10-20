@@ -35,20 +35,26 @@
 - [-] 2. Simplify LangGraph workflow
 
 
-- [ ] 2.1 Update graph.py to disable image workflow path
+
+
+- [x] 2.1 Update graph.py to disable image workflow path
+
 
   - Remove image_node from conditional edges in select_workflow
   - Keep image_node code but don't add to graph
   - Update workflow to only route to conversation_node or audio_node
   - _Requirements: 6.1, 6.4_
 
-- [ ] 2.2 Update router_node to only return 'conversation' or 'audio'
+- [x] 2.2 Update router_node to only return 'conversation' or 'audio'
+
+
 
   - Modify router logic to exclude 'image' option
   - Set default to 'audio' for voice interactions
   - _Requirements: 2.3, 6.4_
 
-- [ ] 2.3 Update edges.py select_workflow function
+- [-] 2.3 Update edges.py select_workflow function
+
 
   - Remove image workflow routing logic
   - Ensure only conversation and audio paths are active

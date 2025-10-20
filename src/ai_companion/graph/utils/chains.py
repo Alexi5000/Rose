@@ -7,7 +7,7 @@ from ai_companion.graph.utils.helpers import AsteriskRemovalParser, get_chat_mod
 
 class RouterResponse(BaseModel):
     response_type: str = Field(
-        description="The response type to give to the user. It must be one of: 'conversation', 'image' or 'audio'"
+        description="The response type to give to the user. It must be one of: 'conversation' or 'audio'. Default to 'audio' for voice-first healing experience."
     )
 
 
