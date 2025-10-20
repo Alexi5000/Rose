@@ -1,19 +1,24 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, ValidationError
+import sys
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_file_encoding="utf-8")
 
+    # Required API keys
     GROQ_API_KEY: str
     ELEVENLABS_API_KEY: str
     ELEVENLABS_VOICE_ID: str
     TOGETHER_API_KEY: str
 
-    QDRANT_API_KEY: str | None
+    # Qdrant configuration
+    QDRANT_API_KEY: str | None = None
     QDRANT_URL: str
     QDRANT_PORT: str = "6333"
     QDRANT_HOST: str | None = None
 
+    # Model configurations
     TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
     SMALL_TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
     STT_MODEL_NAME: str = "whisper-large-v3"
@@ -29,6 +34,7 @@ class Settings(BaseSettings):
     WHATSAPP_TOKEN: str | None = None
     WHATSAPP_VERIFY_TOKEN: str | None = None
 
+    # Memory configuration
     MEMORY_TOP_K: int = 3
     ROUTER_MESSAGES_TO_ANALYZE: int = 3
     TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 20
@@ -36,5 +42,32 @@ class Settings(BaseSettings):
 
     SHORT_TERM_MEMORY_DB_PATH: str = "/app/data/memory.db"
 
+    # Server configuration (for production deployment)
+    PORT: int = 8080
+    HOST: str = "0.0.0.0"
 
-settings = Settings()
+    @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
+    @classmethod
+    def validate_required_fields(cls, v: str, info) -> str:
+        """Validate that required fields are not empty."""
+        if not v or v.strip() == "":
+            raise ValueError(f"{info.field_name} is required and cannot be empty")
+        return v
+
+
+def load_settings() -> Settings:
+    """Load and validate settings, providing helpful error messages."""
+    try:
+        return Settings()
+    except ValidationError as e:
+        print("❌ Configuration Error: Missing or invalid environment variables", file=sys.stderr)
+        print("\nPlease ensure the following environment variables are set:", file=sys.stderr)
+        for error in e.errors():
+            field = error["loc"][0]
+            msg = error["msg"]
+            print(f"  - {field}: {msg}", file=sys.stderr)
+        print("\nRefer to .env.example for required variables.", file=sys.stderr)
+        sys.exit(1)
+
+
+settings = load_settings()
