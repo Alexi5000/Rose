@@ -30,7 +30,12 @@ class Memory:
 
 
 class VectorStore:
-    """A class to handle vector storage operations using Qdrant."""
+    """A class to handle vector storage operations using Qdrant.
+    
+    Implements singleton pattern to ensure only one Qdrant client instance
+    is created and reused across all requests, providing connection pooling
+    and efficient resource management.
+    """
 
     REQUIRED_ENV_VARS = ["QDRANT_URL", "QDRANT_API_KEY"]
     EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -41,17 +46,24 @@ class VectorStore:
     _initialized: bool = False
 
     def __new__(cls) -> "VectorStore":
+        """Ensure only one instance of VectorStore exists (singleton pattern)."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
+        """Initialize VectorStore with Qdrant client (only once due to singleton).
+        
+        The Qdrant client maintains an internal connection pool for efficient
+        request handling across multiple concurrent operations.
+        """
         if not self._initialized:
             self._validate_env_vars()
             self.model = SentenceTransformer(self.EMBEDDING_MODEL)
+            # Qdrant client maintains internal connection pooling
             self.client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
             self._circuit_breaker = get_qdrant_circuit_breaker()
-            self._initialized = True
+            VectorStore._initialized = True
 
     def _validate_env_vars(self) -> None:
         """Validate that all required environment variables are set."""

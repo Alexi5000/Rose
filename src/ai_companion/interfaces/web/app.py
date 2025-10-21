@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 
 from ai_companion.core.backup import backup_manager
 from ai_companion.core.logging_config import configure_logging, get_logger
+from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from ai_companion.interfaces.web.routes import health, session, voice
 from ai_companion.settings import settings
@@ -59,9 +60,21 @@ async def lifespan(app: FastAPI):
         replace_existing=True
     )
     
+    # Schedule automatic session cleanup (runs daily at 3 AM)
+    scheduler.add_job(
+        cleanup_old_sessions,
+        'cron',
+        hour=3,
+        minute=0,
+        args=[settings.SESSION_RETENTION_DAYS],
+        id='session_cleanup',
+        name='Daily session cleanup',
+        replace_existing=True
+    )
+    
     # Start the scheduler
     scheduler.start()
-    logger.info("scheduler_started", jobs=["audio_cleanup", "database_backup"])
+    logger.info("scheduler_started", jobs=["audio_cleanup", "database_backup", "session_cleanup"])
     
     yield
     
@@ -84,6 +97,11 @@ def create_app() -> FastAPI:
         openapi_url="/api/v1/openapi.json" if settings.ENABLE_API_DOCS else None,
     )
     
+    # Configure request size limits to prevent memory exhaustion
+    # This is set at the application level and applies to all endpoints
+    app.state.max_request_size = settings.MAX_REQUEST_SIZE
+    logger.info("request_size_limit_configured", max_size_mb=settings.MAX_REQUEST_SIZE / 1024 / 1024)
+    
     if settings.ENABLE_API_DOCS:
         logger.info("api_documentation_enabled", docs_url="/api/v1/docs", redoc_url="/api/v1/redoc")
     else:
@@ -92,6 +110,23 @@ def create_app() -> FastAPI:
     # Add request ID middleware (should be first to track all requests)
     app.add_middleware(RequestIDMiddleware)
     logger.info("request_id_middleware_enabled")
+    
+    # Add request size limit middleware
+    @app.middleware("http")
+    async def limit_request_size(request: Request, call_next):
+        """Middleware to enforce request size limits."""
+        if request.method in ["POST", "PUT", "PATCH"]:
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > settings.MAX_REQUEST_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "request_too_large",
+                        "message": f"Request body too large. Maximum size is {settings.MAX_REQUEST_SIZE / 1024 / 1024}MB",
+                        "max_size_bytes": settings.MAX_REQUEST_SIZE
+                    }
+                )
+        return await call_next(request)
     
     # Configure CORS with environment-based origins
     allowed_origins = settings.get_allowed_origins()
@@ -137,8 +172,27 @@ def create_app() -> FastAPI:
     if FRONTEND_BUILD_DIR.exists():
         logger.info("frontend_serving_enabled", build_dir=str(FRONTEND_BUILD_DIR))
 
-        # Mount static assets (JS, CSS, images, etc.)
-        app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR / "static"), name="static")
+        # Mount static assets (JS, CSS, images, etc.) with cache headers
+        # Static files are immutable and can be cached for 1 year
+        app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR / "static", html=False), name="static")
+        
+        # Add cache headers for static files
+        @app.middleware("http")
+        async def add_cache_headers(request: Request, call_next):
+            """Add cache headers for static assets."""
+            response = await call_next(request)
+            
+            # Cache static assets (JS, CSS, images) for 1 year
+            if request.url.path.startswith("/static/"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            # Don't cache API responses
+            elif request.url.path.startswith("/api/"):
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            # Cache index.html for 5 minutes (allows updates to propagate quickly)
+            elif request.url.path == "/" or request.url.path.endswith(".html"):
+                response.headers["Cache-Control"] = "public, max-age=300"
+            
+            return response
 
         # Catch-all route for React Router (SPA)
         @app.get("/{full_path:path}")

@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     # API Documentation configuration
     ENABLE_API_DOCS: bool = True  # Enable OpenAPI/Swagger documentation
 
+    # Request size limits (in bytes)
+    MAX_REQUEST_SIZE: int = 10 * 1024 * 1024  # 10MB default
+
+    # Session cleanup configuration
+    SESSION_RETENTION_DAYS: int = 7  # Delete sessions older than 7 days
+
     @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
     @classmethod
     def validate_required_fields(cls, v: str, info) -> str:

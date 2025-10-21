@@ -492,6 +492,19 @@ After deployment:
 
 ---
 
+## Operational Documentation
+
+For production operations, refer to these comprehensive guides:
+
+- **[Operations Runbook](OPERATIONS_RUNBOOK.md)**: Troubleshooting and diagnostic procedures
+- **[Rollback Procedures](ROLLBACK_PROCEDURES.md)**: Deployment rollback and data restoration
+- **[Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)**: Incident management and post-mortems
+- **[Architecture Documentation](ARCHITECTURE.md)**: System architecture and diagrams
+- **[External API Limits](EXTERNAL_API_LIMITS.md)**: API rate limits, quotas, and costs
+- **[Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md)**: Logging and metrics
+
+---
+
 For more information, refer to:
 - [Railway Documentation](https://docs.railway.app/)
 - [Render Documentation](https://render.com/docs)

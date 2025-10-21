@@ -16,7 +16,7 @@ class ApiClient {
 
   constructor() {
     this.client = axios.create({
-      baseURL: '/api',
+      baseURL: '/api/v1',
       timeout: 60000, // 60 seconds for voice processing
       headers: {
         'Content-Type': 'application/json',

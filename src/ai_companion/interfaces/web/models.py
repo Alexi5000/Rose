@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 class ErrorResponse(BaseModel):
     """Standardized error response model.
-    
+
     Attributes:
         error: Machine-readable error code (e.g., 'validation_error', 'service_unavailable')
         message: Human-readable error message
