@@ -182,18 +182,39 @@ class TestCircuitBreakers:
     
     def test_groq_circuit_breaker_configured(self):
         """Test that Groq circuit breaker is configured."""
-        from ai_companion.core.resilience import groq_circuit_breaker
-        assert groq_circuit_breaker is not None
+        # Skip if environment variables are not set
+        required_vars = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]
+        if not all(os.getenv(var) for var in required_vars):
+            pytest.skip("Environment variables not set - skipping circuit breaker test")
+        
+        from ai_companion.core.resilience import get_groq_circuit_breaker
+        breaker = get_groq_circuit_breaker()
+        assert breaker is not None
+        assert breaker.name == "GroqAPI"
     
     def test_elevenlabs_circuit_breaker_configured(self):
         """Test that ElevenLabs circuit breaker is configured."""
-        from ai_companion.core.resilience import elevenlabs_circuit_breaker
-        assert elevenlabs_circuit_breaker is not None
+        # Skip if environment variables are not set
+        required_vars = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]
+        if not all(os.getenv(var) for var in required_vars):
+            pytest.skip("Environment variables not set - skipping circuit breaker test")
+        
+        from ai_companion.core.resilience import get_elevenlabs_circuit_breaker
+        breaker = get_elevenlabs_circuit_breaker()
+        assert breaker is not None
+        assert breaker.name == "ElevenLabsAPI"
     
     def test_qdrant_circuit_breaker_configured(self):
         """Test that Qdrant circuit breaker is configured."""
-        from ai_companion.core.resilience import qdrant_circuit_breaker
-        assert qdrant_circuit_breaker is not None
+        # Skip if environment variables are not set
+        required_vars = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]
+        if not all(os.getenv(var) for var in required_vars):
+            pytest.skip("Environment variables not set - skipping circuit breaker test")
+        
+        from ai_companion.core.resilience import get_qdrant_circuit_breaker
+        breaker = get_qdrant_circuit_breaker()
+        assert breaker is not None
+        assert breaker.name == "QdrantAPI"
 
 
 class TestSecurityMiddleware:
@@ -244,10 +265,11 @@ class TestDataPersistence:
         from ai_companion.core import backup
         assert backup is not None
     
-    def test_backup_scheduler_configured(self):
-        """Test that backup scheduler is configured."""
-        from ai_companion.core.backup import backup_scheduler
-        assert backup_scheduler is not None
+    def test_backup_manager_configured(self):
+        """Test that backup manager is configured."""
+        from ai_companion.core.backup import backup_manager
+        assert backup_manager is not None
+        assert hasattr(backup_manager, 'backup_database')
     
     def test_cleanup_job_configured(self):
         """Test that cleanup job is configured."""
