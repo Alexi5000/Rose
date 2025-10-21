@@ -153,14 +153,14 @@ make rose-delete       # Clean up volumes and containers
    Add all required variables from `.env.example` in Railway dashboard
 
 3. **Deploy**
-   Railway will automatically detect `railway.json` and deploy
+   Railway will automatically detect `config/railway.json` and deploy
 
 ### Alternative Platforms
 
 Rose can be deployed to any platform supporting Docker or Python applications:
 - **Render**: Use `Dockerfile` for deployment
 - **Fly.io**: Use `fly.toml` configuration
-- **Google Cloud Run**: Use `cloudbuild.yaml`
+- **Google Cloud Run**: Use `docker/cloudbuild.yaml`
 
 See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment guides.
 
@@ -217,6 +217,20 @@ Adjust memory behavior in `settings.py`:
 - 🔮 Multi-language support
 - 🔮 User authentication and profiles
 - 🔮 Session history and analytics
+
+## Project Structure
+
+The project is organized for clarity and maintainability:
+
+- **`src/ai_companion/`** - Python application code
+- **`frontend/`** - React voice interface
+- **`tests/`** - Comprehensive test suite
+- **`docs/`** - Detailed documentation
+- **`config/`** - Environment-specific configurations
+- **`scripts/`** - Utility scripts (test runners, etc.)
+- **`docker/`** - Docker configurations
+
+See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for detailed structure documentation.
 
 ## Contributing
 

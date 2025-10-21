@@ -72,8 +72,8 @@ Comprehensive testing suite has been implemented for the Rose the Healer Shaman 
 - **`TESTING_SUMMARY.md`** - This file
 
 #### Test Runners
-- **`run_tests.sh`** - Unix/Linux/Mac test runner script
-- **`run_tests.bat`** - Windows test runner script
+- **`scripts/run_tests.sh`** - Unix/Linux/Mac test runner script
+- **`scripts/run_tests.bat`** - Windows test runner script
 
 ### 2. Test Coverage
 
@@ -145,8 +145,8 @@ playwright = [
 uv pip install -e ".[test]"
 
 # Run all tests
-./run_tests.sh all          # Unix/Linux/Mac
-run_tests.bat all           # Windows
+./scripts/run_tests.sh all          # Unix/Linux/Mac
+scripts\run_tests.bat all           # Windows
 
 # Or use pytest directly
 uv run pytest tests/ -v
@@ -156,22 +156,22 @@ uv run pytest tests/ -v
 
 ```bash
 # Voice interaction tests
-./run_tests.sh voice
+./scripts/run_tests.sh voice
 
 # Character tests
-./run_tests.sh character
+./scripts/run_tests.sh character
 
 # Memory tests
-./run_tests.sh memory
+./scripts/run_tests.sh memory
 
 # Performance tests
-./run_tests.sh performance
+./scripts/run_tests.sh performance
 
 # Deployment tests
-./run_tests.sh deployment
+./scripts/run_tests.sh deployment
 
 # With coverage
-./run_tests.sh coverage
+./scripts/run_tests.sh coverage
 ```
 
 ### Load Testing
@@ -252,8 +252,8 @@ uv run pytest tests/test_deployment.py::TestDeployedInstance -v
 
 ### Immediate Actions
 1. Install test dependencies: `uv pip install -e ".[test]"`
-2. Run core tests to verify setup: `./run_tests.sh core`
-3. Run all tests: `./run_tests.sh all`
+2. Run core tests to verify setup: `./scripts/run_tests.sh core`
+3. Run all tests: `./scripts/run_tests.sh all`
 4. Review any failures and fix issues
 
 ### Before Deployment

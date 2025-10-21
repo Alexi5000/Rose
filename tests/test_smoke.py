@@ -292,7 +292,7 @@ class TestDeploymentReadiness:
     
     def test_railway_config_exists(self):
         """Test that Railway configuration exists."""
-        assert Path("railway.json").exists(), "railway.json not found"
+        assert Path("config/railway.json").exists(), "config/railway.json not found"
     
     def test_environment_example_exists(self):
         """Test that environment example file exists."""

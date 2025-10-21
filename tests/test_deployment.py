@@ -113,8 +113,8 @@ class TestDeploymentConfiguration:
         import os
         from pathlib import Path
 
-        railway_config = Path("railway.json")
-        assert railway_config.exists(), "railway.json not found"
+        railway_config = Path("config/railway.json")
+        assert railway_config.exists(), "config/railway.json not found"
 
     def test_dockerfile_exists(self):
         """Test that Dockerfile exists for deployment."""

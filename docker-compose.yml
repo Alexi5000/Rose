@@ -9,7 +9,7 @@ services:
   chainlit:
     build:
       context: .
-      dockerfile: Dockerfile.chainlit
+      dockerfile: docker/Dockerfile.chainlit
     ports:
       - "8000:8000"
     env_file:

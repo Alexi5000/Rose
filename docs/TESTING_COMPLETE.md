@@ -23,8 +23,8 @@ All testing and validation tasks (Task 10 and all subtasks) have been successful
 3. **TESTING_COMPLETE.md** - This file
 
 ### 🔧 Test Runners (2 files)
-1. **run_tests.sh** - Unix/Linux/Mac test runner
-2. **run_tests.bat** - Windows test runner
+1. **scripts/run_tests.sh** - Unix/Linux/Mac test runner
+2. **scripts/run_tests.bat** - Windows test runner
 
 ### ⚙️ Configuration Updates
 1. **pyproject.toml** - Added test dependencies
@@ -77,10 +77,10 @@ uv pip install -e ".[test]"
 ### Run All Tests
 ```bash
 # Unix/Linux/Mac
-./run_tests.sh all
+./scripts/run_tests.sh all
 
 # Windows
-run_tests.bat all
+scripts\run_tests.bat all
 
 # Or directly with pytest
 uv run pytest tests/ -v
@@ -88,12 +88,12 @@ uv run pytest tests/ -v
 
 ### Run Specific Tests
 ```bash
-./run_tests.sh voice       # Voice interaction tests
-./run_tests.sh character   # Rose character tests
-./run_tests.sh memory      # Memory system tests
-./run_tests.sh performance # Performance tests
-./run_tests.sh deployment  # Deployment tests
-./run_tests.sh coverage    # With coverage report
+./scripts/run_tests.sh voice       # Voice interaction tests
+./scripts/run_tests.sh character   # Rose character tests
+./scripts/run_tests.sh memory      # Memory system tests
+./scripts/run_tests.sh performance # Performance tests
+./scripts/run_tests.sh deployment  # Deployment tests
+./scripts/run_tests.sh coverage    # With coverage report
 ```
 
 ### Run Load Tests
@@ -183,10 +183,16 @@ tests/
 ├── test_deployment.py             # Deployment tests (NEW)
 └── locustfile.py                  # Load testing (NEW)
 
-Root directory:
+scripts/:
 ├── run_tests.sh                   # Test runner (Unix) (NEW)
 ├── run_tests.bat                  # Test runner (Windows) (NEW)
+└── README.md                      # Scripts documentation
+
+docs/:
 ├── TESTING_COMPLETE.md            # This file (NEW)
+└── [other documentation files]
+
+Root directory:
 └── pyproject.toml                 # Updated with test deps
 ```
 
