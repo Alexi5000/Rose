@@ -1,825 +1,616 @@
-# Incident Response Plan: Rose the Healer Shaman
-
-This document outlines the incident response procedures for the Rose application, including detection, response, resolution, and post-incident activities.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Incident Severity Levels](#incident-severity-levels)
-- [Incident Response Team](#incident-response-team)
-- [Incident Response Process](#incident-response-process)
-- [Incident Types](#incident-types)
-- [Communication Protocols](#communication-protocols)
-- [Post-Incident Review](#post-incident-review)
-- [Incident Templates](#incident-templates)
-
----
+# Incident Response Plan
 
 ## Overview
 
-### Purpose
-
-This incident response plan ensures:
-- **Rapid detection** of issues affecting service availability or data integrity
-- **Coordinated response** with clear roles and responsibilities
-- **Effective communication** with stakeholders and users
-- **Systematic resolution** following documented procedures
-- **Continuous improvement** through post-incident reviews
-
-### Scope
-
-This plan covers incidents affecting:
-- Service availability (downtime, degraded performance)
-- Data integrity (corruption, loss)
-- Security (breaches, vulnerabilities)
-- External dependencies (API failures)
-- User experience (critical bugs, errors)
-
-### Incident Definition
-
-An **incident** is any event that:
-- Causes service disruption or degradation
-- Affects multiple users or critical functionality
-- Poses security or data integrity risks
-- Requires immediate attention and coordination
-
----
+This document defines the incident response process for the Rose the Healer Shaman application. It provides a structured approach to detecting, responding to, and resolving production incidents while minimizing user impact.
 
 ## Incident Severity Levels
 
-### P0 - Critical (Response Time: Immediate)
+### SEV-1: Critical
 
-**Definition**: Complete service outage or critical data loss affecting all users.
+**Definition:** Complete service outage or critical functionality broken affecting all users.
 
-**Examples**:
-- Application completely down
-- Database corruption or complete data loss
-- Security breach with data exposure
-- All external APIs failing simultaneously
+**Examples:**
+- Service completely down or unreachable
+- Database corruption causing data loss
+- Security breach or data leak
+- All voice processing failing
+- Error rate > 50%
 
-**Response Requirements**:
-- Immediate response (< 5 minutes)
-- All hands on deck
-- Executive notification
-- Public status updates every 15 minutes
-- Post-mortem required
+**Response Time:** Immediate (< 15 minutes)  
+**Communication:** Immediate notification to all stakeholders  
+**Escalation:** Automatic to engineering manager and CTO
 
-**Target Resolution**: < 1 hour
+### SEV-2: High
 
----
+**Definition:** Major functionality degraded affecting many users.
 
-### P1 - High (Response Time: < 15 minutes)
+**Examples:**
+- Significant performance degradation (> 200% baseline)
+- Critical feature broken (voice, memory, sessions)
+- Error rate 10-50%
+- External API integration failures
+- Repeated service restarts
 
-**Definition**: Major functionality impaired or significant user impact.
+**Response Time:** < 30 minutes  
+**Communication:** Notify team and stakeholders within 15 minutes  
+**Escalation:** To engineering manager if not resolved in 1 hour
 
-**Examples**:
-- Error rate > 10%
-- Voice processing completely failing
-- Memory system down (no context retention)
-- Single critical external API down
-- Performance degradation > 50%
+### SEV-3: Medium
 
-**Response Requirements**:
-- Response within 15 minutes
-- Incident commander assigned
-- Engineering team engaged
-- Status updates every 30 minutes
-- Post-mortem required
+**Definition:** Partial functionality impaired affecting some users.
 
-**Target Resolution**: < 4 hours
-
----
-
-### P2 - Medium (Response Time: < 1 hour)
-
-**Definition**: Partial functionality impaired or moderate user impact.
-
-**Examples**:
-- Error rate 5-10%
-- Audio playback issues
-- Slow response times (> 10 seconds)
+**Examples:**
 - Non-critical feature broken
-- Intermittent external API issues
+- Performance degradation 50-100% baseline
+- Error rate 5-10%
+- Intermittent failures
+- Single external service degraded
 
-**Response Requirements**:
-- Response within 1 hour
-- On-call engineer handles
-- Status updates as needed
-- Post-mortem optional
+**Response Time:** < 1 hour  
+**Communication:** Notify team within 30 minutes  
+**Escalation:** To engineering manager if not resolved in 4 hours
 
-**Target Resolution**: < 24 hours
+### SEV-4: Low
 
----
+**Definition:** Minor issues with minimal user impact.
 
-### P3 - Low (Response Time: < 4 hours)
-
-**Definition**: Minor issues with minimal user impact.
-
-**Examples**:
-- Error rate 2-5%
-- UI glitches
+**Examples:**
+- Cosmetic UI issues
 - Non-critical logging errors
-- Minor performance issues
+- Error rate 1-5%
+- Documentation issues
+- Minor performance degradation
 
-**Response Requirements**:
-- Response within 4 hours
-- Fix in next release
-- No status updates needed
-- No post-mortem required
+**Response Time:** < 4 hours  
+**Communication:** Log in incident tracker  
+**Escalation:** None unless pattern emerges
 
-**Target Resolution**: < 1 week
+## Incident Response Phases
 
----
+### 1. Detection
 
-## Incident Response Team
-
-### Roles and Responsibilities
-
-#### Incident Commander (IC)
-**Primary Responsibility**: Overall incident coordination and decision-making
-
-**Duties**:
-- Declare incident and assign severity
-- Coordinate response team
-- Make rollback/escalation decisions
-- Communicate with stakeholders
-- Ensure documentation
-- Lead post-mortem
-
-**Who**: Senior Engineer or Engineering Lead
-
----
-
-#### Technical Lead
-**Primary Responsibility**: Technical investigation and resolution
-
-**Duties**:
-- Diagnose root cause
-- Implement fixes or rollbacks
-- Coordinate with external support
-- Provide technical updates to IC
-- Document technical details
-
-**Who**: On-call Engineer or Subject Matter Expert
-
----
-
-#### Communications Lead
-**Primary Responsibility**: Stakeholder and user communication
-
-**Duties**:
-- Update status page
-- Send user notifications
-- Coordinate with support team
-- Draft public communications
-- Log all communications
-
-**Who**: Product Manager or designated communicator
-
----
-
-#### Scribe
-**Primary Responsibility**: Documentation and timeline tracking
-
-**Duties**:
-- Document timeline of events
-- Record decisions made
-- Track action items
-- Capture chat logs
-- Prepare post-mortem draft
-
-**Who**: Any available team member
-
----
-
-### On-Call Rotation
-
-**Schedule**: 24/7 coverage with weekly rotation
-
-**On-Call Responsibilities**:
-- Monitor alerts and respond within SLA
-- Perform initial triage and diagnosis
-- Escalate to Incident Commander if needed
-- Execute standard remediation procedures
-- Document all actions taken
-
-**On-Call Handoff**:
-- Review open issues
-- Share context on ongoing investigations
-- Transfer any pending action items
-- Update on-call contact information
-
----
-
-## Incident Response Process
-
-### Phase 1: Detection (0-5 minutes)
-
-**Trigger Sources**:
-- Automated monitoring alerts
-- User reports
+**Automated Detection:**
+- Monitoring alerts (error rate, response time, memory)
 - Health check failures
-- External service notifications
-- Team member observation
+- External service status changes
+- Log pattern detection
 
-**Actions**:
-1. **Acknowledge Alert**
-   - Respond to alert within 5 minutes
-   - Acknowledge in monitoring system
+**Manual Detection:**
+- User reports
+- Team member observation
+- Support tickets
+- Social media mentions
+
+**Actions:**
+1. Acknowledge alert/report
+2. Verify issue is real (not false positive)
+3. Assess initial severity
+4. Create incident ticket
+
+### 2. Response
+
+**Immediate Actions (0-5 minutes):**
+
+1. **Acknowledge Incident**
+   - Create incident ticket with severity
+   - Assign incident commander (on-call engineer)
+   - Start incident timeline
 
 2. **Initial Assessment**
-   - Check service status
+   - Check service health: `curl https://app.railway.app/api/health`
    - Review recent deployments
    - Check external service status
-   - Estimate user impact
+   - Review error logs
 
-3. **Declare Incident**
-   - Assign severity level
-   - Create incident ticket
-   - Notify incident commander (P0/P1)
+3. **Communicate**
+   - Post in incident channel: `#incidents`
+   - Use incident template (see below)
+   - Tag relevant team members
 
-**Tools**:
-- Railway dashboard
-- Health endpoint: `/api/health`
-- External status pages
-- Log aggregation
+**Investigation Actions (5-15 minutes):**
 
----
+1. **Gather Data**
+   ```bash
+   # Check error logs
+   grep "ERROR" /app/logs/app.log | tail -100
+   
+   # Check system resources
+   docker stats
+   
+   # Check database
+   sqlite3 /app/data/short_term_memory.db "SELECT COUNT(*) FROM checkpoints;"
+   
+   # Test external APIs
+   curl https://api.groq.com/health
+   curl https://api.elevenlabs.io/health
+   ```
 
-### Phase 2: Response (5-15 minutes)
+2. **Identify Root Cause**
+   - Recent code changes?
+   - Configuration changes?
+   - External service issues?
+   - Resource exhaustion?
+   - Database issues?
 
-**Actions**:
-1. **Assemble Team**
-   - Incident Commander joins
-   - Technical Lead assigned
-   - Communications Lead notified (P0/P1)
-   - Scribe begins documentation
+3. **Determine Response Strategy**
+   - Can we fix forward quickly (< 15 min)?
+   - Should we rollback?
+   - Do we need to scale resources?
+   - Should we enable degraded mode?
 
-2. **Establish Communication**
-   - Create incident channel (Slack/Teams)
-   - Start incident call (P0/P1)
-   - Set up status page
+### 3. Mitigation
 
-3. **Initial Diagnosis**
-   - Review logs and metrics
-   - Identify affected components
-   - Determine scope of impact
-   - Check for related issues
+**Quick Fixes (if possible):**
 
-4. **Immediate Mitigation**
-   - Apply quick fixes if available
-   - Consider rollback if recent deployment
-   - Implement workarounds
-   - Scale resources if needed
+1. **Configuration Fix**
+   - Revert environment variable
+   - Adjust resource limits
+   - Enable/disable feature flag
 
-**Communication**:
-- Internal: Incident channel updates
-- External: Initial status page update (P0/P1)
+2. **Service Restart**
+   - Clear memory leaks
+   - Reload configuration
+   - Reset connections
 
----
+3. **External Service Workaround**
+   - Switch to backup provider
+   - Enable circuit breaker
+   - Use cached responses
 
-### Phase 3: Resolution (15 minutes - 4 hours)
+**Rollback (if needed):**
 
-**Actions**:
-1. **Root Cause Analysis**
-   - Deep dive into logs
-   - Reproduce issue if possible
-   - Identify contributing factors
-   - Consult documentation/runbooks
+Follow [Rollback Procedures](ROLLBACK_PROCEDURES.md):
+1. Confirm rollback decision
+2. Execute rollback
+3. Verify service health
+4. Monitor for stability
 
-2. **Implement Fix**
-   - Choose resolution strategy:
-     - Rollback (fastest)
-     - Configuration change
-     - Code fix and deploy
-     - External service recovery
-   - Test fix in staging if possible
-   - Deploy fix to production
+**Scaling (if needed):**
 
-3. **Verify Resolution**
-   - Run smoke tests
-   - Monitor error rates
-   - Check key metrics
-   - Verify user reports
+1. Increase memory limits
+2. Add more instances (if supported)
+3. Enable request queuing
+4. Implement rate limiting
 
-4. **Monitor Stability**
-   - Watch for 30 minutes post-fix
-   - Ensure no regression
-   - Verify all systems healthy
+### 4. Recovery
 
-**Communication**:
-- Regular updates (frequency based on severity)
-- Status page updates
-- User notifications when resolved
+**Verification (0-15 minutes after mitigation):**
 
----
+1. **Health Checks**
+   - [ ] Service responding to health endpoint
+   - [ ] All external services connected
+   - [ ] Error rate < 1%
+   - [ ] Response times normal
 
-### Phase 4: Recovery (Post-Resolution)
+2. **Functional Testing**
+   - [ ] Session creation works
+   - [ ] Voice processing works
+   - [ ] Memory retrieval works
+   - [ ] Audio playback works
 
-**Actions**:
-1. **Confirm Full Recovery**
-   - All metrics back to normal
-   - No lingering issues
-   - User reports resolved
-   - External services stable
+3. **Monitoring**
+   - Watch metrics for 15 minutes
+   - Verify no regression
+   - Check for side effects
 
-2. **Close Incident**
-   - Update incident ticket
-   - Final status page update
-   - Thank team members
-   - Schedule post-mortem (P0/P1)
+**Communication:**
+- Update incident channel with resolution
+- Update status page
+- Notify affected users if needed
+- Thank team members
 
-3. **User Communication**
-   - Send resolution notification
-   - Apologize for impact
-   - Explain what happened (high-level)
-   - Share preventive measures
+### 5. Post-Incident
 
-**Timeline Documentation**:
-- Incident start time
-- Detection time
-- Response time
-- Resolution time
-- Total duration
-- User impact duration
+**Immediate (0-1 hour):**
 
----
+1. **Document Incident**
+   - Update incident ticket with timeline
+   - Record root cause
+   - Note mitigation steps taken
+   - List affected users/requests
 
-## Incident Types
+2. **Communicate Resolution**
+   - Post resolution in incident channel
+   - Update stakeholders
+   - Close incident ticket
 
-### Service Outage
+**Short-term (1-24 hours):**
 
-**Symptoms**: Application completely unavailable
+1. **Create Action Items**
+   - Immediate fixes needed
+   - Tests to add
+   - Monitoring to improve
+   - Documentation to update
 
-**Immediate Actions**:
-1. Check Railway service status
-2. Review recent deployments
-3. Check health endpoint
-4. Attempt service restart
-5. Rollback if needed
+2. **Schedule Post-Mortem**
+   - Within 48 hours for SEV-1/SEV-2
+   - Within 1 week for SEV-3
+   - Optional for SEV-4
 
-**Runbook**: [Operations Runbook - Service Down](OPERATIONS_RUNBOOK.md#service-down---complete-outage)
+**Long-term (1-7 days):**
 
----
+1. **Conduct Post-Mortem**
+   - Review timeline
+   - Identify root cause
+   - Discuss what went well
+   - Identify improvements
+   - Create action items
 
-### Performance Degradation
+2. **Implement Improvements**
+   - Add monitoring/alerts
+   - Improve testing
+   - Update runbooks
+   - Train team
 
-**Symptoms**: Slow response times, timeouts
+## Incident Communication
 
-**Immediate Actions**:
-1. Check resource usage (CPU, memory)
-2. Review performance metrics
-3. Identify bottleneck (API, DB, network)
-4. Scale resources if needed
-5. Optimize or rollback
+### Internal Communication Template
 
-**Runbook**: [Operations Runbook - Slow Response Times](OPERATIONS_RUNBOOK.md#slow-response-times)
-
----
-
-### High Error Rate
-
-**Symptoms**: Error rate > 5%
-
-**Immediate Actions**:
-1. Check application logs
-2. Identify error patterns
-3. Check external service status
-4. Verify configuration
-5. Rollback if recent deployment
-
-**Runbook**: [Operations Runbook - High Error Rate](OPERATIONS_RUNBOOK.md#high-error-rate)
-
----
-
-### Data Loss or Corruption
-
-**Symptoms**: Missing data, corrupted database
-
-**Immediate Actions**:
-1. Stop service immediately
-2. Assess extent of damage
-3. Identify backup availability
-4. Restore from backup
-5. Verify data integrity
-
-**Runbook**: [Rollback Procedures - Data Restoration](ROLLBACK_PROCEDURES.md#data-restoration)
-
----
-
-### Security Incident
-
-**Symptoms**: Unauthorized access, data breach, vulnerability
-
-**Immediate Actions**:
-1. Isolate affected systems
-2. Rotate all credentials
-3. Review access logs
-4. Assess data exposure
-5. Notify security team
-
-**Runbook**: [Operations Runbook - Security Incident](OPERATIONS_RUNBOOK.md#security-incident)
-
----
-
-### External API Failure
-
-**Symptoms**: Groq, ElevenLabs, or Qdrant unavailable
-
-**Immediate Actions**:
-1. Verify service status pages
-2. Check circuit breaker status
-3. Confirm API credentials
-4. Test connectivity
-5. Wait for service recovery
-
-**Runbook**: [Operations Runbook - External API Failures](OPERATIONS_RUNBOOK.md#external-api-failures)
-
----
-
-## Communication Protocols
-
-### Internal Communication
-
-**Incident Channel** (Slack/Teams):
-- Create dedicated channel: `#incident-YYYYMMDD-description`
-- Pin important updates
-- Use threads for discussions
-- Keep main channel for status updates
-
-**Update Frequency**:
-- **P0**: Every 15 minutes
-- **P1**: Every 30 minutes
-- **P2**: Every 2 hours
-- **P3**: As needed
-
-**Update Template**:
+**Initial Notification:**
 ```
-[HH:MM] Status Update
-- Current Status: [Investigating/Mitigating/Resolved]
-- Impact: [Description of user impact]
-- Actions Taken: [What we've done]
-- Next Steps: [What we're doing next]
-- ETA: [Expected resolution time]
+🚨 INCIDENT: [Brief Description]
+
+Severity: SEV-[1/2/3/4]
+Status: Investigating
+Started: [Timestamp]
+Incident Commander: @[Name]
+Ticket: [Link]
+
+Impact:
+- [Description of user impact]
+- [Affected functionality]
+
+Current Actions:
+- [What we're doing now]
+
+Updates: Will provide update in 15 minutes
 ```
 
----
+**Status Update:**
+```
+📊 INCIDENT UPDATE: [Brief Description]
 
-### External Communication
+Status: [Investigating/Mitigating/Resolved]
+Time Elapsed: [Duration]
 
-**Status Page Updates**:
-- Initial: "We're investigating reports of [issue]"
-- Progress: "We've identified the issue and are working on a fix"
-- Resolution: "The issue has been resolved"
+Progress:
+- [What we've learned]
+- [What we've tried]
+- [Current status]
 
-**User Notifications**:
-- Email/in-app notifications for P0/P1 incidents
-- Clear, non-technical language
-- Acknowledge impact
-- Provide ETA when possible
-- Follow up when resolved
+Next Steps:
+- [What we're doing next]
 
-**Social Media** (if applicable):
-- Brief status updates
-- Link to status page
-- Respond to user inquiries
-
----
-
-### Stakeholder Communication
-
-**Executive Updates** (P0/P1):
-- Initial notification within 15 minutes
-- Hourly updates until resolved
-- Include business impact
-- Provide resolution ETA
-
-**Customer Success Team**:
-- Notify of user-facing incidents
-- Provide talking points
-- Share resolution timeline
-- Enable proactive outreach
-
----
-
-## Post-Incident Review
-
-### Post-Mortem Meeting
-
-**Timing**: Within 48 hours of resolution (P0/P1)
-
-**Attendees**:
-- Incident Commander
-- Technical Lead
-- All responders
-- Engineering leadership
-- Product/stakeholders (optional)
-
-**Duration**: 60 minutes
-
-**Agenda**:
-1. Timeline review (10 min)
-2. What went well (10 min)
-3. What went wrong (15 min)
-4. Root cause analysis (15 min)
-5. Action items (10 min)
-
----
-
-### Post-Mortem Document
-
-**Template**: See [Incident Templates](#incident-templates)
-
-**Required Sections**:
-1. **Executive Summary**
-   - What happened
-   - User impact
-   - Resolution
-   - Key learnings
-
-2. **Timeline**
-   - Detailed chronology
-   - All significant events
-   - Response times
-
-3. **Root Cause**
-   - Technical root cause
-   - Contributing factors
-   - Why it wasn't caught earlier
-
-4. **Impact Assessment**
-   - Users affected
-   - Duration
-   - Revenue impact (if applicable)
-   - Reputation impact
-
-5. **Response Evaluation**
-   - What went well
-   - What could be improved
-   - Response time analysis
-
-6. **Action Items**
-   - Preventive measures
-   - Process improvements
-   - Technical improvements
-   - Owners and deadlines
-
----
-
-### Follow-Up Actions
-
-**Immediate** (< 1 week):
-- Implement quick wins
-- Update runbooks
-- Add monitoring/alerts
-- Share learnings with team
-
-**Short-term** (< 1 month):
-- Implement technical fixes
-- Update documentation
-- Conduct training if needed
-- Review similar risks
-
-**Long-term** (< 3 months):
-- Architectural improvements
-- Process changes
-- Tool improvements
-- Preventive measures
-
----
-
-## Incident Templates
-
-### Incident Ticket Template
-
-```markdown
-# Incident: [Brief Description]
-
-**Severity**: P[0-3]
-**Status**: [Investigating/Mitigating/Resolved]
-**Incident Commander**: [Name]
-**Started**: [YYYY-MM-DD HH:MM UTC]
-**Resolved**: [YYYY-MM-DD HH:MM UTC]
-
-## Impact
-- **Users Affected**: [Number/Percentage]
-- **Functionality Impacted**: [Description]
-- **Duration**: [Time]
-
-## Timeline
-- [HH:MM] Incident detected
-- [HH:MM] Team assembled
-- [HH:MM] Root cause identified
-- [HH:MM] Fix deployed
-- [HH:MM] Incident resolved
-
-## Root Cause
-[Brief description]
-
-## Resolution
-[What was done to resolve]
-
-## Action Items
-- [ ] [Action 1] - Owner: [Name] - Due: [Date]
-- [ ] [Action 2] - Owner: [Name] - Due: [Date]
-
-## Related Links
-- Incident Channel: [Link]
-- Logs: [Link]
-- Metrics: [Link]
-- Post-Mortem: [Link]
+Next Update: [Timeframe]
 ```
 
----
-
-### Status Page Update Template
-
-**Initial Update**:
+**Resolution:**
 ```
-[HH:MM UTC] Investigating
+✅ INCIDENT RESOLVED: [Brief Description]
+
+Duration: [Total time]
+Root Cause: [Brief explanation]
+Resolution: [What fixed it]
+
+Impact:
+- Users affected: [Number/percentage]
+- Requests failed: [Number]
+- Data loss: [None/Description]
+
+Follow-up:
+- Post-mortem scheduled: [Date/time]
+- Action items: [Link]
+
+Thank you to: @[Team members]
+```
+
+### External Communication Template
+
+**Status Page Update:**
+```
 We're currently investigating reports of [issue description]. 
-Users may experience [impact description]. We'll provide 
-updates as we learn more.
+Some users may experience [specific impact]. 
+
+We're actively working on a resolution and will provide 
+updates every 30 minutes.
+
+Last updated: [Timestamp]
 ```
 
-**Progress Update**:
+**User Notification (if needed):**
 ```
-[HH:MM UTC] Identified
-We've identified the issue as [brief technical description]. 
-Our team is working on a fix. Expected resolution: [ETA].
+Subject: Service Disruption - [Date]
+
+We experienced a service disruption today from [start time] 
+to [end time] that affected [description of impact].
+
+What happened:
+[Brief, non-technical explanation]
+
+What we did:
+[Brief explanation of resolution]
+
+What we're doing to prevent this:
+[Brief explanation of improvements]
+
+We sincerely apologize for the inconvenience.
+
+- The Rose Team
 ```
 
-**Resolution Update**:
-```
-[HH:MM UTC] Resolved
-The issue has been resolved. All systems are operating 
-normally. We apologize for any inconvenience.
-```
+## Incident Roles and Responsibilities
 
----
+### Incident Commander (On-call Engineer)
 
-### Post-Mortem Template
+**Responsibilities:**
+- Lead incident response
+- Make decisions on mitigation strategy
+- Coordinate team members
+- Communicate status updates
+- Ensure documentation
+
+**Authority:**
+- Can make deployment decisions
+- Can rollback without approval
+- Can escalate to management
+- Can request additional resources
+
+### Technical Responders
+
+**Responsibilities:**
+- Investigate root cause
+- Implement fixes
+- Test solutions
+- Monitor systems
+
+**Who:**
+- Backend engineers
+- DevOps engineers
+- Database specialists (if needed)
+
+### Communications Lead (for SEV-1/SEV-2)
+
+**Responsibilities:**
+- Update status page
+- Communicate with stakeholders
+- Draft user notifications
+- Coordinate with support team
+
+**Who:**
+- Product manager
+- Engineering manager
+- Customer support lead
+
+## Escalation Procedures
+
+### When to Escalate
+
+**To Engineering Manager:**
+- SEV-1 incidents (automatic)
+- SEV-2 not resolved in 1 hour
+- SEV-3 not resolved in 4 hours
+- Need additional resources
+- Unclear mitigation strategy
+
+**To CTO:**
+- SEV-1 not resolved in 1 hour
+- Security incidents
+- Data loss incidents
+- Need executive decision
+- External communication needed
+
+**To External Support:**
+- External service issues (Groq, ElevenLabs, Qdrant)
+- Platform issues (Railway)
+- Need vendor assistance
+
+### Escalation Contacts
+
+**Internal:**
+- On-call Engineer: [Pager/Phone]
+- Secondary Engineer: [Pager/Phone]
+- Engineering Manager: [Phone/Slack]
+- CTO: [Phone/Slack]
+
+**External:**
+- Groq Support: support@groq.com
+- ElevenLabs Support: support@elevenlabs.io
+- Qdrant Support: support@qdrant.tech
+- Railway Support: support@railway.app
+
+## Incident Response Tools
+
+### Monitoring and Alerting
+- Railway dashboard: https://railway.app
+- Health check endpoint: /api/health
+- Log aggregation: Railway logs
+- Metrics: Railway metrics
+
+### Communication
+- Incident channel: #incidents (Slack)
+- Status page: [URL if available]
+- Incident tracker: [GitHub Issues/Jira]
+
+### Documentation
+- Operations Runbook: [Link](OPERATIONS_RUNBOOK.md)
+- Rollback Procedures: [Link](ROLLBACK_PROCEDURES.md)
+- Deployment Guide: [Link](DEPLOYMENT.md)
+
+### Access
+- Railway dashboard access
+- Database access (read-only for investigation)
+- Log access
+- Monitoring dashboard access
+
+## Common Incident Scenarios
+
+### Scenario 1: Complete Service Outage
+
+**Symptoms:** Service unreachable, health checks failing
+
+**Response:**
+1. Check Railway service status
+2. Check recent deployments
+3. Review startup logs
+4. Rollback if recent deployment
+5. Restart service if configuration issue
+6. Escalate if platform issue
+
+**Typical Resolution Time:** 10-20 minutes
+
+### Scenario 2: High Error Rate
+
+**Symptoms:** Error rate > 10%, users reporting failures
+
+**Response:**
+1. Check external API status
+2. Review error logs for patterns
+3. Check resource usage
+4. Implement circuit breakers if API issue
+5. Rollback if recent deployment
+6. Scale resources if capacity issue
+
+**Typical Resolution Time:** 15-30 minutes
+
+### Scenario 3: Performance Degradation
+
+**Symptoms:** Slow response times, timeouts
+
+**Response:**
+1. Check memory usage
+2. Check database size
+3. Check external API latency
+4. Clean up temporary files
+5. Restart service to clear memory
+6. Scale resources if needed
+
+**Typical Resolution Time:** 20-40 minutes
+
+### Scenario 4: External Service Failure
+
+**Symptoms:** Specific functionality failing (STT, TTS, memory)
+
+**Response:**
+1. Verify external service status
+2. Check API keys and quotas
+3. Implement circuit breaker
+4. Enable fallback mode if available
+5. Wait for service recovery
+6. Communicate expected resolution time
+
+**Typical Resolution Time:** Depends on external service
+
+### Scenario 5: Database Issues
+
+**Symptoms:** Session errors, memory failures, corruption
+
+**Response:**
+1. Check database file integrity
+2. Check disk space
+3. Restore from backup if corrupted
+4. Run database maintenance (VACUUM)
+5. Migrate to new database if needed
+6. Verify data consistency
+
+**Typical Resolution Time:** 30-60 minutes
+
+## Incident Metrics and Review
+
+### Track for Each Incident
+
+- **Detection Time:** Time from issue start to detection
+- **Response Time:** Time from detection to first action
+- **Mitigation Time:** Time from first action to mitigation
+- **Recovery Time:** Time from mitigation to full recovery
+- **Total Duration:** Total incident time
+- **User Impact:** Number of users/requests affected
+- **Root Cause:** Category of root cause
+
+### Monthly Review
+
+- Total incidents by severity
+- Average resolution time by severity
+- Most common root causes
+- Trends over time
+- Effectiveness of improvements
+
+### Continuous Improvement
+
+- Update runbooks based on incidents
+- Add monitoring for detected gaps
+- Improve testing for root causes
+- Train team on new procedures
+- Automate common responses
+
+## Post-Mortem Template
 
 ```markdown
-# Post-Mortem: [Incident Title]
+# Incident Post-Mortem: [Brief Description]
 
-**Date**: [YYYY-MM-DD]
-**Authors**: [Names]
-**Status**: [Draft/Final]
-**Severity**: P[0-3]
+**Date:** [Date]
+**Severity:** SEV-[1/2/3/4]
+**Duration:** [Total time]
+**Incident Commander:** [Name]
 
-## Executive Summary
+## Summary
 
-[2-3 paragraph summary of what happened, impact, and resolution]
-
-## Impact
-
-- **Duration**: [X hours Y minutes]
-- **Users Affected**: [Number/Percentage]
-- **Functionality Impacted**: [Description]
-- **Revenue Impact**: [If applicable]
-- **Detection Time**: [Time from occurrence to detection]
-- **Resolution Time**: [Time from detection to resolution]
+[2-3 sentence summary of what happened]
 
 ## Timeline
 
-All times in UTC.
+- [HH:MM] - Issue started
+- [HH:MM] - Detected by [monitoring/user report]
+- [HH:MM] - Incident declared
+- [HH:MM] - Root cause identified
+- [HH:MM] - Mitigation started
+- [HH:MM] - Service recovered
+- [HH:MM] - Incident closed
 
-| Time | Event |
-|------|-------|
-| HH:MM | [Event description] |
-| HH:MM | [Event description] |
+## Impact
+
+- **Users Affected:** [Number/percentage]
+- **Requests Failed:** [Number]
+- **Revenue Impact:** [If applicable]
+- **Data Loss:** [None/Description]
 
 ## Root Cause
 
-### Technical Root Cause
-[Detailed technical explanation]
+[Detailed explanation of what caused the incident]
 
-### Contributing Factors
-1. [Factor 1]
-2. [Factor 2]
+## What Went Well
 
-### Why Wasn't This Caught Earlier?
-[Explanation of gaps in testing, monitoring, etc.]
+- [Things that worked well in response]
+- [Effective tools or procedures]
+- [Good team coordination]
 
-## Detection
+## What Went Wrong
 
-### How Was It Detected?
-[Monitoring alert, user report, etc.]
-
-### Could Detection Have Been Faster?
-[Analysis of detection time]
-
-## Response
-
-### What Went Well
-1. [Positive aspect 1]
-2. [Positive aspect 2]
-
-### What Could Be Improved
-1. [Improvement area 1]
-2. [Improvement area 2]
-
-### Response Timeline Analysis
-- **Detection to Response**: [X minutes] (Target: [Y minutes])
-- **Response to Mitigation**: [X minutes] (Target: [Y minutes])
-- **Mitigation to Resolution**: [X minutes] (Target: [Y minutes])
-
-## Resolution
-
-### What Fixed It?
-[Detailed explanation of the fix]
-
-### Why Did This Fix Work?
-[Technical explanation]
-
-### Could Resolution Have Been Faster?
-[Analysis]
+- [Things that didn't work well]
+- [Gaps in monitoring or alerting]
+- [Unclear procedures]
 
 ## Action Items
 
-### Prevent
-Actions to prevent this specific issue from recurring.
-
-| Action | Owner | Due Date | Status |
-|--------|-------|----------|--------|
-| [Action] | [Name] | [Date] | [ ] |
-
-### Detect
-Actions to detect similar issues faster.
-
-| Action | Owner | Due Date | Status |
-|--------|-------|----------|--------|
-| [Action] | [Name] | [Date] | [ ] |
-
-### Respond
-Actions to respond more effectively.
-
-| Action | Owner | Due Date | Status |
-|--------|-------|----------|--------|
-| [Action] | [Name] | [Date] | [ ] |
+- [ ] [Immediate fix] - Owner: [Name] - Due: [Date]
+- [ ] [Add monitoring] - Owner: [Name] - Due: [Date]
+- [ ] [Improve testing] - Owner: [Name] - Due: [Date]
+- [ ] [Update documentation] - Owner: [Name] - Due: [Date]
 
 ## Lessons Learned
 
-1. [Lesson 1]
-2. [Lesson 2]
-3. [Lesson 3]
-
-## Related Incidents
-
-- [Link to similar past incidents]
-
-## Appendix
-
-### Relevant Logs
+[Key takeaways and improvements for future incidents]
 ```
-[Log excerpts]
-```
-
-### Metrics/Graphs
-[Screenshots or links to relevant metrics]
-
-### External References
-- [Links to documentation, tickets, etc.]
-```
-
----
-
-## Incident Metrics
-
-Track these metrics to improve incident response:
-
-### Response Metrics
-- **Mean Time to Detect (MTTD)**: Time from incident start to detection
-- **Mean Time to Acknowledge (MTTA)**: Time from detection to acknowledgment
-- **Mean Time to Resolve (MTTR)**: Time from detection to resolution
-- **Mean Time to Recovery (MTTR)**: Time from detection to full recovery
-
-### Incident Metrics
-- **Incident Count**: Total incidents per month
-- **Incident by Severity**: P0/P1/P2/P3 breakdown
-- **Incident by Type**: Outage/Performance/Security/etc.
-- **Repeat Incidents**: Same root cause recurring
-
-### Target SLAs
-- **P0 MTTR**: < 1 hour
-- **P1 MTTR**: < 4 hours
-- **P2 MTTR**: < 24 hours
-- **P3 MTTR**: < 1 week
-
----
 
 ## Related Documentation
 
 - [Operations Runbook](OPERATIONS_RUNBOOK.md)
 - [Rollback Procedures](ROLLBACK_PROCEDURES.md)
-- [Deployment Guide](DEPLOYMENT.md)
+- [Deployment Checklist](DEPLOYMENT_CHECKLIST.md)
 - [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md)
 
 ---
 
-## Revision History
-
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01-15 | 1.0 | Initial incident response plan |
+**Last Updated:** October 21, 2025  
+**Next Review:** January 21, 2026  
+**Owner:** Engineering Team

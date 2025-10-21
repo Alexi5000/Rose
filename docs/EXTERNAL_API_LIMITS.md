@@ -1,455 +1,480 @@
 # External API Rate Limits and Quotas
 
-This document provides comprehensive information about the external API services used by Rose, including rate limits, quotas, pricing, and best practices.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Groq API](#groq-api)
-- [ElevenLabs API](#elevenlabs-api)
-- [Qdrant Cloud](#qdrant-cloud)
-- [Together AI](#together-ai)
-- [Cost Estimation](#cost-estimation)
-- [Monitoring and Optimization](#monitoring-and-optimization)
-
----
-
 ## Overview
 
-Rose depends on four external API services:
+This document details the rate limits, quotas, and usage constraints for all external APIs used by the Rose the Healer Shaman application. Understanding these limits is critical for capacity planning, cost management, and incident response.
 
-| Service | Purpose | Criticality | Fallback |
-|---------|---------|-------------|----------|
-| Groq | LLM, STT, Vision | Critical | Circuit breaker, graceful error |
-| ElevenLabs | Text-to-Speech | High | Text-only response |
-| Qdrant | Vector memory | Medium | Degraded memory |
-| Together AI | Image generation | Low | Feature disabled (frozen) |
+## Summary Table
+
+| Service | Primary Use | Rate Limit | Monthly Quota | Cost Model |
+|---------|-------------|------------|---------------|------------|
+| Groq | LLM, STT | 30 req/min | Varies by plan | Per token |
+| ElevenLabs | TTS | 50 req/min | 100K chars (free) | Per character |
+| Qdrant Cloud | Vector DB | No hard limit | Storage-based | Per GB/month |
+| Together AI | Image Gen | 600 req/min | Pay-as-you-go | Per image |
 
 ---
 
 ## Groq API
 
-### Service Details
-
-**Website**: https://groq.com/  
-**Status Page**: https://status.groq.com/  
-**Documentation**: https://console.groq.com/docs/
-
-### Models Used
-
-1. **llama-3.3-70b-versatile** (Primary LLM)
-   - Purpose: Conversation generation
-   - Context window: 128K tokens
-   - Speed: ~300 tokens/second
-
-2. **whisper-large-v3** (Speech-to-Text)
-   - Purpose: Audio transcription
-   - Supported formats: mp3, mp4, mpeg, mpga, m4a, wav, webm
-   - Max file size: 25MB
-
-3. **llama-3.2-90b-vision-preview** (Vision - Frozen)
-   - Purpose: Image understanding
-   - Currently not in active use
+### Service Overview
+- **Primary Use:** LLM inference, speech-to-text, vision
+- **Models Used:**
+  - `llama-3.3-70b-versatile` (primary LLM)
+  - `gemma2-9b-it` (backup LLM)
+  - `whisper-large-v3` (speech-to-text)
+  - `llama-3.2-11b-vision-preview` (vision, frozen feature)
 
 ### Rate Limits
 
-**Free Tier**:
-- Requests per minute: 30
-- Requests per day: 14,400
-- Tokens per minute: 20,000
+**Free Tier:**
+- **Requests:** 30 requests per minute
+- **Tokens:** 6,000 tokens per minute
+- **Daily Limit:** 14,400 requests per day
 
-**Paid Tier** (Pay-as-you-go):
-- Requests per minute: 30 (same as free)
-- Requests per day: Unlimited
-- Tokens per minute: Higher limits (contact support)
+**Paid Tier (Pay-as-you-go):**
+- **Requests:** 30 requests per minute (same as free)
+- **Tokens:** Higher limits based on model
+- **Daily Limit:** No daily cap
 
-### Pricing
+**Per Model Limits:**
+- `llama-3.3-70b`: 30 req/min, 6K tokens/min
+- `gemma2-9b-it`: 30 req/min, 15K tokens/min
+- `whisper-large-v3`: 20 req/min (audio transcription)
 
-**LLM (llama-3.3-70b)**:
-- Input: $0.59 per 1M tokens
-- Output: $0.79 per 1M tokens
+### Quotas and Costs
 
-**Speech-to-Text (whisper)**:
-- $0.111 per hour of audio
-- ~$0.00185 per minute
+**Free Tier:**
+- $25 free credits (limited time)
+- No monthly quota after credits exhausted
 
-**Typical Usage**:
-- Average conversation: ~1000 tokens input, ~500 tokens output
-- Cost per conversation: ~$0.001 (0.1 cents)
-- 1000 conversations: ~$1.00
+**Paid Tier:**
+- Pay per token
+- `llama-3.3-70b`: ~$0.59 per 1M input tokens, ~$0.79 per 1M output tokens
+- `whisper-large-v3`: ~$0.111 per hour of audio
 
-### Best Practices
+### Usage Patterns
 
-1. **Token Management**
-   - Monitor token usage per request
-   - Implement conversation summarization (after 20 messages)
-   - Limit context window to necessary messages
+**Typical Request:**
+- Voice message: 1 STT call + 1 LLM call = 2 requests
+- Average tokens per conversation turn: 500-1000 tokens
+- Average audio length: 10-30 seconds
 
-2. **Error Handling**
-   - Implement circuit breaker (5 failures → open)
-   - Retry with exponential backoff (3 attempts)
-   - Graceful degradation on failures
+**Capacity Estimate:**
+- 30 req/min = 15 voice messages/min
+- 900 voice messages/hour
+- ~21,600 voice messages/day (free tier)
 
-3. **Optimization**
-   - Use streaming for faster perceived response
-   - Cache common responses where appropriate
-   - Monitor rate limit headers
+### Error Responses
 
-### Rate Limit Headers
-
+**Rate Limit Exceeded (429):**
+```json
+{
+  "error": {
+    "message": "Rate limit exceeded",
+    "type": "rate_limit_error",
+    "code": "rate_limit_exceeded"
+  }
+}
 ```
-X-RateLimit-Limit-Requests: 30
-X-RateLimit-Remaining-Requests: 25
-X-RateLimit-Reset-Requests: 2024-01-15T10:31:00Z
-X-RateLimit-Limit-Tokens: 20000
-X-RateLimit-Remaining-Tokens: 15000
+
+**Quota Exceeded (429):**
+```json
+{
+  "error": {
+    "message": "You have exceeded your quota",
+    "type": "insufficient_quota",
+    "code": "insufficient_quota"
+  }
+}
 ```
 
-### Error Codes
+### Mitigation Strategies
 
-- **429**: Rate limit exceeded - Retry after reset time
-- **503**: Service unavailable - Circuit breaker should handle
-- **401**: Invalid API key - Check credentials
-- **400**: Invalid request - Check input format
+1. **Implement Exponential Backoff**
+   - Current: 3 retries with exponential backoff
+   - Wait times: 1s, 2s, 4s
+
+2. **Circuit Breaker**
+   - Open circuit after 5 consecutive failures
+   - Recovery timeout: 60 seconds
+
+3. **Request Queuing**
+   - Queue requests when approaching limit
+   - Process at sustainable rate
+
+4. **Model Fallback**
+   - Switch to `gemma2-9b-it` if `llama-3.3-70b` rate limited
+   - Lower quality but higher throughput
+
+### Monitoring
+
+**Key Metrics:**
+- Requests per minute
+- Token usage per minute
+- 429 error rate
+- Average response time
+
+**Alerts:**
+- Warning: > 25 req/min (83% of limit)
+- Critical: > 28 req/min (93% of limit)
+- Error rate > 5%
 
 ---
 
 ## ElevenLabs API
 
-### Service Details
-
-**Website**: https://elevenlabs.io/  
-**Status Page**: https://status.elevenlabs.io/  
-**Documentation**: https://elevenlabs.io/docs/
-
-### Voice Used
-
-**Voice ID**: Configured via `ELEVENLABS_VOICE_ID` environment variable  
-**Model**: eleven_flash_v2_5 (fastest, lowest latency)
+### Service Overview
+- **Primary Use:** Text-to-speech
+- **Voice Used:** `eleven_flash_v2_5` (fast, low-latency)
+- **Voice ID:** Configured via `ELEVENLABS_VOICE_ID`
 
 ### Rate Limits
 
-**Free Tier**:
-- Characters per month: 10,000
-- Concurrent requests: 2
-- Voice cloning: No
-- Commercial use: No
+**Free Tier:**
+- **Requests:** 50 requests per minute
+- **Concurrent:** 2 concurrent requests
+- **Characters:** 10,000 characters per month
 
-**Creator Tier** ($5/month):
-- Characters per month: 30,000
-- Concurrent requests: 3
-- Voice cloning: Yes (up to 3 voices)
-- Commercial use: Yes
+**Starter Tier ($5/month):**
+- **Requests:** 50 requests per minute
+- **Concurrent:** 3 concurrent requests
+- **Characters:** 30,000 characters per month
 
-**Pro Tier** ($22/month):
-- Characters per month: 100,000
-- Concurrent requests: 5
-- Voice cloning: Yes (up to 10 voices)
-- Commercial use: Yes
+**Creator Tier ($22/month):**
+- **Requests:** 100 requests per minute
+- **Concurrent:** 5 concurrent requests
+- **Characters:** 100,000 characters per month
 
-**Scale Tier** ($99/month):
-- Characters per month: 500,000
-- Concurrent requests: 10
-- Voice cloning: Yes (up to 30 voices)
-- Commercial use: Yes
+**Pro Tier ($99/month):**
+- **Requests:** 200 requests per minute
+- **Concurrent:** 10 concurrent requests
+- **Characters:** 500,000 characters per month
 
-### Pricing
+### Quotas and Costs
 
-**Pay-as-you-go** (after quota):
-- $0.30 per 1,000 characters
+**Character Limits:**
+- Free: 10K chars/month (~100 responses)
+- Starter: 30K chars/month (~300 responses)
+- Creator: 100K chars/month (~1,000 responses)
+- Pro: 500K chars/month (~5,000 responses)
 
-**Typical Usage**:
-- Average response: ~200 characters
-- Cost per response: ~$0.06 (6 cents) on free tier
-- 1000 responses: ~$60 (or 30,000 chars = $5/month on Creator)
+**Overage Costs:**
+- Additional characters: $0.30 per 1,000 characters
 
-### Best Practices
+### Usage Patterns
 
-1. **Character Management**
-   - Monitor character usage
-   - Implement response length limits
-   - Cache frequently used responses
+**Typical Response:**
+- Average response length: 100-200 characters
+- Average audio duration: 10-20 seconds
+- Characters per conversation: 200-400
 
-2. **Caching Strategy**
-   - Cache common greetings and responses
-   - Use cache key based on text content
-   - Implement cache expiration (7 days)
+**Capacity Estimate (Creator Tier):**
+- 100K chars/month = ~1,000 responses
+- ~33 responses/day
+- Suitable for 10-20 active users
 
-3. **Error Handling**
-   - Circuit breaker for repeated failures
-   - Fallback to text-only response
-   - Retry with exponential backoff
+### Error Responses
 
-4. **Optimization**
-   - Use eleven_flash_v2_5 for lowest latency
-   - Optimize response text length
-   - Stream audio for faster playback start
-
-### Rate Limit Headers
-
-```
-X-RateLimit-Limit: 3
-X-RateLimit-Remaining: 2
-X-RateLimit-Reset: 1642262400
+**Rate Limit Exceeded (429):**
+```json
+{
+  "detail": {
+    "status": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Please try again later."
+  }
+}
 ```
 
-### Error Codes
+**Quota Exceeded (429):**
+```json
+{
+  "detail": {
+    "status": "quota_exceeded",
+    "message": "Character quota exceeded for this month."
+  }
+}
+```
 
-- **429**: Rate limit exceeded - Wait and retry
-- **401**: Invalid API key - Check credentials
-- **400**: Invalid request - Check voice ID and model
-- **503**: Service unavailable - Fallback to text
+**Concurrent Limit (429):**
+```json
+{
+  "detail": {
+    "status": "concurrent_limit_exceeded",
+    "message": "Too many concurrent requests."
+  }
+}
+```
+
+### Mitigation Strategies
+
+1. **Response Caching**
+   - Current: TTS caching implemented
+   - Cache common responses
+   - Reduce duplicate synthesis
+
+2. **Response Length Optimization**
+   - Keep responses concise
+   - Target 100-150 characters
+   - Avoid verbose responses
+
+3. **Fallback to Text**
+   - Return text-only if quota exceeded
+   - Graceful degradation
+   - Inform user of audio unavailability
+
+4. **Concurrent Request Management**
+   - Queue requests if at concurrent limit
+   - Process sequentially if needed
+
+### Monitoring
+
+**Key Metrics:**
+- Characters used per day
+- Requests per minute
+- Concurrent requests
+- Cache hit rate
+
+**Alerts:**
+- Warning: > 80% monthly quota used
+- Critical: > 95% monthly quota used
+- Concurrent limit reached
 
 ---
 
 ## Qdrant Cloud
 
-### Service Details
-
-**Website**: https://qdrant.io/  
-**Status Page**: https://status.qdrant.io/  
-**Documentation**: https://qdrant.tech/documentation/
-
-### Configuration
-
-**Collection**: Configured via application  
-**Vector Dimension**: 384 (sentence-transformers)  
-**Distance Metric**: Cosine similarity
+### Service Overview
+- **Primary Use:** Vector database for long-term memory
+- **Collection:** `rose_memories`
+- **Vector Dimensions:** 384 (sentence-transformers)
 
 ### Rate Limits
 
-**Free Tier**:
-- Storage: 1GB
-- Requests per second: 100
-- Collections: Unlimited
-- Vectors: ~1M (depending on payload size)
+**Free Tier:**
+- **Storage:** 1 GB
+- **Requests:** No hard rate limit
+- **Vectors:** ~1M vectors (depending on metadata)
 
-**Paid Tiers**:
-- Storage: 1GB-100GB+
-- Requests per second: Higher limits
-- Dedicated clusters available
+**Paid Tiers:**
+- **Storage:** Pay per GB ($0.25/GB/month)
+- **Requests:** No hard rate limit
+- **Throughput:** Scales with cluster size
 
-### Pricing
+### Quotas and Costs
 
-**Free Tier**: $0/month
-- 1GB storage
-- Shared cluster
-- Community support
+**Storage Costs:**
+- $0.25 per GB per month
+- Includes backups and replication
 
-**Starter** (~$25/month):
-- 4GB storage
-- Dedicated resources
-- Email support
+**Typical Usage:**
+- Vector size: ~1.5 KB per memory
+- 1 GB = ~650K memories
+- Average user: 100-500 memories
 
-**Production** (~$100+/month):
-- Custom storage
-- High availability
-- Priority support
+**Capacity Estimate:**
+- 1 GB supports 1,000-5,000 active users
+- Growth rate: ~10 MB per 100 users per month
 
-**Typical Usage**:
-- Average memory: ~500 bytes per vector
-- 1000 conversations: ~500KB
-- Free tier sufficient for 1000+ users
+### Performance Characteristics
 
-### Best Practices
+**Latency:**
+- Search: 10-50ms (typical)
+- Insert: 5-20ms (typical)
+- Batch operations: More efficient
 
-1. **Connection Management**
-   - Use connection pooling/singleton pattern
-   - Reuse client instances
-   - Implement connection retry logic
+**Throughput:**
+- Free tier: 100-500 req/sec
+- Paid tier: 1,000+ req/sec
 
-2. **Query Optimization**
-   - Limit top-K results (default: 3)
-   - Use filters to narrow search space
-   - Monitor query latency
+### Error Responses
 
-3. **Data Management**
-   - Implement memory pruning for old data
-   - Archive inactive user memories
-   - Monitor collection size
-
-4. **Error Handling**
-   - Circuit breaker for connection failures
-   - Retry transient errors
-   - Graceful degradation (continue without memory)
-
-### Error Codes
-
-- **429**: Rate limit exceeded - Implement backoff
-- **503**: Service unavailable - Circuit breaker
-- **401**: Invalid API key - Check credentials
-- **404**: Collection not found - Initialize collection
-
----
-
-## Together AI
-
-### Service Details
-
-**Website**: https://www.together.ai/  
-**Documentation**: https://docs.together.ai/
-
-**Note**: Image generation feature is currently frozen and not in active use.
-
-### Model Used
-
-**FLUX.1-schnell**:
-- Purpose: Fast image generation
-- Resolution: Up to 1024x1024
-- Speed: ~3-5 seconds per image
-
-### Rate Limits
-
-**Free Tier**:
-- Credits: $25 free credits
-- Rate limits: Varies by model
-
-**Paid Tier**:
-- Pay-as-you-go pricing
-- Higher rate limits
-
-### Pricing
-
-**FLUX.1-schnell**:
-- ~$0.01-0.02 per image
-- Varies by resolution and steps
-
-**Typical Usage** (when enabled):
-- Average: 1 image per 10 conversations
-- Cost: ~$0.01 per image
-- 1000 images: ~$10-20
-
-### Best Practices
-
-1. **Usage Management**
-   - Only generate when explicitly requested
-   - Implement request queuing
-   - Cache generated images
-
-2. **Error Handling**
-   - Circuit breaker for failures
-   - Graceful error messages
-   - Retry with backoff
-
----
-
-## Cost Estimation
-
-### Monthly Cost Breakdown
-
-**Low Usage** (100 conversations/month):
-- Groq: ~$0.10
-- ElevenLabs: Free tier (10K chars)
-- Qdrant: Free tier
-- **Total: ~$0.10/month**
-
-**Medium Usage** (1,000 conversations/month):
-- Groq: ~$1.00
-- ElevenLabs: $5/month (Creator tier)
-- Qdrant: Free tier
-- **Total: ~$6/month**
-
-**High Usage** (10,000 conversations/month):
-- Groq: ~$10.00
-- ElevenLabs: $22/month (Pro tier)
-- Qdrant: Free tier (may need upgrade)
-- **Total: ~$32/month**
-
-**Very High Usage** (100,000 conversations/month):
-- Groq: ~$100.00
-- ElevenLabs: $99/month (Scale tier)
-- Qdrant: ~$25/month (Starter tier)
-- **Total: ~$224/month**
-
-### Cost per Conversation
-
-Average cost per conversation:
-- Groq LLM: ~$0.001
-- Groq STT: ~$0.002 (1 minute audio)
-- ElevenLabs TTS: ~$0.06 (200 chars)
-- Qdrant: Negligible
-- **Total: ~$0.063 per conversation**
-
-### Cost Optimization Strategies
-
-1. **Reduce TTS Usage**
-   - Implement aggressive caching
-   - Shorten responses where appropriate
-   - Consider alternative TTS providers
-
-2. **Optimize LLM Usage**
-   - Implement conversation summarization
-   - Reduce context window size
-   - Use smaller models for simple tasks
-
-3. **Batch Operations**
-   - Batch memory operations
-   - Queue non-urgent requests
-   - Implement request coalescing
-
----
-
-## Monitoring and Optimization
-
-### Key Metrics to Track
-
-1. **API Usage**
-   - Requests per minute/day
-   - Token/character consumption
-   - Cost per conversation
-
-2. **Performance**
-   - API latency by service
-   - Error rates
-   - Circuit breaker status
-
-3. **Quotas**
-   - Remaining quota percentage
-   - Time until quota reset
-   - Quota exhaustion alerts
-
-### Monitoring Implementation
-
-```python
-# Example: Track API usage
-import structlog
-
-logger = structlog.get_logger()
-
-def track_api_call(service: str, operation: str, duration_ms: int, cost: float):
-    logger.info(
-        "api_call",
-        service=service,
-        operation=operation,
-        duration_ms=duration_ms,
-        cost=cost
-    )
+**Storage Limit Exceeded:**
+```json
+{
+  "status": "error",
+  "message": "Storage limit exceeded"
+}
 ```
+
+**Connection Timeout:**
+```json
+{
+  "status": "error",
+  "message": "Connection timeout"
+}
+```
+
+### Mitigation Strategies
+
+1. **Connection Pooling**
+   - Reuse client connections
+   - Reduce connection overhead
+   - Implement singleton pattern
+
+2. **Batch Operations**
+   - Batch inserts when possible
+   - Reduce number of requests
+   - Improve throughput
+
+3. **Memory Cleanup**
+   - Archive old memories
+   - Delete inactive user data
+   - Implement retention policy
+
+4. **Circuit Breaker**
+   - Fail fast on connection issues
+   - Prevent cascading failures
+   - Graceful degradation
+
+### Monitoring
+
+**Key Metrics:**
+- Storage usage (GB)
+- Request latency (p95)
+- Error rate
+- Collection size (vector count)
+
+**Alerts:**
+- Warning: > 80% storage used
+- Critical: > 95% storage used
+- Latency > 100ms (p95)
+
+---
+
+## Together AI (Frozen Feature)
+
+### Service Overview
+- **Primary Use:** Image generation (currently disabled)
+- **Model:** `black-forest-labs/FLUX.1-schnell`
+- **Status:** Feature frozen, not in production
+
+### Rate Limits
+
+**Free Tier:**
+- **Requests:** 600 requests per minute
+- **Images:** Pay-as-you-go
+
+**Paid Tier:**
+- **Requests:** 600 requests per minute
+- **Images:** Pay-as-you-go
+
+### Quotas and Costs
+
+**Image Generation:**
+- FLUX.1-schnell: ~$0.015 per image
+- Average generation time: 3-5 seconds
+
+**Capacity Estimate:**
+- 600 req/min = 36,000 images/hour
+- Cost: $540/hour at full capacity
+
+### Usage Patterns (When Enabled)
+
+**Typical Request:**
+- 1 image per request
+- Resolution: 1024x1024 (default)
+- Generation time: 3-5 seconds
+
+### Mitigation Strategies
+
+1. **Feature Flag**
+   - Currently disabled via `FEATURE_IMAGES=false`
+   - Enable only when needed
+   - Control via environment variable
+
+2. **Rate Limiting**
+   - Limit images per user per day
+   - Implement cooldown period
+   - Queue requests if needed
+
+3. **Cost Controls**
+   - Set daily budget limit
+   - Alert on high usage
+   - Disable if budget exceeded
+
+---
+
+## Capacity Planning
+
+### Current Configuration (Free/Starter Tiers)
+
+**Bottleneck:** ElevenLabs character quota
+
+**Estimated Capacity:**
+- **Daily Active Users:** 10-20
+- **Conversations per Day:** 30-50
+- **Voice Messages per Day:** 100-200
+
+**Monthly Costs:**
+- Groq: $0-10 (pay-as-you-go)
+- ElevenLabs: $22 (Creator tier)
+- Qdrant: $0-5 (< 1 GB)
+- **Total: ~$30-40/month**
+
+### Scaling to 100 Users
+
+**Requirements:**
+- Groq: Paid tier with higher limits
+- ElevenLabs: Pro tier (500K chars)
+- Qdrant: 2-5 GB storage
+
+**Estimated Costs:**
+- Groq: $50-100/month
+- ElevenLabs: $99/month
+- Qdrant: $1-2/month
+- **Total: ~$150-200/month**
+
+### Scaling to 1,000 Users
+
+**Requirements:**
+- Groq: Enterprise tier or multiple accounts
+- ElevenLabs: Scale tier (custom pricing)
+- Qdrant: 20-50 GB storage
+- PostgreSQL for checkpointer
+
+**Estimated Costs:**
+- Groq: $500-1,000/month
+- ElevenLabs: $500-1,000/month
+- Qdrant: $5-15/month
+- PostgreSQL: $25-50/month
+- **Total: ~$1,000-2,000/month**
+
+---
+
+## Monitoring and Alerting
+
+### Dashboard Metrics
+
+**API Usage:**
+- Requests per minute (by service)
+- Error rate (by service)
+- Response time (by service)
+- Quota usage (% of limit)
+
+**Cost Tracking:**
+- Daily spend by service
+- Monthly spend projection
+- Cost per user
+- Cost per conversation
 
 ### Alert Thresholds
 
-**Groq**:
+**Rate Limits:**
 - Warning: > 80% of rate limit
-- Critical: Rate limit exceeded
+- Critical: > 95% of rate limit
 
-**ElevenLabs**:
-- Warning: > 80% of monthly quota
-- Critical: > 95% of monthly quota
+**Quotas:**
+- Warning: > 70% of monthly quota
+- Critical: > 90% of monthly quota
 
-**Qdrant**:
-- Warning: > 80% of storage
-- Critical: Connection failures
+**Costs:**
+- Warning: > 80% of monthly budget
+- Critical: > 100% of monthly budget
 
-### Optimization Checklist
-
-- [ ] Implement TTS response caching
-- [ ] Monitor and optimize token usage
-- [ ] Set up quota alerts
-- [ ] Review and optimize prompt lengths
-- [ ] Implement request batching where possible
-- [ ] Monitor cost per conversation
-- [ ] Set up budget alerts
-- [ ] Review API usage patterns monthly
+**Errors:**
+- Warning: > 5% error rate
+- Critical: > 10% error rate
 
 ---
 
@@ -457,43 +482,61 @@ def track_api_call(service: str, operation: str, duration_ms: int, cost: float):
 
 ### Quota Exhaustion
 
-**ElevenLabs Quota Exceeded**:
-1. Switch to text-only responses
-2. Notify users of temporary limitation
-3. Upgrade plan or wait for quota reset
-4. Implement stricter caching
+**Immediate Actions:**
+1. Enable circuit breaker for affected service
+2. Switch to fallback mode (text-only for TTS)
+3. Notify users of degraded service
+4. Upgrade plan or purchase additional quota
 
-**Groq Rate Limit Exceeded**:
-1. Circuit breaker prevents further requests
-2. Queue requests if possible
-3. Notify users of temporary delay
-4. Contact Groq for limit increase
+**Prevention:**
+- Monitor quota usage daily
+- Set alerts at 70% and 90%
+- Plan upgrades before exhaustion
+
+### Rate Limit Exceeded
+
+**Immediate Actions:**
+1. Enable request queuing
+2. Implement exponential backoff
+3. Switch to backup model if available
+4. Scale horizontally if possible
+
+**Prevention:**
+- Monitor request rate
+- Implement client-side rate limiting
+- Use batch operations where possible
 
 ### Service Outage
 
-**Check Status Pages**:
-- Groq: https://status.groq.com/
-- ElevenLabs: https://status.elevenlabs.io/
-- Qdrant: https://status.qdrant.io/
+**Immediate Actions:**
+1. Check service status page
+2. Enable circuit breaker
+3. Return cached responses if available
+4. Notify users of external service issue
 
-**Fallback Strategies**:
-- Groq down: Return graceful error message
-- ElevenLabs down: Text-only responses
-- Qdrant down: Continue without memory context
+**Prevention:**
+- Implement circuit breakers
+- Cache common responses
+- Have fallback providers ready
 
 ---
 
 ## Related Documentation
 
 - [Operations Runbook](OPERATIONS_RUNBOOK.md)
-- [Architecture Documentation](ARCHITECTURE.md)
+- [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
 - [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md)
-- [Security Documentation](SECURITY.md)
+- [Resource Management](RESOURCE_MANAGEMENT.md)
 
 ---
 
-## Revision History
+**Last Updated:** October 21, 2025  
+**Next Review:** January 21, 2026  
+**Owner:** Engineering Team
 
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01-15 | 1.0 | Initial API limits documentation |
+## References
+
+- [Groq API Documentation](https://console.groq.com/docs)
+- [ElevenLabs API Documentation](https://elevenlabs.io/docs/api-reference)
+- [Qdrant Documentation](https://qdrant.tech/documentation/)
+- [Together AI Documentation](https://docs.together.ai/)

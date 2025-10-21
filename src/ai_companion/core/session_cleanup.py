@@ -64,7 +64,7 @@ class SessionCleanupManager:
             # parent_checkpoint_id, type, checkpoint, metadata
             # We'll use checkpoint_id which contains timestamp information
 
-            if "checkpoint_id" in columns:
+            if "checkpoint_id" in columns and "metadata" in columns:
                 # Count sessions before cleanup
                 cursor.execute("SELECT COUNT(DISTINCT thread_id) FROM checkpoints")
                 sessions_before = cursor.fetchone()[0]
@@ -81,22 +81,55 @@ class SessionCleanupManager:
                     cutoff_date=cutoff_date.isoformat(),
                 )
 
-                # For safety, we'll implement a conservative cleanup:
-                # Only delete if we can verify the session is truly old
-                # This requires more sophisticated logic based on checkpoint structure
+                # LangGraph checkpoint_id format is typically a timestamp-based UUID
+                # We'll identify old sessions by finding thread_ids where ALL checkpoints
+                # are older than the cutoff date
 
-                # Conservative approach: don't delete without proper verification
-                # In a production implementation, this would analyze checkpoint_id format
-                # and metadata to determine session age accurately
-                stats["sessions_deleted"] = 0
-                stats["checkpoints_deleted"] = 0
+                # First, find thread_ids that have at least one recent checkpoint
+                # (these are active sessions we want to keep)
+                cursor.execute("""
+                    SELECT DISTINCT thread_id
+                    FROM checkpoints
+                    WHERE checkpoint_id > ?
+                """, (cutoff_date.timestamp(),))
 
-                logger.info(
-                    "session_cleanup_completed",
-                    sessions_deleted=stats["sessions_deleted"],
-                    checkpoints_deleted=stats["checkpoints_deleted"],
-                    sessions_remaining=sessions_before - stats["sessions_deleted"],
-                )
+                active_thread_ids = {row[0] for row in cursor.fetchall()}
+
+                # Now find all thread_ids
+                cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
+                all_thread_ids = {row[0] for row in cursor.fetchall()}
+
+                # Thread IDs to delete are those with no recent activity
+                thread_ids_to_delete = all_thread_ids - active_thread_ids
+
+                if thread_ids_to_delete:
+                    # Delete checkpoints for old sessions
+                    placeholders = ",".join("?" * len(thread_ids_to_delete))
+                    cursor.execute(
+                        f"DELETE FROM checkpoints WHERE thread_id IN ({placeholders})",
+                        tuple(thread_ids_to_delete),
+                    )
+
+                    stats["checkpoints_deleted"] = cursor.rowcount
+                    stats["sessions_deleted"] = len(thread_ids_to_delete)
+
+                    conn.commit()
+
+                    logger.info(
+                        "session_cleanup_completed",
+                        sessions_deleted=stats["sessions_deleted"],
+                        checkpoints_deleted=stats["checkpoints_deleted"],
+                        sessions_remaining=sessions_before - stats["sessions_deleted"],
+                        thread_ids_deleted=list(thread_ids_to_delete)[:5],  # Log first 5 for debugging
+                    )
+                else:
+                    logger.info(
+                        "session_cleanup_completed",
+                        sessions_deleted=0,
+                        checkpoints_deleted=0,
+                        sessions_remaining=sessions_before,
+                        message="No old sessions found to delete",
+                    )
             else:
                 logger.warning("session_cleanup_failed", reason="unexpected_table_schema", columns=list(columns))
                 stats["errors"].append("Unexpected checkpoints table schema")

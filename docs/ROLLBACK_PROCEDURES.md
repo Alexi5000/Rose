@@ -1,559 +1,413 @@
-# Rollback Procedures: Rose the Healer Shaman
-
-This document provides step-by-step procedures for rolling back deployments and restoring data in case of issues.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Deployment Rollback](#deployment-rollback)
-  - [Railway Rollback](#railway-rollback)
-  - [Render Rollback](#render-rollback)
-  - [Fly.io Rollback](#flyio-rollback)
-- [Data Restoration](#data-restoration)
-  - [Database Restoration](#database-restoration)
-  - [Manual Backup Restoration](#manual-backup-restoration)
-- [Rollback Decision Matrix](#rollback-decision-matrix)
-- [Post-Rollback Procedures](#post-rollback-procedures)
-- [Prevention Strategies](#prevention-strategies)
-
----
+# Rollback Procedures
 
 ## Overview
 
-### When to Rollback
+This document outlines procedures for rolling back deployments when issues are detected in production. Quick and safe rollbacks minimize user impact and service disruption.
 
-Consider rollback when:
-- **Critical bugs** affecting core functionality
-- **Data corruption** or loss
-- **Performance degradation** > 50% from baseline
-- **Error rate** > 10% for more than 5 minutes
-- **Security vulnerabilities** discovered in new deployment
-- **External service incompatibility** introduced
+## When to Rollback
 
-### Rollback Types
+### Immediate Rollback (Critical)
+- Service is completely down or unreachable
+- Error rate > 50%
+- Data corruption detected
+- Security vulnerability discovered
+- Memory leaks causing repeated OOM kills
 
-1. **Code Rollback**: Revert to previous application version
-2. **Data Rollback**: Restore database from backup
-3. **Configuration Rollback**: Revert environment variables or settings
-4. **Full Rollback**: Combination of code and data rollback
+### Planned Rollback (High Priority)
+- Error rate > 10% for > 5 minutes
+- Response time degradation > 200% baseline
+- Critical feature broken (voice processing, memory)
+- External API integration failures
+- Database migration failures
 
-### Rollback Time Targets
+### Consider Rollback (Medium Priority)
+- Error rate 5-10% sustained
+- Performance degradation 50-100% baseline
+- Non-critical feature broken
+- User complaints about specific functionality
 
-- **Detection to Decision**: < 5 minutes
-- **Decision to Execution**: < 2 minutes
-- **Execution to Verification**: < 5 minutes
-- **Total Rollback Time**: < 15 minutes
+## Pre-Rollback Checklist
 
----
+Before initiating rollback:
 
-## Deployment Rollback
+1. **Confirm the Issue**
+   - [ ] Verify issue is not transient (wait 2-3 minutes)
+   - [ ] Check external service status (Groq, ElevenLabs, Qdrant)
+   - [ ] Review recent deployment changes
+   - [ ] Confirm issue started after deployment
 
-### Railway Rollback
+2. **Assess Impact**
+   - [ ] Determine number of affected users
+   - [ ] Identify affected functionality
+   - [ ] Check if data loss is possible
+   - [ ] Estimate rollback time
 
-Railway maintains deployment history and allows instant rollback to previous versions.
+3. **Communication**
+   - [ ] Notify team in incident channel
+   - [ ] Update status page if available
+   - [ ] Prepare user communication if needed
 
-#### Quick Rollback (Recommended)
+4. **Document**
+   - [ ] Create incident ticket
+   - [ ] Note symptoms and metrics
+   - [ ] Record decision to rollback
 
-1. **Access Deployment History**
-   - Go to Railway dashboard
-   - Navigate to your service
-   - Click on "Deployments" tab
+## Railway Rollback Procedure
 
-2. **Identify Last Known Good Deployment**
-   - Review deployment list
-   - Find deployment before issues started
-   - Note the deployment ID and timestamp
+### Method 1: Redeploy Previous Version (Recommended)
 
-3. **Rollback to Previous Deployment**
-   - Click on the last known good deployment
+**Time: 3-5 minutes**
+
+1. **Access Railway Dashboard**
+   ```
+   Navigate to: https://railway.app/project/<project-id>
+   ```
+
+2. **View Deployment History**
+   - Click on the service (e.g., "rose-api")
+   - Go to "Deployments" tab
+   - Identify last known good deployment
+
+3. **Redeploy Previous Version**
+   - Click on the last successful deployment
    - Click "Redeploy" button
-   - Confirm rollback action
+   - Confirm redeployment
 
-4. **Monitor Rollback**
-   - Watch deployment logs
-   - Wait for "Deployment successful" message
-   - Typically takes 2-3 minutes
+4. **Monitor Deployment**
+   - Watch build logs for errors
+   - Wait for health checks to pass
+   - Verify service is responding
 
-5. **Verify Service Health**
+5. **Verify Rollback**
    ```bash
+   # Test health endpoint
    curl https://your-app.railway.app/api/health
+   
+   # Test voice processing
+   curl -X POST https://your-app.railway.app/api/session/start
    ```
 
-#### CLI Rollback
+### Method 2: Git Revert and Redeploy
+
+**Time: 5-10 minutes**
+
+1. **Identify Problem Commit**
+   ```bash
+   git log --oneline -10
+   ```
+
+2. **Revert Commit**
+   ```bash
+   # Revert specific commit
+   git revert <commit-hash>
+   
+   # Or revert to specific commit
+   git reset --hard <last-good-commit>
+   git push --force origin main
+   ```
+
+3. **Trigger Deployment**
+   - Railway will automatically detect the push
+   - Monitor deployment in Railway dashboard
+
+4. **Verify Rollback**
+   - Check health endpoint
+   - Test critical functionality
+   - Monitor error rates
+
+### Method 3: Environment Variable Rollback
+
+**Time: 1-2 minutes**
+
+If issue is caused by configuration change:
+
+1. **Access Railway Variables**
+   - Go to service settings
+   - Click "Variables" tab
+
+2. **Revert Variable**
+   - Identify changed variable
+   - Restore previous value
+   - Click "Save"
+
+3. **Restart Service**
+   - Railway will automatically restart
+   - Monitor health checks
+
+## Docker Rollback Procedure
+
+For self-hosted Docker deployments:
+
+### Method 1: Use Previous Image Tag
 
 ```bash
-# List recent deployments
-railway deployments
+# Stop current container
+docker-compose down
 
-# Rollback to specific deployment
-railway rollback <deployment-id>
+# Pull previous image version
+docker pull your-registry/rose-api:v1.2.3
 
-# Monitor rollback progress
-railway logs --tail 100
+# Update docker-compose.yml to use previous tag
+# image: your-registry/rose-api:v1.2.3
+
+# Start with previous version
+docker-compose up -d
+
+# Verify
+docker ps
+docker logs rose-api
+curl http://localhost:8000/api/health
 ```
 
-#### Git-Based Rollback
-
-If you need to rollback code changes:
+### Method 2: Rebuild from Previous Commit
 
 ```bash
-# Identify commit to rollback to
-git log --oneline -10
+# Checkout previous commit
+git checkout <last-good-commit>
 
-# Create rollback commit
-git revert <bad-commit-hash>
+# Rebuild and restart
+docker-compose down
+docker-compose build
+docker-compose up -d
 
-# Or reset to previous commit (use with caution)
-git reset --hard <good-commit-hash>
-
-# Force push (if necessary)
-git push origin main --force
-
-# Railway will auto-deploy the rollback
+# Verify
+docker logs rose-api
 ```
 
-**Warning**: Force pushing can cause issues for other developers. Prefer `git revert` for shared branches.
+## Database Rollback Procedures
 
----
+### SQLite Rollback
 
-### Render Rollback
+**If database migration caused issues:**
 
-Render also maintains deployment history with easy rollback.
-
-#### Dashboard Rollback
-
-1. **Access Deployment History**
-   - Go to Render dashboard
-   - Select your service
-   - Click "Deploys" tab
-
-2. **Select Previous Deployment**
-   - Find last known good deployment
-   - Click "Rollback to this deploy"
-
-3. **Confirm Rollback**
-   - Review deployment details
-   - Click "Rollback" to confirm
-   - Wait for deployment to complete (3-5 minutes)
-
-4. **Verify Service**
+1. **Stop Service**
    ```bash
-   curl https://your-app.onrender.com/api/health
+   docker-compose down
+   # or Railway: pause deployment
    ```
 
-#### Manual Redeploy
+2. **Restore from Backup**
+   ```bash
+   # Copy backup to active location
+   cp /app/backups/short_term_memory_20251021.db \
+      /app/data/short_term_memory.db
+   ```
 
-If rollback button is unavailable:
+3. **Verify Database**
+   ```bash
+   sqlite3 /app/data/short_term_memory.db "PRAGMA integrity_check;"
+   ```
 
-```bash
-# Trigger manual deploy from specific commit
-git checkout <good-commit-hash>
-git push render main --force
-```
+4. **Restart Service**
+   ```bash
+   docker-compose up -d
+   ```
 
----
+### Qdrant Rollback
 
-### Fly.io Rollback
+**If vector database issues:**
 
-Fly.io uses image-based deployments with version history.
+1. **Check Qdrant Status**
+   ```bash
+   curl -X GET "$QDRANT_URL/health" \
+     -H "api-key: $QDRANT_API_KEY"
+   ```
 
-#### CLI Rollback
-
-```bash
-# List deployment history
-fly releases
-
-# Rollback to previous release
-fly releases rollback
-
-# Or rollback to specific version
-fly releases rollback <version-number>
-
-# Monitor rollback
-fly logs
-```
-
-#### Verify Rollback
-
-```bash
-# Check current version
-fly status
-
-# Test health endpoint
-curl https://your-app.fly.dev/api/health
-```
-
----
-
-## Data Restoration
-
-### Database Restoration
-
-The application includes automatic backup functionality. Follow these steps to restore from backup.
-
-#### Automatic Backup Restoration
-
-1. **Identify Available Backups**
+2. **Restore Collection from Snapshot**
+   ```bash
+   # Create snapshot of current state first
+   curl -X POST "$QDRANT_URL/collections/rose_memories/snapshots" \
+     -H "api-key: $QDRANT_API_KEY"
    
-   Backups are stored in `/app/data/backups/` with naming pattern:
-   - `memory_YYYYMMDD_HHMMSS.db` (SQLite backups)
-   - `backup.log` (backup operation logs)
+   # Restore from previous snapshot
+   curl -X PUT "$QDRANT_URL/collections/rose_memories/snapshots/<snapshot-name>/recover" \
+     -H "api-key: $QDRANT_API_KEY"
+   ```
 
-2. **Access Backup Files**
+3. **Recreate Collection (Last Resort)**
+   ```bash
+   # Delete corrupted collection
+   curl -X DELETE "$QDRANT_URL/collections/rose_memories" \
+     -H "api-key: $QDRANT_API_KEY"
    
-   **Railway:**
-   ```bash
-   # SSH into container (if available)
-   railway run bash
-   
-   # List available backups
-   ls -lh /app/data/backups/
+   # Recreate with proper schema
+   # Run initialization script
+   python -m ai_companion.modules.memory.initialize
    ```
-   
-   **Alternative: Download via API**
-   - Create temporary endpoint to download backups
-   - Or use Railway's file browser (if available)
-
-3. **Stop Application**
-   ```bash
-   railway down
-   ```
-
-4. **Restore Database**
-   ```bash
-   # Copy backup to active database location
-   cp /app/data/backups/memory_20240115_020000.db /app/data/memory.db
-   
-   # Verify file integrity
-   sqlite3 /app/data/memory.db "PRAGMA integrity_check;"
-   ```
-
-5. **Restart Application**
-   ```bash
-   railway up
-   ```
-
-6. **Verify Restoration**
-   - Test session creation
-   - Verify conversation history
-   - Check memory retrieval
-
-#### Manual Backup Restoration
-
-If you have manual backups stored externally:
-
-1. **Download Backup File**
-   ```bash
-   # Download from your backup storage
-   wget https://your-backup-storage.com/memory_backup.db
-   ```
-
-2. **Upload to Railway**
-   ```bash
-   # Use Railway CLI to upload
-   railway run --command "cat > /app/data/memory.db" < memory_backup.db
-   ```
-
-3. **Restart and Verify**
-   ```bash
-   railway restart
-   curl https://your-app.railway.app/api/health
-   ```
-
----
-
-### Qdrant Data Restoration
-
-Qdrant (long-term memory) restoration depends on your Qdrant setup.
-
-#### Qdrant Cloud Restoration
-
-1. **Contact Qdrant Support**
-   - Email: support@qdrant.io
-   - Request point-in-time restoration
-   - Provide cluster ID and timestamp
-
-2. **Alternative: Recreate Collection**
-   ```python
-   # If you have conversation history, rebuild vectors
-   from ai_companion.modules.memory.long_term_memory import LongTermMemory
-   
-   memory = LongTermMemory()
-   # Rebuild from conversation logs
-   ```
-
-#### Self-Hosted Qdrant Restoration
-
-1. **Stop Qdrant Service**
-   ```bash
-   docker stop qdrant
-   ```
-
-2. **Restore Snapshot**
-   ```bash
-   # Copy snapshot to Qdrant storage directory
-   cp qdrant_snapshot.tar.gz /path/to/qdrant/storage/
-   
-   # Extract snapshot
-   cd /path/to/qdrant/storage/
-   tar -xzf qdrant_snapshot.tar.gz
-   ```
-
-3. **Restart Qdrant**
-   ```bash
-   docker start qdrant
-   ```
-
----
-
-## Rollback Decision Matrix
-
-Use this matrix to determine the appropriate rollback strategy:
-
-| Issue Type | Severity | Code Rollback | Data Rollback | Downtime | Priority |
-|------------|----------|---------------|---------------|----------|----------|
-| Critical bug | High | Yes | No | < 5 min | P0 |
-| Data corruption | Critical | Maybe | Yes | < 15 min | P0 |
-| Performance degradation | Medium | Yes | No | < 5 min | P1 |
-| Minor bug | Low | No | No | 0 min | P2 |
-| Config error | Medium | No | No | < 2 min | P1 |
-| Security issue | Critical | Yes | Maybe | < 5 min | P0 |
-| External API incompatibility | High | Yes | No | < 5 min | P0 |
-
-### Decision Flowchart
-
-```
-Issue Detected
-    ↓
-Is it affecting users?
-    ↓ Yes                    ↓ No
-Is error rate > 10%?     Monitor and fix
-    ↓ Yes                    in next release
-Is there data loss?
-    ↓ Yes                ↓ No
-Full Rollback        Code Rollback
-(Code + Data)        Only
-    ↓                    ↓
-Execute Rollback     Execute Rollback
-    ↓                    ↓
-Verify Health        Verify Health
-    ↓                    ↓
-Post-Mortem          Post-Mortem
-```
-
----
 
 ## Post-Rollback Procedures
 
-### Immediate Verification (< 5 minutes)
+### Immediate (0-15 minutes)
 
-1. **Health Check**
-   ```bash
-   curl https://your-app.railway.app/api/health
-   ```
-   
-   Expected: All services "healthy"
+1. **Verify Service Health**
+   - [ ] Health endpoint returns 200 OK
+   - [ ] All external services connected
+   - [ ] Error rate < 1%
+   - [ ] Response times normal
 
-2. **Smoke Test**
-   - Create new session
-   - Send test voice input
-   - Verify response generation
-   - Check audio playback
+2. **Test Critical Paths**
+   - [ ] Session creation works
+   - [ ] Voice processing works
+   - [ ] Memory retrieval works
+   - [ ] Audio playback works
 
-3. **Monitor Error Rate**
-   ```bash
-   railway logs | grep "ERROR" | wc -l
-   ```
-   
-   Expected: < 1% error rate
+3. **Monitor Metrics**
+   - [ ] Watch error rates for 15 minutes
+   - [ ] Monitor response times
+   - [ ] Check memory usage
+   - [ ] Verify no new issues
 
-4. **Check Key Metrics**
-   - Response time < 5 seconds
-   - Memory usage stable
-   - No circuit breaker alerts
+### Short-term (15-60 minutes)
 
-### Short-Term Actions (< 1 hour)
+1. **Communication**
+   - [ ] Update incident ticket
+   - [ ] Notify team of successful rollback
+   - [ ] Update status page
+   - [ ] Communicate to affected users if needed
 
-1. **Notify Stakeholders**
-   - Inform team of rollback
-   - Update status page
-   - Communicate with affected users
+2. **Root Cause Analysis**
+   - [ ] Identify what caused the issue
+   - [ ] Document findings in incident ticket
+   - [ ] Determine if issue was preventable
+   - [ ] Identify what tests were missing
 
-2. **Document Incident**
-   - Record timeline of events
-   - Note symptoms and impact
-   - Document rollback steps taken
+3. **Plan Forward**
+   - [ ] Create fix plan for rolled-back changes
+   - [ ] Add tests to prevent regression
+   - [ ] Schedule fix deployment
+   - [ ] Update deployment checklist
 
-3. **Identify Root Cause**
-   - Review failed deployment changes
-   - Analyze logs from failed deployment
-   - Identify what went wrong
+### Long-term (1-24 hours)
 
-4. **Create Fix Plan**
-   - Determine proper fix
-   - Plan testing strategy
-   - Schedule fix deployment
+1. **Incident Review**
+   - [ ] Conduct post-mortem meeting
+   - [ ] Document lessons learned
+   - [ ] Update runbooks and procedures
+   - [ ] Identify process improvements
 
-### Long-Term Actions (< 1 week)
+2. **Prevention**
+   - [ ] Add monitoring/alerts for issue
+   - [ ] Improve testing coverage
+   - [ ] Update deployment checklist
+   - [ ] Consider staging environment
 
-1. **Conduct Post-Mortem**
-   - See [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
-   - Identify contributing factors
-   - Document lessons learned
+3. **Fix and Redeploy**
+   - [ ] Implement fix with tests
+   - [ ] Test in development
+   - [ ] Deploy to staging (if available)
+   - [ ] Deploy to production with monitoring
 
-2. **Implement Preventive Measures**
-   - Add tests to catch similar issues
-   - Improve deployment checks
-   - Update monitoring/alerts
+## Rollback Decision Matrix
 
-3. **Deploy Fix**
-   - Implement proper fix
-   - Test thoroughly in staging
-   - Deploy with extra monitoring
+| Metric | Normal | Warning | Rollback |
+|--------|--------|---------|----------|
+| Error Rate | < 1% | 1-5% | > 5% |
+| Response Time (p95) | < 2s | 2-5s | > 5s |
+| Memory Usage | < 70% | 70-90% | > 90% |
+| Health Check | Pass | Degraded | Fail |
+| User Reports | 0-1 | 2-5 | > 5 |
 
-4. **Update Documentation**
-   - Update runbooks if needed
-   - Document new failure mode
-   - Share learnings with team
+## Rollback Communication Templates
 
----
+### Internal Team Notification
 
-## Prevention Strategies
+```
+🚨 ROLLBACK IN PROGRESS
 
-### Pre-Deployment Checks
+Service: Rose API
+Environment: Production
+Reason: [Brief description]
+Started: [Timestamp]
+ETA: [Estimated completion]
+Incident: [Ticket link]
 
-1. **Automated Testing**
-   - Run full test suite
-   - Check code coverage
-   - Verify integration tests pass
+Current Status: [In progress/Complete]
+```
 
-2. **Staging Deployment**
-   - Deploy to staging first
-   - Run smoke tests
-   - Monitor for 30 minutes
+### User Communication (if needed)
 
-3. **Deployment Checklist**
-   - [ ] All tests passing
-   - [ ] Code review completed
-   - [ ] Environment variables verified
-   - [ ] Database migrations tested
-   - [ ] Rollback plan documented
-   - [ ] Monitoring alerts configured
+```
+We're currently experiencing technical difficulties with Rose. 
+We've identified the issue and are working to restore service. 
+We expect to be back online within [timeframe].
 
-### Deployment Best Practices
+We apologize for the inconvenience.
+```
 
-1. **Gradual Rollout**
-   - Deploy to single instance first
-   - Monitor for issues
-   - Gradually increase traffic
+### Post-Rollback Update
 
-2. **Feature Flags**
-   - Use feature flags for risky changes
-   - Enable for small percentage of users
-   - Gradually increase rollout
+```
+✅ ROLLBACK COMPLETE
 
-3. **Canary Deployments**
-   - Deploy to small subset of infrastructure
-   - Compare metrics with stable version
-   - Proceed only if metrics are good
+Service: Rose API
+Environment: Production
+Duration: [Total time]
+Impact: [Number of users/requests affected]
 
-4. **Blue-Green Deployments**
-   - Maintain two identical environments
-   - Deploy to inactive environment
-   - Switch traffic after verification
+Service is now stable. We're investigating the root cause 
+and will deploy a fix after thorough testing.
 
-### Monitoring During Deployment
+Incident Report: [Link]
+```
 
-1. **Watch Key Metrics**
-   - Error rate
-   - Response time
-   - Memory usage
-   - Active sessions
+## Testing Rollback Procedures
 
-2. **Set Deployment Alerts**
-   - Alert on error rate > 2%
-   - Alert on response time > 8s
-   - Alert on health check failures
+### Quarterly Rollback Drill
 
-3. **Have Rollback Ready**
-   - Keep rollback command ready
-   - Monitor for 15 minutes post-deployment
-   - Be prepared to rollback quickly
+Practice rollback procedures in staging:
 
----
+1. **Preparation**
+   - Schedule drill with team
+   - Prepare "broken" deployment
+   - Set up monitoring
 
-## Rollback Testing
-
-### Regular Rollback Drills
-
-Conduct rollback drills quarterly to ensure procedures work:
-
-1. **Schedule Drill**
-   - Choose low-traffic time
-   - Notify team in advance
-   - Prepare test scenarios
-
-2. **Execute Rollback**
-   - Follow documented procedures
+2. **Execute Drill**
+   - Deploy broken version
+   - Detect issue
+   - Execute rollback procedure
    - Time each step
-   - Note any issues
 
-3. **Verify Success**
-   - Run full smoke tests
-   - Check all functionality
-   - Verify data integrity
-
-4. **Document Results**
-   - Update procedures if needed
-   - Note time taken
+3. **Review**
+   - Discuss what went well
    - Identify improvements
+   - Update procedures
+   - Train new team members
 
-### Rollback Checklist
+## Rollback Metrics
 
-Use this checklist during actual rollbacks:
+Track and review:
+- Time to detect issue
+- Time to decide on rollback
+- Time to complete rollback
+- Time to verify success
+- Total incident duration
 
-- [ ] Issue severity assessed
-- [ ] Rollback decision made
-- [ ] Stakeholders notified
-- [ ] Last known good version identified
-- [ ] Rollback command prepared
-- [ ] Monitoring dashboard open
-- [ ] Rollback executed
-- [ ] Health check passed
-- [ ] Smoke tests passed
-- [ ] Error rate normal
-- [ ] Users notified
-- [ ] Incident documented
-- [ ] Post-mortem scheduled
-
----
+**Target Metrics:**
+- Detection: < 5 minutes
+- Decision: < 5 minutes
+- Rollback: < 10 minutes
+- Verification: < 5 minutes
+- **Total: < 25 minutes**
 
 ## Emergency Contacts
 
-### Internal Escalation
-- **On-Call Engineer**: [Contact info]
-- **Engineering Lead**: [Contact info]
-- **CTO/VP Engineering**: [Contact info]
+### Internal
+- On-call Engineer: [Contact]
+- Engineering Manager: [Contact]
+- CTO: [Contact]
 
-### External Support
-- **Railway Support**: help@railway.app
-- **Groq Support**: support@groq.com
-- **ElevenLabs Support**: support@elevenlabs.io
-- **Qdrant Support**: support@qdrant.io
-
----
+### External
+- Railway Support: support@railway.app
+- Qdrant Support: support@qdrant.tech
 
 ## Related Documentation
 
 - [Operations Runbook](OPERATIONS_RUNBOOK.md)
 - [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
 - [Deployment Guide](DEPLOYMENT.md)
-- [Data Persistence Guide](DATA_PERSISTENCE.md)
+- [Deployment Checklist](DEPLOYMENT_CHECKLIST.md)
 
 ---
 
-## Revision History
-
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01-15 | 1.0 | Initial rollback procedures |
+**Last Updated:** October 21, 2025  
+**Next Review:** January 21, 2026

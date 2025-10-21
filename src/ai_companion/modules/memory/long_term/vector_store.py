@@ -198,6 +198,34 @@ class VectorStore:
             logging.getLogger(__name__).error("Cannot search Qdrant memories: circuit breaker is open")
             return []
 
+    def get_collection_info(self) -> Optional[dict]:
+        """Get information about the memory collection for monitoring.
+
+        Returns:
+            Dictionary with collection statistics or None if unavailable
+        """
+        try:
+            if not self._collection_exists():
+                return None
+
+            def _get_info():
+                return self.client.get_collection(collection_name=self.COLLECTION_NAME)
+
+            collection_info = self._circuit_breaker.call(_get_info)
+
+            return {
+                "name": collection_info.name,
+                "vectors_count": collection_info.vectors_count,
+                "points_count": collection_info.points_count,
+                "status": collection_info.status,
+            }
+
+        except CircuitBreakerError:
+            import logging
+
+            logging.getLogger(__name__).error("Cannot get Qdrant collection info: circuit breaker is open")
+            return None
+
 
 @lru_cache
 def get_vector_store() -> VectorStore:

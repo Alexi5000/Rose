@@ -1,683 +1,507 @@
-# Operations Runbook: Rose the Healer Shaman
+# Operations Runbook
 
-This runbook provides troubleshooting procedures, diagnostic steps, and solutions for common operational issues with the Rose application.
+## Overview
 
-## Table of Contents
-
-- [Quick Reference](#quick-reference)
-- [Common Issues](#common-issues)
-  - [High Error Rate](#high-error-rate)
-  - [Slow Response Times](#slow-response-times)
-  - [Memory Issues](#memory-issues)
-  - [Database Issues](#database-issues)
-  - [External API Failures](#external-api-failures)
-  - [Audio Processing Failures](#audio-processing-failures)
-- [Diagnostic Procedures](#diagnostic-procedures)
-- [Emergency Procedures](#emergency-procedures)
-- [Monitoring and Alerts](#monitoring-and-alerts)
-
----
+This runbook provides troubleshooting guidance for common operational issues with the Rose the Healer Shaman application. Use this guide for quick diagnosis and resolution of production incidents.
 
 ## Quick Reference
 
-### Key Endpoints
-
-| Endpoint | Purpose | Expected Response |
-|----------|---------|-------------------|
-| `/api/health` | Health check | `{"status": "healthy", ...}` |
-| `/api/session/start` | Start new session | `{"session_id": "..."}` |
-| `/api/voice/process` | Process voice input | `{"text": "...", "audio_url": "..."}` |
-
-### Key Metrics to Monitor
-
-- **Error Rate**: Should be < 1% under normal conditions
-- **Response Time**: P95 should be < 5 seconds for voice processing
-- **Memory Usage**: Should stay under 80% of allocated memory
-- **Disk Usage**: `/app/data` should not exceed 80% capacity
-- **Active Sessions**: Track concurrent session count
-
-### Log Locations
-
-- **Application Logs**: stdout/stderr (captured by platform)
-- **Structured Logs**: JSON format with request IDs
-- **Backup Logs**: `/app/data/backups/backup.log`
-
-### External Service Status Pages
-
-- **Groq**: https://status.groq.com/
-- **ElevenLabs**: https://status.elevenlabs.io/
-- **Qdrant Cloud**: https://status.qdrant.io/
-- **Railway**: https://railway.app/status
-
----
+| Issue | Severity | First Response |
+|-------|----------|----------------|
+| High error rate | Critical | Check external API status, review logs |
+| Slow response times | High | Check Qdrant connectivity, memory usage |
+| Memory issues | High | Check database size, temporary files |
+| Audio processing failures | Medium | Verify Groq/ElevenLabs API keys |
+| Session not found | Low | Check SQLite database, session cleanup |
 
 ## Common Issues
 
-### High Error Rate
+### 1. High Error Rate
 
-#### Symptoms
-- Error rate > 5% in monitoring dashboard
+**Symptoms:**
 - Multiple 500 errors in logs
-- Users reporting failures
+- Users reporting failed requests
+- Error rate > 5% in monitoring dashboard
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Check recent error logs
+grep "ERROR" /app/logs/app.log | tail -50
 
-1. **Check Application Logs**
-   ```bash
-   # Railway
-   railway logs --tail 100
-   
-   # Check for error patterns
-   railway logs | grep "ERROR"
-   ```
+# Check external API status
+curl https://api.groq.com/health
+curl https://api.elevenlabs.io/health
 
-2. **Verify External Service Status**
-   - Check Groq status page
-   - Check ElevenLabs status page
-   - Check Qdrant status page
+# Verify environment variables
+env | grep -E "(GROQ|ELEVENLABS|QDRANT)"
+```
 
-3. **Check Circuit Breaker Status**
-   - Look for "Circuit breaker OPEN" messages in logs
-   - Indicates repeated failures to external service
+**Resolution:**
+1. **External API Issues:**
+   - Check status pages: Groq, ElevenLabs, Qdrant
+   - Verify API keys are valid and not expired
+   - Check rate limits haven't been exceeded
+   - Wait for service recovery or switch to backup provider
 
-4. **Review Recent Deployments**
-   - Check if error rate increased after deployment
-   - Consider rollback if correlation exists
+2. **Configuration Issues:**
+   - Verify all required environment variables are set
+   - Check CORS configuration matches frontend origin
+   - Restart service to reload configuration
 
-#### Common Causes and Solutions
+3. **Database Issues:**
+   - Check SQLite database file permissions
+   - Verify Qdrant connection with health check endpoint
+   - Check disk space availability
 
-**Cause: External API Outage**
-- **Solution**: Circuit breakers should handle this automatically
-- **Action**: Monitor external service status pages
-- **Recovery**: Errors should resolve when service recovers
-
-**Cause: Invalid API Keys**
-- **Solution**: Verify environment variables
-  ```bash
-  railway variables
-  ```
-- **Action**: Check for expired or revoked keys
-- **Recovery**: Update keys and redeploy
-
-**Cause: Rate Limit Exceeded**
-- **Solution**: Check API usage against quotas
-- **Action**: Implement request queuing or upgrade API plan
-- **Recovery**: Wait for rate limit reset or upgrade plan
-
-**Cause: Memory Exhaustion**
-- **Solution**: Check memory usage metrics
-- **Action**: Restart service or increase memory allocation
-- **Recovery**: See [Memory Issues](#memory-issues) section
+**Prevention:**
+- Implement circuit breakers for external services
+- Set up monitoring alerts for error rate > 3%
+- Regular API key rotation schedule
 
 ---
 
-### Slow Response Times
+### 2. Slow Response Times
 
-#### Symptoms
-- Response times > 10 seconds
-- Users reporting delays
-- Timeout errors in logs
+**Symptoms:**
+- Response times > 5 seconds
+- Users reporting lag or timeouts
+- High CPU or memory usage
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Check system resources
+docker stats
 
-1. **Check Performance Metrics**
-   ```bash
-   # Look for timing logs
-   railway logs | grep "duration_ms"
-   ```
+# Check database size
+ls -lh /app/data/*.db
 
-2. **Identify Bottleneck**
-   - Check Groq API latency (look for "groq_duration_ms")
-   - Check Qdrant query times (look for "qdrant_duration_ms")
-   - Check TTS generation times (look for "tts_duration_ms")
+# Check temporary file count
+find /tmp -name "*.wav" -o -name "*.mp3" | wc -l
 
-3. **Check Concurrent Load**
-   - Review active session count
-   - Check if slowdown correlates with high traffic
+# Check active sessions
+sqlite3 /app/data/short_term_memory.db "SELECT COUNT(*) FROM sessions;"
+```
 
-4. **Verify Network Connectivity**
-   - Test external API connectivity from deployment region
-   - Check for network issues between services
+**Resolution:**
+1. **High Memory Usage:**
+   - Restart service to clear memory leaks
+   - Check for large audio files in /tmp
+   - Run cleanup job: `python -m ai_companion.core.session_cleanup`
 
-#### Common Causes and Solutions
+2. **Database Performance:**
+   - Check SQLite database size (should be < 100MB)
+   - Run VACUUM on SQLite: `sqlite3 /app/data/short_term_memory.db "VACUUM;"`
+   - Archive old sessions (> 7 days)
 
-**Cause: Groq API Slow**
-- **Solution**: Groq may be experiencing high load
-- **Action**: Monitor Groq status page
-- **Temporary Fix**: Consider switching to faster model (gemma2-9b)
-- **Recovery**: Performance should improve when Groq load decreases
+3. **External API Latency:**
+   - Check Qdrant response times
+   - Verify network connectivity to external services
+   - Consider enabling TTS caching
 
-**Cause: Qdrant Query Slow**
-- **Solution**: Large vector database or complex queries
-- **Action**: Check Qdrant collection size
-- **Optimization**: Reduce `MEMORY_TOP_K` setting (default: 3)
-- **Recovery**: Consider upgrading Qdrant plan
+4. **High Concurrent Load:**
+   - Check number of active sessions
+   - Consider scaling horizontally (requires PostgreSQL migration)
+   - Implement request queuing
 
-**Cause: High Concurrent Sessions**
-- **Solution**: Application under heavy load
-- **Action**: Check active session count in logs
-- **Scaling**: Increase instance size or add horizontal scaling
-- **Recovery**: Scale resources or implement request queuing
-
-**Cause: Memory Pressure**
-- **Solution**: Application swapping or near memory limit
-- **Action**: Check memory usage metrics
-- **Recovery**: Restart service or increase memory allocation
+**Prevention:**
+- Set up monitoring for response time > 3s
+- Implement automatic session cleanup
+- Configure memory limits in Docker
 
 ---
 
-### Memory Issues
+### 3. Memory Issues / OOM Kills
 
-#### Symptoms
-- Out of memory (OOM) errors
-- Application crashes
-- Slow performance with high memory usage
-- Platform warnings about memory limits
+**Symptoms:**
+- Container restarts unexpectedly
+- "Out of memory" errors in logs
+- Railway shows memory limit exceeded
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Check memory usage
+docker stats --no-stream
 
-1. **Check Memory Usage**
-   ```bash
-   # Railway dashboard shows memory metrics
-   # Look for memory usage trends
-   ```
+# Check for memory leaks
+ps aux | grep python | awk '{print $6}'
 
-2. **Check for Memory Leaks**
-   - Review memory usage over time
-   - Look for steady increase without corresponding load
+# Check temporary files
+du -sh /tmp
 
-3. **Check Session Count**
-   ```bash
-   # Count active sessions in database
-   railway logs | grep "active_sessions"
-   ```
+# Check database sizes
+du -sh /app/data/
+```
 
-4. **Check Temporary Files**
-   ```bash
-   # SSH into container (if available) or check logs
-   railway logs | grep "audio_cleanup"
-   ```
+**Resolution:**
+1. **Immediate:**
+   - Restart service to clear memory
+   - Clean up temporary files: `find /tmp -name "*.wav" -mtime +1 -delete`
+   - Clear old sessions
 
-#### Common Causes and Solutions
+2. **Short-term:**
+   - Reduce concurrent session limit
+   - Enable aggressive session cleanup
+   - Increase memory limit in Railway
 
-**Cause: Too Many Active Sessions**
-- **Solution**: Old sessions not being cleaned up
-- **Action**: Check session cleanup job is running
-  ```bash
-  railway logs | grep "session_cleanup"
-  ```
-- **Fix**: Manually trigger cleanup or reduce retention period
-- **Prevention**: Ensure cleanup job runs daily
+3. **Long-term:**
+   - Implement automatic temporary file cleanup
+   - Add memory profiling to identify leaks
+   - Optimize Qdrant client connection pooling
 
-**Cause: Temporary Audio Files Not Cleaned**
-- **Solution**: Audio cleanup job not running
-- **Action**: Check for cleanup logs
-  ```bash
-  railway logs | grep "cleanup_old_audio"
-  ```
-- **Fix**: Restart service to reinitialize cleanup job
-- **Prevention**: Monitor disk usage regularly
-
-**Cause: Large Vector Database**
-- **Solution**: Qdrant memory usage growing
-- **Action**: Check Qdrant collection size
-- **Optimization**: Implement memory pruning or archival
-- **Recovery**: Consider upgrading Qdrant plan
-
-**Cause: Memory Leak**
-- **Solution**: Application not releasing memory
-- **Action**: Review recent code changes
-- **Temporary Fix**: Restart service
-- **Long-term**: Profile application and fix leak
+**Prevention:**
+- Configure Docker memory limits (512MB-1GB)
+- Implement scheduled cleanup jobs
+- Monitor memory usage trends
 
 ---
 
-### Database Issues
+### 4. Audio Processing Failures
 
-#### Symptoms
-- "Database locked" errors
-- Slow query performance
-- Data corruption warnings
-- Session state not persisting
+**Symptoms:**
+- "Speech-to-text failed" errors
+- "Text-to-speech failed" errors
+- Users can't hear responses
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Check API keys
+echo $GROQ_API_KEY | cut -c1-10
+echo $ELEVENLABS_API_KEY | cut -c1-10
 
-1. **Check Database Health**
-   ```bash
-   # Health endpoint includes database check
-   curl https://your-app.railway.app/api/health
-   ```
+# Test Groq STT
+curl -X POST https://api.groq.com/openai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $GROQ_API_KEY" \
+  -F file=@test.wav -F model=whisper-large-v3
 
-2. **Check Database Size**
-   ```bash
-   railway logs | grep "database_size"
-   ```
+# Test ElevenLabs TTS
+curl -X POST https://api.elevenlabs.io/v1/text-to-speech/$ELEVENLABS_VOICE_ID \
+  -H "xi-api-key: $ELEVENLABS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"test"}'
+```
 
-3. **Check for Corruption**
-   ```bash
-   railway logs | grep "database" | grep -i "corrupt\|error"
-   ```
+**Resolution:**
+1. **API Key Issues:**
+   - Verify API keys are correct and active
+   - Check API quota/credits remaining
+   - Rotate keys if compromised
 
-4. **Verify Volume Mount**
-   - Check Railway dashboard for volume configuration
-   - Ensure `/app/data` is mounted to persistent volume
+2. **Audio Format Issues:**
+   - Verify audio file format (should be WAV/MP3)
+   - Check file size (< 25MB for Groq)
+   - Validate audio encoding
 
-#### Common Causes and Solutions
+3. **Rate Limiting:**
+   - Check if rate limits exceeded
+   - Implement exponential backoff
+   - Consider upgrading API plan
 
-**Cause: Database Locked (SQLite)**
-- **Solution**: Concurrent write attempts
-- **Action**: Check for multiple processes accessing database
-- **Temporary Fix**: Restart service
-- **Long-term**: Consider PostgreSQL for better concurrency
-
-**Cause: Database Corruption**
-- **Solution**: Unexpected shutdown or disk issues
-- **Action**: Check backup availability
-  ```bash
-  railway logs | grep "backup_created"
-  ```
-- **Recovery**: Restore from most recent backup
-- **Prevention**: Ensure proper shutdown procedures
-
-**Cause: Volume Not Mounted**
-- **Solution**: Data stored on ephemeral storage
-- **Action**: Check Railway volume configuration
-- **Fix**: Add persistent volume and redeploy
-- **Impact**: Previous data may be lost
-
-**Cause: Disk Full**
-- **Solution**: Volume capacity exceeded
-- **Action**: Check disk usage
-- **Fix**: Increase volume size or clean old data
-- **Prevention**: Monitor disk usage regularly
+**Prevention:**
+- Monitor API usage and quotas
+- Implement circuit breakers
+- Set up alerts for API failures > 10%
 
 ---
 
-### External API Failures
+### 5. Qdrant Connection Issues
 
-#### Symptoms
-- "Service unavailable" errors
-- Circuit breaker open messages
-- Specific API error messages (Groq, ElevenLabs, Qdrant)
+**Symptoms:**
+- "Failed to connect to Qdrant" errors
+- Memory retrieval failures
+- Slow memory operations
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Test Qdrant connectivity
+curl -X GET "$QDRANT_URL/health" \
+  -H "api-key: $QDRANT_API_KEY"
 
-1. **Identify Failing Service**
-   ```bash
-   railway logs | grep -i "groq\|elevenlabs\|qdrant" | grep -i "error\|fail"
-   ```
+# Check collection status
+curl -X GET "$QDRANT_URL/collections/rose_memories" \
+  -H "api-key: $QDRANT_API_KEY"
 
-2. **Check Circuit Breaker Status**
-   ```bash
-   railway logs | grep "circuit_breaker"
-   ```
+# Check network connectivity
+ping $(echo $QDRANT_URL | sed 's|https://||' | sed 's|/.*||')
+```
 
-3. **Verify API Keys**
-   ```bash
-   railway variables | grep -i "api_key"
-   ```
+**Resolution:**
+1. **Connection Failures:**
+   - Verify QDRANT_URL and QDRANT_API_KEY
+   - Check network connectivity
+   - Verify Qdrant Cloud service status
 
-4. **Test API Connectivity**
-   - Use health endpoint to test all services
-   - Check service status pages
+2. **Collection Issues:**
+   - Recreate collection if corrupted
+   - Check collection size and limits
+   - Verify vector dimensions match
 
-#### Common Causes and Solutions
+3. **Performance Issues:**
+   - Implement connection pooling
+   - Add retry logic with backoff
+   - Consider Qdrant plan upgrade
 
-**Cause: Groq API Down**
-- **Symptoms**: STT or LLM failures
-- **Solution**: Circuit breaker prevents cascading failures
-- **Action**: Monitor Groq status page
-- **User Impact**: Graceful error messages shown
-- **Recovery**: Automatic when Groq recovers
-
-**Cause: ElevenLabs API Down**
-- **Symptoms**: TTS failures, no audio responses
-- **Solution**: Fallback to text-only responses
-- **Action**: Monitor ElevenLabs status page
-- **User Impact**: Text responses still work
-- **Recovery**: Automatic when ElevenLabs recovers
-
-**Cause: Qdrant Connection Issues**
-- **Symptoms**: Memory retrieval failures
-- **Solution**: Application continues with degraded memory
-- **Action**: Check Qdrant URL and API key
-- **User Impact**: Reduced context awareness
-- **Recovery**: Verify credentials and connectivity
-
-**Cause: Rate Limit Exceeded**
-- **Symptoms**: 429 errors in logs
-- **Solution**: Retry logic with backoff
-- **Action**: Check API usage against quotas
-- **Mitigation**: Implement request queuing
-- **Long-term**: Upgrade API plan
+**Prevention:**
+- Implement circuit breaker for Qdrant
+- Monitor Qdrant response times
+- Regular health checks
 
 ---
 
-### Audio Processing Failures
+### 6. Session Not Found Errors
 
-#### Symptoms
-- "Audio processing failed" errors
-- Invalid audio format errors
-- Corrupted audio file warnings
+**Symptoms:**
+- "Session not found" errors
+- Users lose conversation context
+- Inconsistent session state
 
-#### Diagnostic Steps
+**Diagnosis:**
+```bash
+# Check session in database
+sqlite3 /app/data/short_term_memory.db \
+  "SELECT * FROM checkpoints WHERE thread_id='<session_id>' LIMIT 1;"
 
-1. **Check Audio Validation Logs**
-   ```bash
-   railway logs | grep "audio_validation"
-   ```
+# Check session count
+sqlite3 /app/data/short_term_memory.db \
+  "SELECT COUNT(DISTINCT thread_id) FROM checkpoints;"
 
-2. **Check File Size Limits**
-   ```bash
-   railway logs | grep "audio_size"
-   ```
+# Check for cleanup job logs
+grep "session_cleanup" /app/logs/app.log
+```
 
-3. **Check Temporary Storage**
-   ```bash
-   railway logs | grep "tmp" | grep -i "error"
-   ```
+**Resolution:**
+1. **Session Expired:**
+   - Normal behavior for sessions > 7 days
+   - User needs to start new session
+   - Frontend should handle gracefully
 
-4. **Verify Audio Format**
-   - Check client is sending supported formats
-   - Review audio encoding settings
+2. **Database Corruption:**
+   - Restore from backup
+   - Recreate database if necessary
+   - Check disk space and permissions
 
-#### Common Causes and Solutions
+3. **Cleanup Job Too Aggressive:**
+   - Adjust cleanup threshold (default 7 days)
+   - Disable automatic cleanup temporarily
+   - Review cleanup logs
 
-**Cause: Invalid Audio Format**
-- **Symptoms**: Format validation errors
-- **Solution**: Client sending unsupported format
-- **Action**: Check frontend audio recording settings
-- **Fix**: Ensure WebM or WAV format
-- **Prevention**: Add format validation in frontend
-
-**Cause: Audio File Too Large**
-- **Symptoms**: Size limit exceeded errors
-- **Solution**: Audio exceeds 10MB limit
-- **Action**: Check recording duration
-- **Fix**: Implement client-side duration limits
-- **Prevention**: Add UI feedback for recording length
-
-**Cause: Corrupted Audio Data**
-- **Symptoms**: Decoding errors
-- **Solution**: Network issues during upload
-- **Action**: Check network stability
-- **Fix**: Implement retry logic in frontend
-- **Prevention**: Add audio integrity checks
-
-**Cause: Temporary Storage Full**
-- **Symptoms**: Cannot write audio file
-- **Solution**: Disk space exhausted
-- **Action**: Check disk usage
-- **Fix**: Trigger manual cleanup or increase storage
-- **Prevention**: Ensure cleanup job runs regularly
+**Prevention:**
+- Implement session persistence in frontend
+- Regular database backups
+- Monitor session lifecycle
 
 ---
 
-## Diagnostic Procedures
+### 7. Deployment Failures
 
-### Health Check Procedure
+**Symptoms:**
+- Build fails on Railway
+- Health checks fail after deployment
+- Service won't start
 
-1. **Basic Health Check**
-   ```bash
-   curl https://your-app.railway.app/api/health
-   ```
-   
-   Expected response:
-   ```json
-   {
-     "status": "healthy",
-     "timestamp": "2024-01-15T10:30:00Z",
-     "services": {
-       "groq": "healthy",
-       "elevenlabs": "healthy",
-       "qdrant": "healthy",
-       "database": "healthy"
-     }
-   }
-   ```
+**Diagnosis:**
+```bash
+# Check build logs in Railway dashboard
+# Check startup logs
+docker logs <container_id>
 
-2. **Detailed Service Check**
-   - If any service shows "unhealthy", investigate that service
-   - Check service-specific logs
-   - Verify credentials and connectivity
+# Verify health check
+curl http://localhost:8000/api/health
 
-### Log Analysis Procedure
+# Check environment variables
+env | grep -E "(GROQ|ELEVENLABS|QDRANT|WHATSAPP)"
+```
 
-1. **Get Recent Logs**
-   ```bash
-   railway logs --tail 500 > logs.txt
-   ```
+**Resolution:**
+1. **Build Failures:**
+   - Check pyproject.toml for dependency conflicts
+   - Verify Python version (3.12+)
+   - Check Docker build logs for errors
 
-2. **Search for Errors**
-   ```bash
-   grep "ERROR" logs.txt
-   grep "CRITICAL" logs.txt
-   grep "exception" logs.txt -i
-   ```
+2. **Health Check Failures:**
+   - Verify all external services are accessible
+   - Check API keys are set correctly
+   - Increase health check timeout
 
-3. **Identify Patterns**
-   - Look for repeated errors
-   - Check timestamps for correlation
-   - Identify affected endpoints or sessions
+3. **Startup Failures:**
+   - Check for missing environment variables
+   - Verify database file permissions
+   - Check port conflicts
 
-4. **Extract Request IDs**
-   ```bash
-   grep "request_id" logs.txt | grep "ERROR"
-   ```
-   - Use request IDs to trace full request lifecycle
-
-### Performance Analysis Procedure
-
-1. **Extract Timing Metrics**
-   ```bash
-   railway logs | grep "duration_ms" > timings.txt
-   ```
-
-2. **Calculate Percentiles**
-   - Identify P50, P95, P99 response times
-   - Compare against SLA targets
-
-3. **Identify Slow Operations**
-   - Find operations > 5 seconds
-   - Determine which service is slow
-
-4. **Check Resource Usage**
-   - Review memory usage trends
-   - Check CPU utilization
-   - Monitor disk I/O
+**Prevention:**
+- Run smoke tests before deployment
+- Use CI/CD pipeline for validation
+- Maintain deployment checklist
 
 ---
 
-## Emergency Procedures
+## Health Check Interpretation
 
-### Service Down - Complete Outage
+### `/api/health` Endpoint Response
 
-**Immediate Actions:**
+**Healthy Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "services": {
+    "groq": "connected",
+    "elevenlabs": "connected",
+    "qdrant": "connected"
+  },
+  "timestamp": "2025-10-21T12:00:00Z"
+}
+```
 
-1. **Check Service Status**
-   ```bash
-   railway status
-   ```
+**Degraded Response (503 Service Unavailable):**
+```json
+{
+  "status": "degraded",
+  "services": {
+    "groq": "connected",
+    "elevenlabs": "error",
+    "qdrant": "connected"
+  },
+  "errors": ["ElevenLabs API unreachable"],
+  "timestamp": "2025-10-21T12:00:00Z"
+}
+```
 
-2. **Check Recent Deployments**
-   - Review deployment history
-   - Identify if outage started after deployment
-
-3. **Attempt Service Restart**
-   ```bash
-   railway restart
-   ```
-
-4. **Check Logs for Crash Cause**
-   ```bash
-   railway logs --tail 200
-   ```
-
-5. **If Restart Fails, Rollback**
-   - See [Rollback Procedures](ROLLBACK_PROCEDURES.md)
-
-**Communication:**
-- Update status page (if available)
-- Notify users via appropriate channels
-- Provide ETA for resolution
-
-### Data Loss Event
-
-**Immediate Actions:**
-
-1. **Stop Service**
-   ```bash
-   railway down
-   ```
-
-2. **Assess Damage**
-   - Check what data is affected
-   - Verify backup availability
-
-3. **Restore from Backup**
-   - See [Rollback Procedures](ROLLBACK_PROCEDURES.md)
-   - Follow backup restoration steps
-
-4. **Verify Data Integrity**
-   - Test restored data
-   - Verify session continuity
-
-5. **Resume Service**
-   ```bash
-   railway up
-   ```
-
-**Post-Incident:**
-- Document what happened
-- Identify root cause
-- Implement preventive measures
-
-### Security Incident
-
-**Immediate Actions:**
-
-1. **Isolate Affected Systems**
-   - Take service offline if necessary
-   - Block suspicious IP addresses
-
-2. **Rotate All Credentials**
-   ```bash
-   railway variables set GROQ_API_KEY=new_key
-   railway variables set ELEVENLABS_API_KEY=new_key
-   # Rotate all API keys
-   ```
-
-3. **Review Access Logs**
-   - Identify unauthorized access
-   - Determine scope of breach
-
-4. **Notify Stakeholders**
-   - Follow incident response plan
-   - Comply with disclosure requirements
-
-5. **Restore Service Securely**
-   - Verify all credentials rotated
-   - Implement additional security measures
+**Actions by Status:**
+- `healthy`: No action needed
+- `degraded`: Investigate failing service, may continue with reduced functionality
+- `unhealthy`: Service should not receive traffic, investigate immediately
 
 ---
 
 ## Monitoring and Alerts
 
-### Recommended Alert Thresholds
+### Key Metrics to Monitor
 
-| Metric | Warning | Critical | Action |
-|--------|---------|----------|--------|
-| Error Rate | > 2% | > 5% | Investigate logs, check external services |
-| Response Time (P95) | > 8s | > 15s | Check performance metrics, scale if needed |
-| Memory Usage | > 70% | > 85% | Check for leaks, restart if needed |
-| Disk Usage | > 70% | > 85% | Clean old data, increase volume size |
-| Circuit Breaker Open | Any | Multiple | Check external service status |
-| Health Check Failures | 2 consecutive | 5 consecutive | Restart service, investigate |
+1. **Error Rate**
+   - Target: < 1%
+   - Warning: > 3%
+   - Critical: > 5%
 
-### Monitoring Setup
+2. **Response Time (p95)**
+   - Target: < 2s
+   - Warning: > 3s
+   - Critical: > 5s
 
-**Railway Built-in Metrics:**
-- CPU usage
-- Memory usage
-- Network traffic
-- Request count
+3. **Memory Usage**
+   - Target: < 70%
+   - Warning: > 80%
+   - Critical: > 90%
 
-**Application Metrics (via Logs):**
-- Error rate by endpoint
-- Response time percentiles
-- Active session count
-- Circuit breaker status
-- Backup success/failure
+4. **Active Sessions**
+   - Target: < 100
+   - Warning: > 150
+   - Critical: > 200
 
-**External Monitoring:**
-- Uptime monitoring (UptimeRobot, Pingdom)
-- Error tracking (Sentry)
-- Log aggregation (Logtail, Papertrail)
+5. **External API Errors**
+   - Target: < 1%
+   - Warning: > 5%
+   - Critical: > 10%
 
-### Log Monitoring Queries
+### Alert Response Times
 
-**High Error Rate:**
+- **Critical**: Respond within 15 minutes
+- **High**: Respond within 1 hour
+- **Medium**: Respond within 4 hours
+- **Low**: Respond within 24 hours
+
+---
+
+## Maintenance Tasks
+
+### Daily
+- Review error logs for patterns
+- Check memory and disk usage
+- Verify external API status
+
+### Weekly
+- Review performance metrics
+- Check database sizes
+- Clean up old temporary files
+- Review session counts
+
+### Monthly
+- Rotate API keys
+- Review and update dependencies
+- Backup databases
+- Review and update documentation
+
+---
+
+## Useful Commands
+
+### Log Analysis
 ```bash
-railway logs | grep "ERROR" | wc -l
+# View recent errors
+grep "ERROR" /app/logs/app.log | tail -100
+
+# Count errors by type
+grep "ERROR" /app/logs/app.log | awk '{print $5}' | sort | uniq -c
+
+# View slow requests (> 3s)
+grep "duration" /app/logs/app.log | awk '$NF > 3000'
 ```
 
-**Slow Requests:**
+### Database Operations
 ```bash
-railway logs | grep "duration_ms" | awk -F'"duration_ms":' '{print $2}' | awk -F',' '{print $1}' | sort -n | tail -20
+# Database size
+ls -lh /app/data/*.db
+
+# Session count
+sqlite3 /app/data/short_term_memory.db \
+  "SELECT COUNT(DISTINCT thread_id) FROM checkpoints;"
+
+# Old sessions (> 7 days)
+sqlite3 /app/data/short_term_memory.db \
+  "SELECT COUNT(*) FROM checkpoints WHERE created_at < datetime('now', '-7 days');"
+
+# Vacuum database
+sqlite3 /app/data/short_term_memory.db "VACUUM;"
 ```
 
-**Circuit Breaker Events:**
+### Cleanup Operations
 ```bash
-railway logs | grep "circuit_breaker" | grep "OPEN"
-```
+# Clean old audio files
+find /tmp -name "*.wav" -mtime +1 -delete
+find /tmp -name "*.mp3" -mtime +1 -delete
 
-**Active Sessions:**
-```bash
-railway logs | grep "active_sessions" | tail -1
+# Clean old sessions
+python -m ai_companion.core.session_cleanup --days 7
+
+# Clear cache
+rm -rf /app/cache/*
 ```
 
 ---
 
-## Escalation Procedures
+## Contact and Escalation
 
-### Level 1: On-Call Engineer
-- Initial response to alerts
-- Basic troubleshooting
-- Service restarts
-- Log analysis
+### On-Call Rotation
+- Primary: [On-call engineer]
+- Secondary: [Backup engineer]
+- Manager: [Engineering manager]
 
-### Level 2: Senior Engineer
-- Complex troubleshooting
-- Performance optimization
-- Database issues
-- Code-level debugging
+### External Support
+- **Groq**: support@groq.com
+- **ElevenLabs**: support@elevenlabs.io
+- **Qdrant**: support@qdrant.tech
+- **Railway**: support@railway.app
 
-### Level 3: Engineering Lead
-- Architecture decisions
-- Major incidents
-- Data loss events
-- Security incidents
-
-### External Escalation
-- **Groq Support**: support@groq.com
-- **ElevenLabs Support**: support@elevenlabs.io
-- **Qdrant Support**: support@qdrant.io
-- **Railway Support**: help@railway.app
+### Escalation Path
+1. On-call engineer (0-15 min)
+2. Secondary engineer (15-30 min)
+3. Engineering manager (30-60 min)
+4. CTO (> 60 min for critical issues)
 
 ---
 
-## Related Documentation
+## Additional Resources
 
+- [Deployment Guide](DEPLOYMENT.md)
 - [Rollback Procedures](ROLLBACK_PROCEDURES.md)
 - [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
-- [Deployment Guide](DEPLOYMENT.md)
-- [Data Persistence Guide](DATA_PERSISTENCE.md)
-- [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md)
-
----
-
-## Revision History
-
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01-15 | 1.0 | Initial runbook creation |
+- [Architecture Documentation](ARCHITECTURE.md)
+- [External API Limits](EXTERNAL_API_LIMITS.md)

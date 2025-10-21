@@ -1,296 +1,387 @@
 # Operational Documentation Index
 
-This index provides a comprehensive guide to all operational documentation for the Rose the Healer Shaman application.
+## Overview
+
+This index provides a comprehensive guide to all operational documentation for the Rose the Healer Shaman application. Use this as your starting point for deployment, operations, troubleshooting, and incident response.
+
+---
 
 ## Quick Start
 
-**New to Operations?** Start here:
+**New to the project?** Start here:
 1. [Architecture Documentation](ARCHITECTURE.md) - Understand the system
-2. [Deployment Guide](DEPLOYMENT.md) - Deploy the application
-3. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Handle common issues
+2. [Deployment Guide](DEPLOYMENT.md) - Deploy to production
+3. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Day-to-day operations
 
-**Incident Response?** Go here:
-1. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Diagnose and fix issues
-2. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Coordinate response
-3. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - Rollback if needed
+**Experiencing an issue?** Go here:
+1. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Common issues and solutions
+2. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Incident procedures
+3. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - How to rollback
 
 ---
 
 ## Documentation Categories
 
-### 🏗️ Architecture & Design
+### 1. Architecture and Design
 
-**[Architecture Documentation](ARCHITECTURE.md)**
+**Purpose:** Understand how the system works
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Architecture Documentation](ARCHITECTURE.md) | System architecture, components, data flow, deployment architecture | All engineers |
+| [Project Structure](PROJECT_STRUCTURE.md) | Code organization and conventions | Developers |
+| [Data Persistence](DATA_PERSISTENCE.md) | Memory system, databases, backups | Backend engineers |
+
+**Key Topics:**
 - System overview and component architecture
-- Data flow diagrams
-- Deployment architecture
-- Memory system architecture
+- LangGraph workflow and state management
+- Memory system (short-term and long-term)
+- Deployment architecture on Railway
 - Security and resilience patterns
-- Performance characteristics
-
-**Purpose**: Understand how the system works and how components interact.
+- Scaling considerations
 
 ---
 
-### 🚀 Deployment & Configuration
+### 2. Deployment and Configuration
 
-**[Deployment Guide](DEPLOYMENT.md)**
-- Railway deployment (recommended)
-- Alternative platforms (Render, Fly.io)
-- Environment variables
-- Data persistence setup
-- Post-deployment checklist
+**Purpose:** Deploy and configure the application
 
-**[Data Persistence Guide](DATA_PERSISTENCE.md)**
-- Volume configuration
-- Automatic backup system
-- Manual backup procedures
-- Disaster recovery
-- Storage optimization
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Deployment Guide](DEPLOYMENT.md) | Complete deployment instructions for Railway and other platforms | DevOps, Backend |
+| [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) | Pre-deployment verification checklist | DevOps, QA |
+| [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) | Environment-specific configuration | DevOps |
+| [Railway Setup](RAILWAY_SETUP.md) | Railway-specific setup instructions | DevOps |
+| [GCP Setup](gcp_setup.md) | Google Cloud Platform deployment (alternative) | DevOps |
 
-**Purpose**: Deploy and configure the application correctly.
-
----
-
-### 🔧 Operations & Troubleshooting
-
-**[Operations Runbook](OPERATIONS_RUNBOOK.md)**
-- Common issues and solutions
-- Diagnostic procedures
-- Emergency procedures
-- Monitoring and alerts
-- Escalation procedures
-
-**Topics Covered**:
-- High error rate
-- Slow response times
-- Memory issues
-- Database issues
-- External API failures
-- Audio processing failures
-
-**Purpose**: Quickly diagnose and resolve operational issues.
+**Key Topics:**
+- Railway deployment process
+- Environment variable configuration
+- Persistent volume setup
+- Health check configuration
+- CI/CD pipeline setup
+- Docker configuration
 
 ---
 
-### 🔄 Incident Management
+### 3. Operations and Maintenance
 
-**[Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)**
-- Incident severity levels (P0-P3)
-- Response team roles
-- Response process (Detection → Response → Resolution → Recovery)
-- Communication protocols
-- Post-incident review procedures
-- Incident templates
+**Purpose:** Run and maintain the application in production
 
-**[Rollback Procedures](ROLLBACK_PROCEDURES.md)**
-- When to rollback
-- Deployment rollback (Railway, Render, Fly.io)
-- Data restoration procedures
-- Rollback decision matrix
-- Post-rollback verification
-- Prevention strategies
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Operations Runbook](OPERATIONS_RUNBOOK.md) | Troubleshooting guide for common issues | On-call engineers, SRE |
+| [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) | Logging, metrics, and monitoring setup | SRE, DevOps |
+| [Resource Management](RESOURCE_MANAGEMENT.md) | Memory, CPU, disk management | SRE, Backend |
+| [External API Limits](EXTERNAL_API_LIMITS.md) | Rate limits and quotas for external services | All engineers |
 
-**Purpose**: Coordinate effective incident response and recovery.
-
----
-
-### 🔒 Security
-
-**[Security Documentation](SECURITY.md)**
-- Security architecture
-- Authentication and authorization
-- Data protection
-- API security
-- Security best practices
-- Vulnerability management
-
-**Purpose**: Understand and maintain security posture.
-
----
-
-### 📊 Monitoring & Observability
-
-**[Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md)**
-- Logging architecture
-- Metrics collection
-- Alerting configuration
+**Key Topics:**
+- Common operational issues and solutions
+- Health check interpretation
+- Log analysis and debugging
 - Performance monitoring
-- External service monitoring
-
-**Purpose**: Monitor system health and performance.
-
----
-
-### 🌐 External Services
-
-**[External API Limits](EXTERNAL_API_LIMITS.md)**
-- Groq API (LLM, STT)
-- ElevenLabs API (TTS)
-- Qdrant Cloud (Vector DB)
-- Together AI (Image generation)
-- Rate limits and quotas
-- Pricing and cost estimation
-- Optimization strategies
-
-**Purpose**: Understand external dependencies and manage costs.
+- Resource usage optimization
+- External API management
 
 ---
 
-### 🛡️ Resilience & Reliability
+### 4. Incident Response
 
-**[Circuit Breakers](CIRCUIT_BREAKERS.md)**
-- Circuit breaker pattern
-- Implementation details
-- Configuration
-- Monitoring
+**Purpose:** Respond to and resolve production incidents
 
-**[Resource Management](RESOURCE_MANAGEMENT.md)**
-- Memory management
-- Disk space management
-- Connection pooling
-- Cleanup jobs
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) | Structured incident response process | On-call engineers, Management |
+| [Rollback Procedures](ROLLBACK_PROCEDURES.md) | How to rollback deployments safely | On-call engineers, DevOps |
 
-**Purpose**: Ensure system resilience and efficient resource usage.
+**Key Topics:**
+- Incident severity levels
+- Detection and response procedures
+- Communication templates
+- Escalation procedures
+- Post-incident review process
+- Rollback decision matrix
 
 ---
 
-### 🔄 CI/CD
+### 5. Security and Compliance
 
-**[CI/CD Setup](CI_CD_SETUP.md)**
-- GitHub Actions workflow
+**Purpose:** Ensure security and compliance
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Security Documentation](SECURITY.md) | Security best practices and implementation | Security, Backend |
+| [Security Implementation Summary](SECURITY_IMPLEMENTATION_SUMMARY.md) | Summary of security features | All engineers |
+
+**Key Topics:**
+- Authentication and authorization (future)
+- API security (CORS, rate limiting)
+- Data encryption and protection
+- Security headers
+- Vulnerability management
+- Compliance considerations
+
+---
+
+### 6. Development and Testing
+
+**Purpose:** Develop and test features
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Getting Started](GETTING_STARTED.md) | Local development setup | New developers |
+| [Testing Documentation](../tests/README.md) | Testing strategy and test execution | QA, Developers |
+| [Testing Summary](../tests/TESTING_SUMMARY.md) | Test coverage and results | QA, Management |
+| [API Documentation](API_DOCUMENTATION.md) | API endpoints and usage | Frontend, Backend |
+| [API Quick Reference](API_QUICK_REFERENCE.md) | Quick API reference | All developers |
+
+**Key Topics:**
+- Local development environment setup
+- Running tests
+- API endpoint documentation
+- Code quality standards
+- Pre-commit hooks
+
+---
+
+### 7. API and Integration
+
+**Purpose:** Integrate with the application
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [API Documentation](API_DOCUMENTATION.md) | Complete API reference | Frontend, Integrators |
+| [API Quick Reference](API_QUICK_REFERENCE.md) | Quick API lookup | All developers |
+| [API Design Verification](API_DESIGN_VERIFICATION.md) | API design standards | Backend |
+| [Error Handling and Observability](ERROR_HANDLING_AND_OBSERVABILITY.md) | Error handling patterns | Backend |
+
+**Key Topics:**
+- REST API endpoints
+- Request/response formats
+- Error handling
+- Rate limiting
+- Authentication (future)
+
+---
+
+### 8. CI/CD and Automation
+
+**Purpose:** Automate testing and deployment
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [CI/CD Pipeline](CI_CD_PIPELINE.md) | Continuous integration and deployment | DevOps, Backend |
+| [CI/CD Setup](CI_CD_SETUP.md) | Setting up CI/CD | DevOps |
+| [CI/CD Implementation Summary](CI_CD_IMPLEMENTATION_SUMMARY.md) | CI/CD features and status | All engineers |
+
+**Key Topics:**
+- GitHub Actions workflows
 - Automated testing
-- Code coverage
+- Code coverage reporting
 - Deployment automation
+- Pre-deployment checks
 
-**Purpose**: Automate testing and deployment.
+---
+
+### 9. Recent Changes and Improvements
+
+**Purpose:** Track recent changes and improvements
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Recent Improvements](RECENT_IMPROVEMENTS.md) | Summary of recent enhancements | All engineers |
+| [Changelog](../CHANGELOG.md) | Version history and changes | All engineers |
+| [Task Summaries](.) | Implementation summaries for completed tasks | All engineers |
+
+**Key Topics:**
+- Recent feature additions
+- Bug fixes
+- Performance improvements
+- Security enhancements
 
 ---
 
 ## Common Scenarios
 
-### Scenario: Service is Down
+### Scenario 1: New Engineer Onboarding
 
-1. Check [Operations Runbook - Service Down](OPERATIONS_RUNBOOK.md#service-down---complete-outage)
-2. Follow [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
-3. Consider [Rollback Procedures](ROLLBACK_PROCEDURES.md) if recent deployment
+**Goal:** Get a new engineer up to speed
 
-### Scenario: High Error Rate
+**Reading Order:**
+1. [Getting Started](GETTING_STARTED.md) - Set up local environment
+2. [Architecture Documentation](ARCHITECTURE.md) - Understand the system
+3. [Project Structure](PROJECT_STRUCTURE.md) - Navigate the codebase
+4. [API Documentation](API_DOCUMENTATION.md) - Learn the API
+5. [Testing Documentation](../tests/README.md) - Run tests
 
-1. Check [Operations Runbook - High Error Rate](OPERATIONS_RUNBOOK.md#high-error-rate)
-2. Review [External API Limits](EXTERNAL_API_LIMITS.md) for quota issues
-3. Check [Monitoring Dashboard](MONITORING_AND_OBSERVABILITY.md)
+**Estimated Time:** 4-6 hours
 
-### Scenario: Slow Performance
+---
 
-1. Check [Operations Runbook - Slow Response Times](OPERATIONS_RUNBOOK.md#slow-response-times)
-2. Review [Architecture - Performance](ARCHITECTURE.md#performance-characteristics)
-3. Check [Resource Management](RESOURCE_MANAGEMENT.md)
+### Scenario 2: Deploying to Production
 
-### Scenario: Memory Issues
+**Goal:** Deploy the application to Railway
 
-1. Check [Operations Runbook - Memory Issues](OPERATIONS_RUNBOOK.md#memory-issues)
-2. Review [Resource Management](RESOURCE_MANAGEMENT.md)
-3. Check [Data Persistence](DATA_PERSISTENCE.md) for cleanup jobs
+**Reading Order:**
+1. [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) - Pre-deployment verification
+2. [Deployment Guide](DEPLOYMENT.md) - Follow deployment steps
+3. [Railway Setup](RAILWAY_SETUP.md) - Railway-specific configuration
+4. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Set up monitoring
+5. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Prepare for operations
 
-### Scenario: Deploying New Version
+**Estimated Time:** 2-3 hours
 
-1. Follow [Deployment Guide](DEPLOYMENT.md)
-2. Review [CI/CD Setup](CI_CD_SETUP.md) for automated deployment
-3. Have [Rollback Procedures](ROLLBACK_PROCEDURES.md) ready
+---
 
-### Scenario: Data Loss
+### Scenario 3: Troubleshooting Production Issue
 
-1. Follow [Rollback Procedures - Data Restoration](ROLLBACK_PROCEDURES.md#data-restoration)
-2. Check [Data Persistence - Backup System](DATA_PERSISTENCE.md)
-3. Follow [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
+**Goal:** Diagnose and resolve a production issue
 
-### Scenario: Security Incident
+**Reading Order:**
+1. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Find common issues
+2. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Check logs and metrics
+3. [External API Limits](EXTERNAL_API_LIMITS.md) - Check API status
+4. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Follow incident process
+5. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - Rollback if needed
 
-1. Follow [Operations Runbook - Security Incident](OPERATIONS_RUNBOOK.md#security-incident)
-2. Review [Security Documentation](SECURITY.md)
-3. Follow [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md)
+**Estimated Time:** 15 minutes - 2 hours (depending on severity)
 
-### Scenario: Cost Optimization
+---
 
-1. Review [External API Limits - Cost Estimation](EXTERNAL_API_LIMITS.md#cost-estimation)
-2. Check [Resource Management](RESOURCE_MANAGEMENT.md)
-3. Review [Architecture - Performance](ARCHITECTURE.md#performance-characteristics)
+### Scenario 4: Responding to an Incident
+
+**Goal:** Handle a production incident
+
+**Reading Order:**
+1. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Follow incident process
+2. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Troubleshoot the issue
+3. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - Rollback if necessary
+4. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Monitor recovery
+
+**Estimated Time:** Varies by severity (15 min - 4 hours)
+
+---
+
+### Scenario 5: Adding a New Feature
+
+**Goal:** Develop and deploy a new feature
+
+**Reading Order:**
+1. [Architecture Documentation](ARCHITECTURE.md) - Understand integration points
+2. [Project Structure](PROJECT_STRUCTURE.md) - Find where to add code
+3. [API Documentation](API_DOCUMENTATION.md) - Design API changes
+4. [Testing Documentation](../tests/README.md) - Write tests
+5. [Deployment Guide](DEPLOYMENT.md) - Deploy changes
+
+**Estimated Time:** Varies by feature complexity
+
+---
+
+### Scenario 6: Scaling the Application
+
+**Goal:** Scale to support more users
+
+**Reading Order:**
+1. [Architecture Documentation](ARCHITECTURE.md) - Review scaling architecture
+2. [Resource Management](RESOURCE_MANAGEMENT.md) - Optimize resources
+3. [External API Limits](EXTERNAL_API_LIMITS.md) - Plan for API limits
+4. [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) - Adjust configuration
+5. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Monitor performance
+
+**Estimated Time:** 1-2 days
 
 ---
 
 ## Documentation Maintenance
 
-### Updating Documentation
+### Review Schedule
 
-When making changes to the system:
-1. Update relevant documentation
-2. Add revision history entry
-3. Notify team of changes
-4. Review related documents for consistency
+| Document Type | Review Frequency | Owner |
+|---------------|------------------|-------|
+| Architecture | Quarterly | Tech Lead |
+| Operations Runbook | Monthly | SRE Team |
+| Deployment Guide | After each major change | DevOps |
+| API Documentation | After each API change | Backend Team |
+| Incident Response | After each incident | On-call Engineer |
 
-### Documentation Review Schedule
+### Update Process
 
-- **Monthly**: Review runbooks for accuracy
-- **Quarterly**: Update cost estimates and API limits
-- **After Incidents**: Update runbooks with new learnings
-- **After Architecture Changes**: Update architecture diagrams
+1. **Identify Need:** Issue found or process changed
+2. **Update Document:** Make necessary changes
+3. **Review:** Peer review by relevant team
+4. **Merge:** Update documentation
+5. **Communicate:** Notify team of changes
+
+### Documentation Standards
+
+- Use Markdown format
+- Include diagrams where helpful (Mermaid preferred)
+- Keep language clear and concise
+- Include examples and code snippets
+- Update "Last Updated" date
+- Link to related documents
 
 ---
 
 ## Getting Help
 
 ### Internal Resources
-- Operations Runbook: First stop for troubleshooting
-- Incident Response Plan: For coordinated response
-- Team chat: Real-time assistance
 
-### External Support
-- **Railway**: help@railway.app
-- **Groq**: support@groq.com
-- **ElevenLabs**: support@elevenlabs.io
-- **Qdrant**: support@qdrant.io
+- **Slack Channels:**
+  - `#engineering` - General engineering questions
+  - `#incidents` - Production incidents
+  - `#deployments` - Deployment notifications
+
+- **On-Call:**
+  - Primary: [Contact info]
+  - Secondary: [Contact info]
+  - Manager: [Contact info]
+
+### External Resources
+
+- **Railway Support:** support@railway.app
+- **Groq Support:** support@groq.com
+- **ElevenLabs Support:** support@elevenlabs.io
+- **Qdrant Support:** support@qdrant.tech
 
 ---
 
 ## Contributing to Documentation
 
-### Documentation Standards
+### How to Contribute
 
-- Use clear, concise language
-- Include code examples where helpful
-- Add diagrams for complex concepts
-- Keep procedures step-by-step
-- Include troubleshooting tips
-- Add revision history
+1. Identify documentation gap or error
+2. Create branch: `docs/description`
+3. Make changes following standards
+4. Submit pull request
+5. Request review from relevant team
 
-### Documentation Template
+### Documentation Checklist
 
-```markdown
-# Document Title
-
-Brief description of what this document covers.
-
-## Table of Contents
-- [Section 1](#section-1)
-- [Section 2](#section-2)
-
-## Section 1
-Content...
-
-## Related Documentation
-- [Link to related doc](RELATED.md)
-
-## Revision History
-| Date | Version | Changes |
-|------|---------|---------|
-| YYYY-MM-DD | 1.0 | Initial version |
-```
+- [ ] Clear and concise language
+- [ ] Code examples tested
+- [ ] Links verified
+- [ ] Diagrams included (if helpful)
+- [ ] Related docs updated
+- [ ] "Last Updated" date updated
+- [ ] Peer reviewed
 
 ---
 
-## Revision History
+## Document Status
 
-| Date | Version | Changes |
-|------|---------|---------|
-| 2024-01-15 | 1.0 | Initial operational documentation index |
+| Document | Status | Last Updated | Next Review |
+|----------|--------|--------------|-------------|
+| Architecture Documentation | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Operations Runbook | ✅ Complete | 2025-10-21 | 2025-11-21 |
+| Incident Response Plan | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Rollback Procedures | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| External API Limits | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Deployment Guide | ✅ Complete | 2025-10-15 | 2026-01-15 |
+| Monitoring and Observability | ✅ Complete | 2025-10-18 | 2026-01-18 |
+
+---
+
+**Last Updated:** October 21, 2025  
+**Maintained By:** Engineering Team  
+**Questions?** Contact the on-call engineer or post in `#engineering`
