@@ -1,9 +1,11 @@
+import asyncio
 from io import BytesIO
 
 import chainlit as cl
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from ai_companion.core.resilience import CircuitBreakerError
 from ai_companion.graph import graph_builder
 from ai_companion.modules.image import ImageToText
 from ai_companion.modules.speech import SpeechToText, TextToSpeech
@@ -47,21 +49,47 @@ async def on_message(message: cl.Message):
                 except Exception as e:
                     cl.logger.warning(f"Failed to analyze image: {e}")
 
-    # Process through graph with enriched message content
+    # Process through graph with enriched message content and error handling
     thread_id = cl.user_session.get("thread_id")
 
-    async with cl.Step(type="run"):
-        async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
-            graph = graph_builder.compile(checkpointer=short_term_memory)
-            async for chunk in graph.astream(
-                {"messages": [HumanMessage(content=content)]},
-                {"configurable": {"thread_id": thread_id}},
-                stream_mode="messages",
-            ):
-                if chunk[1]["langgraph_node"] == "conversation_node" and isinstance(chunk[0], AIMessageChunk):
-                    await msg.stream_token(chunk[0].content)
+    try:
+        async with cl.Step(type="run"):
+            async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
+                graph = graph_builder.compile(checkpointer=short_term_memory)
 
-            output_state = await graph.aget_state(config={"configurable": {"thread_id": thread_id}})
+                # Stream with timeout
+                try:
+                    async with asyncio.timeout(settings.WORKFLOW_TIMEOUT_SECONDS):
+                        async for chunk in graph.astream(
+                            {"messages": [HumanMessage(content=content)]},
+                            {"configurable": {"thread_id": thread_id}},
+                            stream_mode="messages",
+                        ):
+                            if chunk[1]["langgraph_node"] == "conversation_node" and isinstance(
+                                chunk[0], AIMessageChunk
+                            ):
+                                await msg.stream_token(chunk[0].content)
+
+                        output_state = await graph.aget_state(config={"configurable": {"thread_id": thread_id}})
+                except asyncio.TimeoutError:
+                    cl.logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s")
+                    await cl.Message(
+                        content="I'm taking longer than usual to respond. Please try again."
+                    ).send()
+                    return
+
+    except CircuitBreakerError as e:
+        cl.logger.error(f"Circuit breaker open during workflow: {e}")
+        await cl.Message(
+            content="I'm having trouble connecting to my services right now. Please try again in a moment."
+        ).send()
+        return
+    except Exception as e:
+        cl.logger.error(f"Workflow failed: {e}", exc_info=True)
+        await cl.Message(
+            content="I'm having trouble processing that right now. Could you try rephrasing?"
+        ).send()
+        return
 
     if output_state.values.get("workflow") == "audio":
         response = output_state.values["messages"][-1].content
@@ -109,20 +137,44 @@ async def on_audio_end(elements):
 
     thread_id = cl.user_session.get("thread_id")
 
-    async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
-        graph = graph_builder.compile(checkpointer=short_term_memory)
-        output_state = await graph.ainvoke(
-            {"messages": [HumanMessage(content=transcription)]},
-            {"configurable": {"thread_id": thread_id}},
+    try:
+        async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
+            graph = graph_builder.compile(checkpointer=short_term_memory)
+
+            # Invoke with timeout
+            try:
+                output_state = await asyncio.wait_for(
+                    graph.ainvoke(
+                        {"messages": [HumanMessage(content=transcription)]},
+                        {"configurable": {"thread_id": thread_id}},
+                    ),
+                    timeout=settings.WORKFLOW_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                cl.logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s")
+                await cl.Message(
+                    content="I'm taking longer than usual to respond. Please try again."
+                ).send()
+                return
+
+        # Use global TextToSpeech instance
+        audio_buffer = await text_to_speech.synthesize(output_state["messages"][-1].content)
+
+        output_audio_el = cl.Audio(
+            name="Audio",
+            auto_play=True,
+            mime="audio/mpeg3",
+            content=audio_buffer,
         )
+        await cl.Message(content=output_state["messages"][-1].content, elements=[output_audio_el]).send()
 
-    # Use global TextToSpeech instance
-    audio_buffer = await text_to_speech.synthesize(output_state["messages"][-1].content)
-
-    output_audio_el = cl.Audio(
-        name="Audio",
-        auto_play=True,
-        mime="audio/mpeg3",
-        content=audio_buffer,
-    )
-    await cl.Message(content=output_state["messages"][-1].content, elements=[output_audio_el]).send()
+    except CircuitBreakerError as e:
+        cl.logger.error(f"Circuit breaker open during audio workflow: {e}")
+        await cl.Message(
+            content="I'm having trouble connecting to my services right now. Please try again in a moment."
+        ).send()
+    except Exception as e:
+        cl.logger.error(f"Audio workflow failed: {e}", exc_info=True)
+        await cl.Message(
+            content="I'm having trouble processing that right now. Could you try rephrasing?"
+        ).send()

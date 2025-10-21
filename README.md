@@ -1,5 +1,8 @@
 # Rose the Healer Shaman 🌹
 
+[![Tests](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO)
+
 An AI grief counselor and holistic healing companion powered by open-source LLMs through Groq. Rose provides empathetic support using ancient healing wisdom through a voice-first web interface.
 
 ## Overview
@@ -160,6 +163,17 @@ Rose can be deployed to any platform supporting Docker or Python applications:
 - **Google Cloud Run**: Use `cloudbuild.yaml`
 
 See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment guides.
+
+### CI/CD Pipeline
+
+The project includes automated testing and deployment via GitHub Actions:
+
+- **Automated Testing**: Runs on every push and PR
+- **Code Coverage**: Tracked via Codecov (70% minimum)
+- **Smoke Tests**: Pre-deployment validation
+- **Automated Deployment**: Deploys to Railway on main branch
+
+See [CI_CD_SETUP.md](docs/CI_CD_SETUP.md) for setup instructions and configuration details.
 
 ## Configuration
 

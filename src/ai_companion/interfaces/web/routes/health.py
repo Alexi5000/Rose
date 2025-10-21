@@ -1,6 +1,8 @@
 """Health check endpoints."""
 
 import logging
+import sqlite3
+from pathlib import Path
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Request
@@ -19,11 +21,34 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 class HealthCheckResponse(BaseModel):
-    """Response model for health check."""
+    """Response model for health check.
+    
+    Attributes:
+        status: Overall system health status ('healthy' or 'degraded')
+        version: API version number (semantic versioning)
+        services: Connectivity status for each external service dependency
+    """
 
     status: str
     version: str
     services: Dict[str, str]
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "status": "healthy",
+                    "version": "1.0.0",
+                    "services": {
+                        "groq": "connected",
+                        "qdrant": "connected",
+                        "elevenlabs": "connected",
+                        "sqlite": "connected"
+                    }
+                }
+            ]
+        }
+    }
 
 
 @router.get("/health", response_model=HealthCheckResponse)
@@ -31,8 +56,32 @@ class HealthCheckResponse(BaseModel):
 async def health_check(request: Request) -> HealthCheckResponse:
     """Check system health and connectivity to external services.
 
+    Performs connectivity checks for all external dependencies and returns
+    overall system health status. Used by load balancers and monitoring systems.
+
+    **Validation Rules:**
+    - No authentication required
+    - Rate limit: 60 requests per minute per IP address
+    - Response time: Typically <2 seconds
+
+    **Health Check Components:**
+    - Groq API: LLM and speech-to-text service connectivity
+    - Qdrant: Vector database for long-term memory
+    - ElevenLabs: Text-to-speech service connectivity
+    - SQLite: Local database for conversation checkpointing
+
+    **Status Values:**
+    - `healthy`: All services connected and operational
+    - `degraded`: One or more services disconnected (partial functionality)
+
+    Args:
+        request: FastAPI request object (injected)
+
     Returns:
-        HealthCheckResponse: System status, version, and service connectivity
+        HealthCheckResponse: System status, API version, and service connectivity map
+
+    Raises:
+        HTTPException 429: Rate limit exceeded (60 requests/minute)
     """
     services = {}
 
@@ -72,6 +121,25 @@ async def health_check(request: Request) -> HealthCheckResponse:
     except Exception as e:
         logger.error(f"ElevenLabs health check failed: {e}")
         services["elevenlabs"] = "disconnected"
+
+    # Check SQLite database connectivity
+    try:
+        db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
+        
+        # Check if database file exists or can be created
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Try to connect and execute a simple query
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        conn.close()
+        
+        services["sqlite"] = "connected"
+    except Exception as e:
+        logger.error(f"SQLite health check failed: {e}")
+        services["sqlite"] = "disconnected"
 
     # Overall status
     status = "healthy" if all(s == "connected" for s in services.values()) else "degraded"

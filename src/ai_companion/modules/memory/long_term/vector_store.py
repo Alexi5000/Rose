@@ -4,6 +4,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import List, Optional
 
+from ai_companion.core.resilience import get_qdrant_circuit_breaker, CircuitBreakerError
 from ai_companion.settings import settings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -49,6 +50,7 @@ class VectorStore:
             self._validate_env_vars()
             self.model = SentenceTransformer(self.EMBEDDING_MODEL)
             self.client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+            self._circuit_breaker = get_qdrant_circuit_breaker()
             self._initialized = True
 
     def _validate_env_vars(self) -> None:
@@ -59,19 +61,33 @@ class VectorStore:
 
     def _collection_exists(self) -> bool:
         """Check if the memory collection exists."""
-        collections = self.client.get_collections().collections
-        return any(col.name == self.COLLECTION_NAME for col in collections)
+        try:
+            collections = self._circuit_breaker.call(self.client.get_collections).collections
+            return any(col.name == self.COLLECTION_NAME for col in collections)
+        except CircuitBreakerError:
+            # Circuit breaker is open - assume collection doesn't exist
+            return False
 
     def _create_collection(self) -> None:
         """Create a new collection for storing memories."""
         sample_embedding = self.model.encode("sample text")
-        self.client.create_collection(
-            collection_name=self.COLLECTION_NAME,
-            vectors_config=VectorParams(
-                size=len(sample_embedding),
-                distance=Distance.COSINE,
-            ),
-        )
+
+        def _create():
+            return self.client.create_collection(
+                collection_name=self.COLLECTION_NAME,
+                vectors_config=VectorParams(
+                    size=len(sample_embedding),
+                    distance=Distance.COSINE,
+                ),
+            )
+
+        try:
+            self._circuit_breaker.call(_create)
+        except CircuitBreakerError:
+            # Circuit breaker is open - log and continue
+            import logging
+
+            logging.getLogger(__name__).error("Cannot create Qdrant collection: circuit breaker is open")
 
     def find_similar_memory(self, text: str) -> Optional[Memory]:
         """Find if a similar memory already exists.
@@ -94,28 +110,40 @@ class VectorStore:
             text: The text content of the memory
             metadata: Additional information about the memory (timestamp, type, etc.)
         """
-        if not self._collection_exists():
-            self._create_collection()
+        try:
+            if not self._collection_exists():
+                self._create_collection()
 
-        # Check if similar memory exists
-        similar_memory = self.find_similar_memory(text)
-        if similar_memory and similar_memory.id:
-            metadata["id"] = similar_memory.id  # Keep same ID for update
+            # Check if similar memory exists
+            similar_memory = self.find_similar_memory(text)
+            if similar_memory and similar_memory.id:
+                metadata["id"] = similar_memory.id  # Keep same ID for update
 
-        embedding = self.model.encode(text)
-        point = PointStruct(
-            id=metadata.get("id", hash(text)),
-            vector=embedding.tolist(),
-            payload={
-                "text": text,
-                **metadata,
-            },
-        )
+            embedding = self.model.encode(text)
+            point = PointStruct(
+                id=metadata.get("id", hash(text)),
+                vector=embedding.tolist(),
+                payload={
+                    "text": text,
+                    **metadata,
+                },
+            )
 
-        self.client.upsert(
-            collection_name=self.COLLECTION_NAME,
-            points=[point],
-        )
+            def _upsert():
+                return self.client.upsert(
+                    collection_name=self.COLLECTION_NAME,
+                    points=[point],
+                )
+
+            self._circuit_breaker.call(_upsert)
+
+        except CircuitBreakerError:
+            # Circuit breaker is open - log and continue without storing
+            import logging
+
+            logging.getLogger(__name__).error(
+                f"Cannot store memory in Qdrant: circuit breaker is open. Memory: {text[:50]}..."
+            )
 
     def search_memories(self, query: str, k: int = 5) -> List[Memory]:
         """Search for similar memories in the vector store.
@@ -127,24 +155,36 @@ class VectorStore:
         Returns:
             List of Memory objects
         """
-        if not self._collection_exists():
+        try:
+            if not self._collection_exists():
+                return []
+
+            query_embedding = self.model.encode(query)
+
+            def _search():
+                return self.client.search(
+                    collection_name=self.COLLECTION_NAME,
+                    query_vector=query_embedding.tolist(),
+                    limit=k,
+                )
+
+            results = self._circuit_breaker.call(_search)
+
+            return [
+                Memory(
+                    text=hit.payload["text"],
+                    metadata={k: v for k, v in hit.payload.items() if k != "text"},
+                    score=hit.score,
+                )
+                for hit in results
+            ]
+
+        except CircuitBreakerError:
+            # Circuit breaker is open - return empty list
+            import logging
+
+            logging.getLogger(__name__).error("Cannot search Qdrant memories: circuit breaker is open")
             return []
-
-        query_embedding = self.model.encode(query)
-        results = self.client.search(
-            collection_name=self.COLLECTION_NAME,
-            query_vector=query_embedding.tolist(),
-            limit=k,
-        )
-
-        return [
-            Memory(
-                text=hit.payload["text"],
-                metadata={k: v for k, v in hit.payload.items() if k != "text"},
-                score=hit.score,
-            )
-            for hit in results
-        ]
 
 
 @lru_cache

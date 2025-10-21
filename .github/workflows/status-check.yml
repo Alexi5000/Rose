@@ -1,0 +1,78 @@
+name: Status Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  status:
+    name: PR Status Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check PR title format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          
+          # Check if PR title follows conventional commits
+          if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: ]]; then
+            echo "❌ PR title should follow conventional commits format"
+            echo "Examples:"
+            echo "  feat: add new feature"
+            echo "  fix: resolve bug in component"
+            echo "  docs: update README"
+            echo "  test: add unit tests"
+            exit 1
+          fi
+          
+          echo "✅ PR title format is valid"
+      
+      - name: Check for required files
+        run: |
+          REQUIRED_FILES=(
+            "README.md"
+            "pyproject.toml"
+            "pytest.ini"
+            ".env.example"
+          )
+          
+          MISSING_FILES=()
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              MISSING_FILES+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+            echo "❌ Missing required files:"
+            printf '%s\n' "${MISSING_FILES[@]}"
+            exit 1
+          fi
+          
+          echo "✅ All required files present"
+      
+      - name: Check for large files
+        run: |
+          # Find files larger than 1MB
+          LARGE_FILES=$(find . -type f -size +1M -not -path "./.git/*" -not -path "./.venv/*" -not -path "./node_modules/*")
+          
+          if [ -n "$LARGE_FILES" ]; then
+            echo "⚠️ Warning: Large files detected (>1MB):"
+            echo "$LARGE_FILES"
+            echo "Consider using Git LFS for large files"
+          else
+            echo "✅ No large files detected"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## PR Status Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All checks passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR Title**: ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Author**: @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY

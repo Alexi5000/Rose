@@ -42,6 +42,9 @@ class Settings(BaseSettings):
 
     SHORT_TERM_MEMORY_DB_PATH: str = "/app/data/memory.db"
 
+    # Workflow configuration
+    WORKFLOW_TIMEOUT_SECONDS: int = 60  # Global timeout for LangGraph workflow execution
+
     # Server configuration (for production deployment)
     PORT: int = 8080
     HOST: str = "0.0.0.0"
@@ -51,6 +54,13 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_PER_MINUTE: int = 10  # Requests per minute per IP
     ENABLE_SECURITY_HEADERS: bool = True
+
+    # Logging configuration
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_FORMAT: str = "json"  # json or console
+
+    # API Documentation configuration
+    ENABLE_API_DOCS: bool = True  # Enable OpenAPI/Swagger documentation
 
     @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
     @classmethod

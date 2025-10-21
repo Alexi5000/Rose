@@ -7,6 +7,7 @@ from typing import Optional
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
 
 from ai_companion.core.exceptions import TextToSpeechError
+from ai_companion.core.resilience import CircuitBreakerError, get_elevenlabs_circuit_breaker
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class TextToSpeech:
         self._validate_env_vars()
         self._client: Optional[ElevenLabs] = None
         self._tts_available = True  # Track TTS availability for fallback logic
+        self._circuit_breaker = get_elevenlabs_circuit_breaker()
 
         # Cache configuration
         self._cache_enabled = enable_cache
@@ -101,25 +103,34 @@ class TextToSpeech:
         )
 
         try:
-            audio_generator = self.client.generate(
-                text=text,
-                voice=Voice(
-                    voice_id=selected_voice_id,
-                    settings=VoiceSettings(
-                        stability=voice_stability,
-                        similarity_boost=voice_similarity,
+            # Use circuit breaker for API call
+            def _call_elevenlabs_api():
+                audio_generator = self.client.generate(
+                    text=text,
+                    voice=Voice(
+                        voice_id=selected_voice_id,
+                        settings=VoiceSettings(
+                            stability=voice_stability,
+                            similarity_boost=voice_similarity,
+                        ),
                     ),
-                ),
-                model=settings.TTS_MODEL_NAME,
-            )
+                    model=settings.TTS_MODEL_NAME,
+                )
+                # Convert generator to bytes
+                return b"".join(audio_generator)
 
-            # Convert generator to bytes
-            audio_bytes = b"".join(audio_generator)
+            audio_bytes = self._circuit_breaker.call(_call_elevenlabs_api)
+
             if not audio_bytes:
                 raise TextToSpeechError("Generated audio is empty")
 
             logger.info(f"Successfully generated {len(audio_bytes)} bytes of audio for Rose")
             return audio_bytes
+
+        except CircuitBreakerError as e:
+            # Circuit breaker is open - fail fast
+            logger.error(f"Circuit breaker is open for ElevenLabs API: {str(e)}")
+            raise TextToSpeechError("Text-to-speech service is temporarily unavailable") from e
 
         except ValueError:
             # Re-raise validation errors
@@ -161,6 +172,13 @@ class TextToSpeech:
             )
             self._tts_available = True  # Reset availability flag on success
             return audio_bytes, text
+
+        except CircuitBreakerError as e:
+            # Circuit breaker is open - fall back to text gracefully
+            logger.error(f"Circuit breaker is open for ElevenLabs API, falling back to text-only: {str(e)}")
+            self._tts_available = False
+            fallback_message = f"I'm having trouble with my voice right now, but I'm here: {text}"
+            return None, fallback_message
 
         except TextToSpeechError as e:
             # TTS service error - log and fall back to text

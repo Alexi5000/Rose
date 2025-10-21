@@ -14,11 +14,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from ai_companion.core.backup import backup_manager
-from ai_companion.interfaces.web.middleware import SecurityHeadersMiddleware
+from ai_companion.core.logging_config import configure_logging, get_logger
+from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from ai_companion.interfaces.web.routes import health, session, voice
 from ai_companion.settings import settings
 
-logger = logging.getLogger(__name__)
+# Configure structured logging before any other imports
+configure_logging()
+
+logger = get_logger(__name__)
 
 # Path to React frontend build directory
 FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent.parent.parent / "frontend" / "build"
@@ -27,7 +31,7 @@ FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent.parent.parent / "fronte
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    logger.info("Starting Rose the Healer Shaman web interface")
+    logger.info("app_starting", service="rose_web_interface")
     
     # Initialize scheduler for background jobs
     scheduler = AsyncIOScheduler()
@@ -57,27 +61,41 @@ async def lifespan(app: FastAPI):
     
     # Start the scheduler
     scheduler.start()
-    logger.info("Background scheduler started - audio cleanup and database backup jobs scheduled")
+    logger.info("scheduler_started", jobs=["audio_cleanup", "database_backup"])
     
     yield
     
     # Shutdown scheduler
     scheduler.shutdown()
-    logger.info("Shutting down Rose the Healer Shaman web interface")
+    logger.info("app_shutdown", service="rose_web_interface")
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Rose the Healer Shaman",
-        description="AI grief counselor and holistic healing companion",
+        title="Rose the Healer Shaman API",
+        description="Voice-first AI grief counselor and holistic healing companion. "
+                    "Provides conversational AI interactions with memory persistence, "
+                    "voice processing, and therapeutic support.",
         version="1.0.0",
         lifespan=lifespan,
+        docs_url="/api/v1/docs" if settings.ENABLE_API_DOCS else None,
+        redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,
+        openapi_url="/api/v1/openapi.json" if settings.ENABLE_API_DOCS else None,
     )
+    
+    if settings.ENABLE_API_DOCS:
+        logger.info("api_documentation_enabled", docs_url="/api/v1/docs", redoc_url="/api/v1/redoc")
+    else:
+        logger.info("api_documentation_disabled")
 
+    # Add request ID middleware (should be first to track all requests)
+    app.add_middleware(RequestIDMiddleware)
+    logger.info("request_id_middleware_enabled")
+    
     # Configure CORS with environment-based origins
     allowed_origins = settings.get_allowed_origins()
-    logger.info(f"Configuring CORS with allowed origins: {allowed_origins}")
+    logger.info("cors_configured", allowed_origins=allowed_origins)
     
     app.add_middleware(
         CORSMiddleware,
@@ -90,27 +108,34 @@ def create_app() -> FastAPI:
     # Add security headers middleware
     if settings.ENABLE_SECURITY_HEADERS:
         app.add_middleware(SecurityHeadersMiddleware)
-        logger.info("Security headers middleware enabled")
+        logger.info("security_headers_enabled")
     
     # Configure rate limiting
     if settings.RATE_LIMIT_ENABLED:
         limiter = Limiter(key_func=get_remote_address)
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-        logger.info(f"Rate limiting enabled: {settings.RATE_LIMIT_PER_MINUTE} requests/minute per IP")
+        logger.info("rate_limiting_enabled", requests_per_minute=settings.RATE_LIMIT_PER_MINUTE)
     else:
         # Create a no-op limiter if rate limiting is disabled
         app.state.limiter = None
-        logger.info("Rate limiting disabled")
+        logger.info("rate_limiting_disabled")
 
-    # Register API routes
-    app.include_router(health.router, prefix="/api", tags=["health"])
-    app.include_router(session.router, prefix="/api", tags=["session"])
-    app.include_router(voice.router, prefix="/api", tags=["voice"])
+    # Register API routes with v1 versioning
+    app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+    app.include_router(session.router, prefix="/api/v1", tags=["Session Management"])
+    app.include_router(voice.router, prefix="/api/v1", tags=["Voice Processing"])
+    
+    # Maintain backward compatibility with non-versioned routes (deprecated)
+    app.include_router(health.router, prefix="/api", tags=["Health (Deprecated)"], deprecated=True)
+    app.include_router(session.router, prefix="/api", tags=["Session Management (Deprecated)"], deprecated=True)
+    app.include_router(voice.router, prefix="/api", tags=["Voice Processing (Deprecated)"], deprecated=True)
+    
+    logger.info("api_routes_registered", version="v1", backward_compatible=True)
 
     # Serve React frontend static files (if build directory exists)
     if FRONTEND_BUILD_DIR.exists():
-        logger.info(f"Serving React frontend from {FRONTEND_BUILD_DIR}")
+        logger.info("frontend_serving_enabled", build_dir=str(FRONTEND_BUILD_DIR))
 
         # Mount static assets (JS, CSS, images, etc.)
         app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR / "static"), name="static")
@@ -131,8 +156,8 @@ def create_app() -> FastAPI:
             return {"detail": "Frontend not found"}
 
     else:
-        logger.warning(f"Frontend build directory not found: {FRONTEND_BUILD_DIR}")
-        logger.warning("React frontend will not be served. Build the frontend first.")
+        logger.warning("frontend_build_not_found", build_dir=str(FRONTEND_BUILD_DIR))
+        logger.warning("frontend_not_served")
 
     return app
 

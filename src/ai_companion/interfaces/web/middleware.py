@@ -4,11 +4,45 @@ import logging
 import os
 import stat
 from typing import Callable
+from uuid import uuid4
 
+import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to add unique request ID to each request for tracing."""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """Add request ID to request state and response headers.
+
+        Args:
+            request: Incoming request
+            call_next: Next middleware/handler in chain
+
+        Returns:
+            Response with X-Request-ID header
+        """
+        # Generate unique request ID
+        request_id = str(uuid4())
+
+        # Store in request state for access in route handlers
+        request.state.request_id = request_id
+
+        # Bind request ID to structlog context for all logs in this request
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+
+        # Process request
+        response = await call_next(request)
+
+        # Add request ID to response headers
+        response.headers["X-Request-ID"] = request_id
+
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

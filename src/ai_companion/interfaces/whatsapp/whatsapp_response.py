@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from io import BytesIO
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Request, Response
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from ai_companion.core.resilience import CircuitBreakerError
 from ai_companion.graph import graph_builder
 from ai_companion.modules.image import ImageToText
 from ai_companion.modules.speech import SpeechToText, TextToSpeech
@@ -66,16 +68,48 @@ async def whatsapp_handler(request: Request) -> Response:
             else:
                 content = message["text"]["body"]
 
-            # Process message through the graph agent
-            async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
-                graph = graph_builder.compile(checkpointer=short_term_memory)
-                await graph.ainvoke(
-                    {"messages": [HumanMessage(content=content)]},
-                    {"configurable": {"thread_id": session_id}},
-                )
+            # Process message through the graph agent with error handling
+            try:
+                async with AsyncSqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH) as short_term_memory:
+                    graph = graph_builder.compile(checkpointer=short_term_memory)
 
-                # Get the workflow type and response from the state
-                output_state = await graph.aget_state(config={"configurable": {"thread_id": session_id}})
+                    # Invoke with timeout
+                    try:
+                        await asyncio.wait_for(
+                            graph.ainvoke(
+                                {"messages": [HumanMessage(content=content)]},
+                                {"configurable": {"thread_id": session_id}},
+                            ),
+                            timeout=settings.WORKFLOW_TIMEOUT_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s for {from_number}")
+                        await send_response(
+                            from_number,
+                            "I'm taking longer than usual to respond. Please try again.",
+                            "text",
+                        )
+                        return Response(content="Workflow timeout", status_code=200)
+
+                    # Get the workflow type and response from the state
+                    output_state = await graph.aget_state(config={"configurable": {"thread_id": session_id}})
+
+            except CircuitBreakerError as e:
+                logger.error(f"Circuit breaker open during workflow: {e}")
+                await send_response(
+                    from_number,
+                    "I'm having trouble connecting to my services right now. Please try again in a moment.",
+                    "text",
+                )
+                return Response(content="Circuit breaker open", status_code=200)
+            except Exception as e:
+                logger.error(f"Workflow failed: {e}", exc_info=True)
+                await send_response(
+                    from_number,
+                    "I'm having trouble processing that right now. Could you try rephrasing?",
+                    "text",
+                )
+                return Response(content="Workflow error", status_code=200)
 
             workflow = output_state.values.get("workflow", "conversation")
             response_message = output_state.values["messages"][-1].content

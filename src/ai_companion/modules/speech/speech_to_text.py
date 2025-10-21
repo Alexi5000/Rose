@@ -7,6 +7,7 @@ from typing import Optional
 from groq import Groq
 
 from ai_companion.core.exceptions import SpeechToTextError
+from ai_companion.core.resilience import get_groq_circuit_breaker, CircuitBreakerError
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class SpeechToText:
         """Initialize the SpeechToText class and validate environment variables."""
         self._validate_env_vars()
         self._client: Optional[Groq] = None
+        self._circuit_breaker = get_groq_circuit_breaker()
 
     def _validate_env_vars(self) -> None:
         """Validate that all required environment variables are set."""
@@ -116,12 +118,16 @@ class SpeechToText:
                     with open(temp_file_path, "rb") as audio_file:
                         logger.info(f"Attempt {attempt + 1}/{self.MAX_RETRIES}: Calling Groq Whisper API")
 
-                        transcription = self.client.audio.transcriptions.create(
-                            file=audio_file,
-                            model=settings.STT_MODEL_NAME,
-                            language="en",
-                            response_format="text",
-                        )
+                        # Use circuit breaker for API call
+                        def _call_groq_api():
+                            return self.client.audio.transcriptions.create(
+                                file=audio_file,
+                                model=settings.STT_MODEL_NAME,
+                                language="en",
+                                response_format="text",
+                            )
+
+                        transcription = self._circuit_breaker.call(_call_groq_api)
 
                     if not transcription:
                         raise SpeechToTextError("Transcription result is empty")
@@ -135,6 +141,11 @@ class SpeechToText:
                         os.unlink(temp_file_path)
                     except Exception as cleanup_error:
                         logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
+
+            except CircuitBreakerError as e:
+                # Circuit breaker is open - fail fast without retrying
+                logger.error(f"Circuit breaker is open for Groq API: {str(e)}")
+                raise SpeechToTextError("Speech-to-text service is temporarily unavailable") from e
 
             except Exception as e:
                 last_exception = e

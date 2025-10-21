@@ -1,0 +1,230 @@
+name: Tests and Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    # Optional: Run Qdrant as a service if not using Qdrant Cloud
+    # Uncomment this section and remove QDRANT_URL/QDRANT_API_KEY from secrets
+    # services:
+    #   qdrant:
+    #     image: qdrant/qdrant:latest
+    #     ports:
+    #       - 6333:6333
+    #     options: >-
+    #       --health-cmd "curl -f http://localhost:6333/health || exit 1"
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install -e ".[test]"
+      
+      - name: Run linting
+        run: |
+          uv run ruff check src/ tests/
+      
+      - name: Run formatting check
+        run: |
+          uv run ruff format --check src/ tests/
+      
+      - name: Run unit tests with coverage
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          uv run pytest tests/ -v \
+            --cov=ai_companion \
+            --cov-report=xml \
+            --cov-report=term \
+            --cov-report=html \
+            -m "not slow and not integration"
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+      
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+      
+      - name: Check coverage threshold
+        run: |
+          uv run pytest tests/ \
+            --cov=ai_companion \
+            --cov-fail-under=70 \
+            -m "not slow and not integration" \
+            --quiet
+
+  smoke-tests:
+    name: Pre-Deployment Smoke Tests
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install -e ".[test]"
+      
+      - name: Run deployment validation tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          uv run pytest tests/test_deployment.py -v -k "not TestDeployedInstance"
+      
+      - name: Verify Docker build
+        run: |
+          docker build -t rose-test:latest .
+      
+      - name: Test Docker container startup
+        run: |
+          docker run -d --name rose-test \
+            -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+            -e ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }} \
+            -e ELEVENLABS_VOICE_ID=${{ secrets.ELEVENLABS_VOICE_ID }} \
+            -e QDRANT_URL=${{ secrets.QDRANT_URL }} \
+            -e QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }} \
+            -p 8080:8080 \
+            rose-test:latest
+          
+          # Wait for container to start
+          sleep 10
+          
+          # Check health endpoint
+          curl -f http://localhost:8080/api/health || exit 1
+          
+          # Stop container
+          docker stop rose-test
+          docker rm rose-test
+
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: [test, smoke-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+      
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service rose-production
+      
+      - name: Wait for deployment
+        run: sleep 30
+      
+      - name: Verify deployment
+        env:
+          RAILWAY_URL: ${{ secrets.RAILWAY_URL }}
+        run: |
+          # Check health endpoint
+          curl -f $RAILWAY_URL/api/health || exit 1
+          
+          echo "Deployment successful!"
+      
+      - name: Run post-deployment smoke tests
+        env:
+          RAILWAY_URL: ${{ secrets.RAILWAY_URL }}
+        run: |
+          # Set up Python for post-deployment tests
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv sync
+          uv pip install -e ".[test]"
+          
+          # Run deployed instance tests
+          uv run pytest tests/test_deployment.py::TestDeployedInstance -v
+
+  integration-tests:
+    name: Integration Tests (Optional)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install -e ".[test]"
+      
+      - name: Run integration tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          uv run pytest tests/ -v -m "integration" || true
