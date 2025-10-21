@@ -9,9 +9,11 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ai_companion.core.logging_config import get_logger
+from ai_companion.core.metrics import metrics, track_performance
 from ai_companion.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -44,6 +46,7 @@ class SessionStartResponse(BaseModel):
 
 @router.post("/session/start", response_model=SessionStartResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+@track_performance("session_start")
 async def start_session(request: Request) -> SessionStartResponse:
     """Initialize a new healing session with Rose.
 
@@ -74,7 +77,11 @@ async def start_session(request: Request) -> SessionStartResponse:
         HTTPException 500: Internal server error
     """
     session_id = str(uuid.uuid4())
-    logger.info(f"Started new session: {session_id}")
+    
+    # Record session metrics
+    metrics.record_session_started(session_id)
+    
+    logger.info("session_started", session_id=session_id)
 
     return SessionStartResponse(
         session_id=session_id,

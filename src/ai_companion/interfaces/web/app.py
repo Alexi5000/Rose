@@ -14,10 +14,16 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from ai_companion.core.backup import backup_manager
+from ai_companion.core.error_responses import (
+    ai_companion_error_handler,
+    global_exception_handler,
+    validation_error_handler,
+)
+from ai_companion.core.exceptions import AICompanionError
 from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
-from ai_companion.interfaces.web.routes import health, session, voice
+from ai_companion.interfaces.web.routes import health, metrics as metrics_route, session, voice
 from ai_companion.settings import settings
 
 # Configure structured logging before any other imports
@@ -156,15 +162,23 @@ def create_app() -> FastAPI:
         app.state.limiter = None
         logger.info("rate_limiting_disabled")
 
+    # Register exception handlers
+    app.add_exception_handler(AICompanionError, ai_companion_error_handler)
+    app.add_exception_handler(ValueError, validation_error_handler)
+    app.add_exception_handler(Exception, global_exception_handler)
+    logger.info("exception_handlers_registered")
+
     # Register API routes with v1 versioning
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
     app.include_router(session.router, prefix="/api/v1", tags=["Session Management"])
     app.include_router(voice.router, prefix="/api/v1", tags=["Voice Processing"])
+    app.include_router(metrics_route.router, prefix="/api/v1", tags=["Metrics"])
     
     # Maintain backward compatibility with non-versioned routes (deprecated)
     app.include_router(health.router, prefix="/api", tags=["Health (Deprecated)"], deprecated=True)
     app.include_router(session.router, prefix="/api", tags=["Session Management (Deprecated)"], deprecated=True)
     app.include_router(voice.router, prefix="/api", tags=["Voice Processing (Deprecated)"], deprecated=True)
+    app.include_router(metrics_route.router, prefix="/api", tags=["Metrics (Deprecated)"], deprecated=True)
     
     logger.info("api_routes_registered", version="v1", backward_compatible=True)
 

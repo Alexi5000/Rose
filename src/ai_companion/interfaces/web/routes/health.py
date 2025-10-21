@@ -10,9 +10,11 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ai_companion.core.logging_config import get_logger
+from ai_companion.core.metrics import track_performance
 from ai_companion.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -53,6 +55,7 @@ class HealthCheckResponse(BaseModel):
 
 @router.get("/health", response_model=HealthCheckResponse)
 @limiter.limit("60/minute")  # Higher limit for health checks
+@track_performance("health_check")
 async def health_check(request: Request) -> HealthCheckResponse:
     """Check system health and connectivity to external services.
 
@@ -93,7 +96,7 @@ async def health_check(request: Request) -> HealthCheckResponse:
         # Simple check - if we can create client, API key is valid
         services["groq"] = "connected"
     except Exception as e:
-        logger.error(f"Groq API health check failed: {e}")
+        logger.error("groq_health_check_failed", error=str(e))
         services["groq"] = "disconnected"
 
     # Check Qdrant connectivity
@@ -109,7 +112,7 @@ async def health_check(request: Request) -> HealthCheckResponse:
         client.get_collections()
         services["qdrant"] = "connected"
     except Exception as e:
-        logger.error(f"Qdrant health check failed: {e}")
+        logger.error("qdrant_health_check_failed", error=str(e))
         services["qdrant"] = "disconnected"
 
     # Check ElevenLabs connectivity
@@ -119,7 +122,7 @@ async def health_check(request: Request) -> HealthCheckResponse:
         client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
         services["elevenlabs"] = "connected"
     except Exception as e:
-        logger.error(f"ElevenLabs health check failed: {e}")
+        logger.error("elevenlabs_health_check_failed", error=str(e))
         services["elevenlabs"] = "disconnected"
 
     # Check SQLite database connectivity
@@ -138,10 +141,12 @@ async def health_check(request: Request) -> HealthCheckResponse:
         
         services["sqlite"] = "connected"
     except Exception as e:
-        logger.error(f"SQLite health check failed: {e}")
+        logger.error("sqlite_health_check_failed", error=str(e))
         services["sqlite"] = "disconnected"
 
     # Overall status
     status = "healthy" if all(s == "connected" for s in services.values()) else "degraded"
+
+    logger.info("health_check_complete", status=status, services=services)
 
     return HealthCheckResponse(status=status, version="1.0.0", services=services)

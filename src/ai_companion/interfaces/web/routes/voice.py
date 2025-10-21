@@ -1,7 +1,6 @@
 """Voice processing endpoints."""
 
 import asyncio
-import logging
 import os
 import stat
 import tempfile
@@ -18,13 +17,16 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ai_companion.core.exceptions import SpeechToTextError, TextToSpeechError, WorkflowError
+from ai_companion.core.logging_config import get_logger
+from ai_companion.core.metrics import metrics, track_performance
 from ai_companion.core.resilience import CircuitBreakerError
 from ai_companion.graph.graph import create_workflow_graph
 from ai_companion.modules.speech.speech_to_text import SpeechToText
 from ai_companion.modules.speech.text_to_speech import TextToSpeech
 from ai_companion.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -71,6 +73,7 @@ class VoiceProcessResponse(BaseModel):
 
 @router.post("/voice/process", response_model=VoiceProcessResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+@track_performance("voice_processing")
 async def process_voice(
     request: Request,
     audio: UploadFile = File(..., description="Audio file containing user's voice input"),
@@ -119,32 +122,53 @@ async def process_voice(
 
         # Validate audio size
         if len(audio_data) > MAX_AUDIO_SIZE:
+            metrics.record_error("audio_too_large", endpoint="voice_process")
             raise HTTPException(
                 status_code=413, detail=f"Audio file too large. Maximum size is {MAX_AUDIO_SIZE / 1024 / 1024}MB"
             )
 
         if not audio_data:
+            metrics.record_error("audio_empty", endpoint="voice_process")
             raise HTTPException(status_code=400, detail="Audio file is empty")
 
-        logger.info(f"Processing voice input for session {session_id}, size: {len(audio_data)} bytes")
+        # Record voice request metrics
+        metrics.record_voice_request(session_id, len(audio_data))
+
+        logger.info(
+            "voice_processing_started",
+            session_id=session_id,
+            audio_size_bytes=len(audio_data)
+        )
 
         # Transcribe audio to text
+        stt_start = time.time()
         try:
             transcribed_text = await stt.transcribe(audio_data)
-            logger.info(f"Transcribed text: {transcribed_text}")
+            stt_duration_ms = (time.time() - stt_start) * 1000
+            metrics.record_api_call("groq_stt", success=True, duration_ms=stt_duration_ms)
+            logger.info(
+                "speech_to_text_success",
+                session_id=session_id,
+                transcribed_length=len(transcribed_text),
+                duration_ms=round(stt_duration_ms, 2)
+            )
         except ValueError as e:
             # Validation errors (bad audio format, empty file, etc.)
-            logger.error(f"Audio validation failed: {e}")
+            stt_duration_ms = (time.time() - stt_start) * 1000
+            metrics.record_api_call("groq_stt", success=False, duration_ms=stt_duration_ms)
+            metrics.record_error("audio_validation_failed", endpoint="voice_process")
+            logger.error("audio_validation_failed", error=str(e), session_id=session_id)
             raise HTTPException(status_code=400, detail=f"Invalid audio: {str(e)}")
         except Exception as e:
             # API or processing errors
-            logger.error(f"Speech-to-text failed: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=503,
-                detail="I couldn't hear that clearly. Could you try again?",
-            )
+            stt_duration_ms = (time.time() - stt_start) * 1000
+            metrics.record_api_call("groq_stt", success=False, duration_ms=stt_duration_ms)
+            metrics.record_error("speech_to_text_failed", endpoint="voice_process")
+            logger.error("speech_to_text_failed", error=str(e), session_id=session_id, exc_info=True)
+            raise SpeechToTextError(f"Speech-to-text conversion failed: {str(e)}")
 
         # Process through LangGraph workflow with timeout and error handling
+        workflow_start = time.time()
         try:
             # Create checkpointer for session persistence
             checkpointer = SqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH)
@@ -165,7 +189,14 @@ async def process_voice(
                     timeout=settings.WORKFLOW_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError:
-                logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s for session {session_id}")
+                workflow_duration_ms = (time.time() - workflow_start) * 1000
+                metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
+                metrics.record_error("workflow_timeout", endpoint="voice_process")
+                logger.error(
+                    "workflow_timeout",
+                    session_id=session_id,
+                    timeout_seconds=settings.WORKFLOW_TIMEOUT_SECONDS
+                )
                 raise HTTPException(
                     status_code=504,
                     detail="I'm taking longer than usual to respond. Please try again.",
@@ -173,11 +204,21 @@ async def process_voice(
 
             # Extract response text from the last AI message
             response_text = result["messages"][-1].content
-            logger.info(f"Generated response: {response_text[:100]}...")
+            workflow_duration_ms = (time.time() - workflow_start) * 1000
+            metrics.record_workflow_execution(session_id, workflow_duration_ms, success=True)
+            logger.info(
+                "workflow_execution_success",
+                session_id=session_id,
+                response_length=len(response_text),
+                duration_ms=round(workflow_duration_ms, 2)
+            )
 
         except CircuitBreakerError as e:
             # Circuit breaker is open for one of the services
-            logger.error(f"Circuit breaker open during workflow: {e}")
+            workflow_duration_ms = (time.time() - workflow_start) * 1000
+            metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
+            metrics.record_error("circuit_breaker_open", endpoint="voice_process")
+            logger.error("circuit_breaker_open", error=str(e), session_id=session_id)
             raise HTTPException(
                 status_code=503,
                 detail="I'm having trouble connecting to my services right now. Please try again in a moment.",
@@ -186,30 +227,32 @@ async def process_voice(
             # Re-raise HTTP exceptions (including timeout)
             raise
         except Exception as e:
-            logger.error(f"LangGraph workflow failed: {e}", exc_info=True)
-            # Provide graceful fallback response
-            raise HTTPException(
-                status_code=503,
-                detail="I'm having trouble processing that right now. Could you try rephrasing?",
-            )
+            workflow_duration_ms = (time.time() - workflow_start) * 1000
+            metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
+            metrics.record_error("workflow_execution_failed", endpoint="voice_process")
+            logger.error("workflow_execution_failed", error=str(e), session_id=session_id, exc_info=True)
+            # Raise custom exception for proper error handling
+            raise WorkflowError(f"Workflow execution failed: {str(e)}")
 
         # Generate audio response
+        tts_start = time.time()
         try:
             audio_bytes = await tts.synthesize(response_text)
-            logger.info(f"Generated audio: {len(audio_bytes)} bytes")
-        except Exception as e:
-            logger.error(f"Text-to-speech failed: {e}", exc_info=True)
-            # Return text-only response as fallback
-            logger.warning("Falling back to text-only response due to TTS failure")
-            raise HTTPException(
-                status_code=200,
-                detail={
-                    "text": response_text,
-                    "audio_url": None,
-                    "session_id": session_id,
-                    "error": "I'm having trouble with my voice right now, but I'm here.",
-                },
+            tts_duration_ms = (time.time() - tts_start) * 1000
+            metrics.record_api_call("elevenlabs_tts", success=True, duration_ms=tts_duration_ms)
+            logger.info(
+                "text_to_speech_success",
+                session_id=session_id,
+                audio_size_bytes=len(audio_bytes),
+                duration_ms=round(tts_duration_ms, 2)
             )
+        except Exception as e:
+            tts_duration_ms = (time.time() - tts_start) * 1000
+            metrics.record_api_call("elevenlabs_tts", success=False, duration_ms=tts_duration_ms)
+            metrics.record_error("text_to_speech_failed", endpoint="voice_process")
+            logger.error("text_to_speech_failed", error=str(e), session_id=session_id, exc_info=True)
+            # Raise custom exception for proper error handling
+            raise TextToSpeechError(f"Text-to-speech conversion failed: {str(e)}")
 
         # Save audio file temporarily with secure permissions
         audio_id = str(uuid.uuid4())
@@ -220,13 +263,21 @@ async def process_voice(
             fd = os.open(str(audio_path), os.O_CREAT | os.O_WRONLY | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
             os.write(fd, audio_bytes)
             os.close(fd)
-            logger.info(f"Saved audio to {audio_path} with secure permissions")
+            logger.info("audio_file_saved", audio_id=audio_id, path=str(audio_path))
         except Exception as e:
-            logger.error(f"Failed to save audio file: {e}")
+            metrics.record_error("audio_save_failed", endpoint="voice_process")
+            logger.error("audio_save_failed", error=str(e), audio_id=audio_id)
             raise HTTPException(status_code=500, detail="Failed to save audio response")
 
         # Return response with audio URL
         audio_url = f"/api/voice/audio/{audio_id}"
+
+        logger.info(
+            "voice_processing_complete",
+            session_id=session_id,
+            audio_id=audio_id,
+            response_length=len(response_text)
+        )
 
         return VoiceProcessResponse(
             text=response_text,
@@ -236,12 +287,17 @@ async def process_voice(
 
     except HTTPException:
         raise
+    except (SpeechToTextError, TextToSpeechError, WorkflowError):
+        # These will be handled by the global exception handler
+        raise
     except Exception as e:
-        logger.error(f"Unexpected error in voice processing: {e}")
+        metrics.record_error("unexpected_error", endpoint="voice_process")
+        logger.error("unexpected_error", error=str(e), session_id=session_id, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/voice/audio/{audio_id}")
+@track_performance("audio_serving")
 async def get_audio(audio_id: str):
     """Serve generated audio file.
 
@@ -266,10 +322,11 @@ async def get_audio(audio_id: str):
     audio_path = AUDIO_DIR / f"{audio_id}.mp3"
 
     if not audio_path.exists():
-        logger.error(f"Audio file not found: {audio_id}")
+        metrics.record_error("audio_not_found", endpoint="audio_serving")
+        logger.error("audio_file_not_found", audio_id=audio_id)
         raise HTTPException(status_code=404, detail="Audio file not found")
 
-    logger.info(f"Serving audio file: {audio_id}")
+    logger.info("audio_file_served", audio_id=audio_id)
 
     return FileResponse(
         path=audio_path,
@@ -288,12 +345,16 @@ def cleanup_old_audio_files(max_age_hours: Optional[int] = None) -> None:
         max_age = max_age_hours if max_age_hours is not None else settings.AUDIO_CLEANUP_MAX_AGE_HOURS
         current_time = time.time()
         max_age_seconds = max_age * 3600
+        deleted_count = 0
 
         for audio_file in AUDIO_DIR.glob("*.mp3"):
             file_age = current_time - audio_file.stat().st_mtime
             if file_age > max_age_seconds:
                 audio_file.unlink()
-                logger.info(f"Deleted old audio file: {audio_file.name}")
+                deleted_count += 1
+                logger.info("audio_file_deleted", filename=audio_file.name, age_hours=file_age / 3600)
+
+        logger.info("audio_cleanup_complete", deleted_count=deleted_count, max_age_hours=max_age)
 
     except Exception as e:
-        logger.error(f"Error cleaning up audio files: {e}")
+        logger.error("audio_cleanup_failed", error=str(e), exc_info=True)
