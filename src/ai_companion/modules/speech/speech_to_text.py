@@ -7,44 +7,34 @@ from typing import Optional
 from groq import Groq
 
 from ai_companion.core.exceptions import SpeechToTextError
-from ai_companion.core.resilience import get_groq_circuit_breaker, CircuitBreakerError
+from ai_companion.core.resilience import CircuitBreakerError, get_groq_circuit_breaker
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
 class SpeechToText:
-    """A class to handle speech-to-text conversion using Groq's Whisper model."""
+    """A class to handle speech-to-text conversion using Groq's Whisper model.
 
-    # Required environment variables
-    REQUIRED_ENV_VARS = ["GROQ_API_KEY"]
+    This class provides speech-to-text transcription with automatic retry logic,
+    circuit breaker protection, and audio format detection.
 
-    # Retry configuration
-    MAX_RETRIES = 3
-    INITIAL_BACKOFF = 1.0  # seconds
-    MAX_BACKOFF = 10.0  # seconds
-    TIMEOUT = 60  # seconds
+    Configuration is loaded from settings module for consistency across the application.
+    """
 
     # Supported audio formats
     SUPPORTED_FORMATS = [".wav", ".mp3", ".webm", ".m4a", ".ogg", ".flac"]
 
     def __init__(self):
         """Initialize the SpeechToText class and validate environment variables."""
-        self._validate_env_vars()
         self._client: Optional[Groq] = None
         self._circuit_breaker = get_groq_circuit_breaker()
-
-    def _validate_env_vars(self) -> None:
-        """Validate that all required environment variables are set."""
-        missing_vars = [var for var in self.REQUIRED_ENV_VARS if not os.getenv(var)]
-        if missing_vars:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
     @property
     def client(self) -> Groq:
         """Get or create Groq client instance using singleton pattern."""
         if self._client is None:
-            self._client = Groq(api_key=settings.GROQ_API_KEY, timeout=self.TIMEOUT)
+            self._client = Groq(api_key=settings.GROQ_API_KEY, timeout=settings.STT_TIMEOUT)
         return self._client
 
     def _detect_audio_format(self, audio_data: bytes) -> str:
@@ -89,10 +79,10 @@ class SpeechToText:
         if not audio_data:
             raise ValueError("Audio data cannot be empty")
 
-        # Validate audio size (max 25MB for Groq Whisper)
-        max_size = 25 * 1024 * 1024
+        # Validate audio size (configurable via settings)
+        max_size = settings.STT_MAX_AUDIO_SIZE_MB * 1024 * 1024
         if len(audio_data) > max_size:
-            raise ValueError(f"Audio file too large. Maximum size is {max_size / 1024 / 1024}MB")
+            raise ValueError(f"Audio file too large. Maximum size is {settings.STT_MAX_AUDIO_SIZE_MB}MB")
 
         # Determine file extension
         if audio_format:
@@ -104,9 +94,9 @@ class SpeechToText:
 
         logger.info(f"Transcribing audio: size={len(audio_data)} bytes, format={file_ext}")
 
-        # Retry loop with exponential backoff
+        # Retry loop with exponential backoff (configured via settings)
         last_exception = None
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(settings.STT_MAX_RETRIES):
             try:
                 # Create a temporary file with appropriate extension
                 with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temp_file:
@@ -116,7 +106,7 @@ class SpeechToText:
                 try:
                     # Open the temporary file for the API request
                     with open(temp_file_path, "rb") as audio_file:
-                        logger.info(f"Attempt {attempt + 1}/{self.MAX_RETRIES}: Calling Groq Whisper API")
+                        logger.info(f"Attempt {attempt + 1}/{settings.STT_MAX_RETRIES}: Calling Groq Whisper API")
 
                         # Use circuit breaker for API call
                         def _call_groq_api():
@@ -150,8 +140,8 @@ class SpeechToText:
             except Exception as e:
                 last_exception = e
                 logger.warning(
-                    f"Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {type(e).__name__}: {str(e)}",
-                    exc_info=attempt == self.MAX_RETRIES - 1,  # Full traceback on last attempt
+                    f"Attempt {attempt + 1}/{settings.STT_MAX_RETRIES} failed: {type(e).__name__}: {str(e)}",
+                    exc_info=attempt == settings.STT_MAX_RETRIES - 1,  # Full traceback on last attempt
                 )
 
                 # Don't retry on validation errors
@@ -159,13 +149,13 @@ class SpeechToText:
                     raise
 
                 # If not the last attempt, wait with exponential backoff
-                if attempt < self.MAX_RETRIES - 1:
-                    backoff_time = min(self.INITIAL_BACKOFF * (2**attempt), self.MAX_BACKOFF)
+                if attempt < settings.STT_MAX_RETRIES - 1:
+                    backoff_time = min(settings.STT_INITIAL_BACKOFF * (2**attempt), settings.STT_MAX_BACKOFF)
                     logger.info(f"Retrying in {backoff_time:.1f} seconds...")
                     time.sleep(backoff_time)
 
         # All retries exhausted
-        error_msg = f"Speech-to-text conversion failed after {self.MAX_RETRIES} attempts"
+        error_msg = f"Speech-to-text conversion failed after {settings.STT_MAX_RETRIES} attempts"
         if last_exception:
             error_msg += f": {str(last_exception)}"
         logger.error(error_msg)

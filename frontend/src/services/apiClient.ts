@@ -23,14 +23,35 @@ class ApiClient {
       },
     })
 
+    // Add request interceptor to check network status
+    this.client.interceptors.request.use(
+      (config) => {
+        // Check if browser is online
+        if (!navigator.onLine) {
+          return Promise.reject(new Error('No internet connection'))
+        }
+        return config
+      },
+      (error) => Promise.reject(error)
+    )
+
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (error.message === 'No internet connection') {
+          throw new Error('No internet connection. Please check your network.')
+        }
+        
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Request timed out. Please try again.')
+        }
+
         if (error.response) {
           // Server responded with error status
           console.error('API Error:', error.response.status, error.response.data)
-          throw new Error(error.response.data.detail || 'Server error occurred')
+          const message = error.response.data.detail || error.response.data.message || 'Server error occurred'
+          throw new Error(message)
         } else if (error.request) {
           // Request made but no response
           console.error('Network Error:', error.request)

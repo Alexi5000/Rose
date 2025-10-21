@@ -1,3 +1,9 @@
+"""LangGraph workflow graph construction.
+
+This module defines the conversation workflow graph for Rose the Healer Shaman,
+orchestrating memory extraction, routing, context injection, and response generation.
+"""
+
 from functools import lru_cache
 
 from langgraph.graph import END, START, StateGraph
@@ -20,7 +26,7 @@ from ai_companion.graph.state import AICompanionState
 
 
 @lru_cache(maxsize=1)
-def create_workflow_graph():
+def create_workflow_graph() -> StateGraph:
     graph_builder = StateGraph(AICompanionState)
 
     # Add all nodes

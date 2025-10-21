@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import os
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -14,26 +13,33 @@ logger = logging.getLogger(__name__)
 
 
 class TextToSpeech:
-    """A class to handle text-to-speech conversion using ElevenLabs with Rose's therapeutic voice."""
+    """A class to handle text-to-speech conversion using ElevenLabs with Rose's therapeutic voice.
 
-    # Required environment variables
-    REQUIRED_ENV_VARS = ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID"]
+    This class provides text-to-speech synthesis with caching, circuit breaker protection,
+    and graceful fallback to text-only responses when audio generation fails.
 
-    def __init__(self, enable_cache: bool = True, cache_ttl_hours: int = 24):
-        """Initialize the TextToSpeech class and validate environment variables.
+    Configuration is loaded from settings module for consistency across the application.
+    """
+
+    def __init__(
+        self,
+        enable_cache: Optional[bool] = None,
+        cache_ttl_hours: Optional[int] = None,
+    ):
+        """Initialize the TextToSpeech class.
 
         Args:
-            enable_cache: Whether to enable caching of TTS responses
-            cache_ttl_hours: Time-to-live for cached responses in hours
+            enable_cache: Whether to enable caching (defaults to settings.TTS_CACHE_ENABLED)
+            cache_ttl_hours: Cache TTL in hours (defaults to settings.TTS_CACHE_TTL_HOURS)
         """
-        self._validate_env_vars()
         self._client: Optional[ElevenLabs] = None
         self._tts_available = True  # Track TTS availability for fallback logic
         self._circuit_breaker = get_elevenlabs_circuit_breaker()
 
-        # Cache configuration
-        self._cache_enabled = enable_cache
-        self._cache_ttl = timedelta(hours=cache_ttl_hours)
+        # Cache configuration (use settings defaults if not provided)
+        self._cache_enabled = enable_cache if enable_cache is not None else settings.TTS_CACHE_ENABLED
+        cache_ttl = cache_ttl_hours if cache_ttl_hours is not None else settings.TTS_CACHE_TTL_HOURS
+        self._cache_ttl = timedelta(hours=cache_ttl)
         self._cache: dict[str, tuple[bytes, datetime]] = {}  # {cache_key: (audio_bytes, timestamp)}
 
         # Common therapeutic phrases to pre-cache (can be expanded)
@@ -47,12 +53,6 @@ class TextToSpeech:
             "Let's take a deep breath together.",
             "I hear you, and your feelings are valid.",
         ]
-
-    def _validate_env_vars(self) -> None:
-        """Validate that all required environment variables are set."""
-        missing_vars = [var for var in self.REQUIRED_ENV_VARS if not os.getenv(var)]
-        if missing_vars:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
     @property
     def client(self) -> ElevenLabs:
@@ -86,16 +86,16 @@ class TextToSpeech:
         if not text.strip():
             raise ValueError("Input text cannot be empty")
 
-        if len(text) > 5000:  # ElevenLabs typical limit
-            raise ValueError("Input text exceeds maximum length of 5000 characters")
+        if len(text) > settings.TTS_MAX_TEXT_LENGTH:
+            raise ValueError(f"Input text exceeds maximum length of {settings.TTS_MAX_TEXT_LENGTH} characters")
 
         # Use Rose-specific voice if configured, otherwise use default
         selected_voice_id = voice_id or settings.ROSE_VOICE_ID or settings.ELEVENLABS_VOICE_ID
 
         # Rose's therapeutic voice settings: high stability for calming, grounding effect
         # Slightly slower speech rate is achieved through voice selection, not API parameters
-        voice_stability = stability if stability is not None else 0.75  # High stability for consistent, calming tone
-        voice_similarity = similarity_boost if similarity_boost is not None else 0.5  # Medium for natural variation
+        voice_stability = stability if stability is not None else settings.TTS_VOICE_STABILITY
+        voice_similarity = similarity_boost if similarity_boost is not None else settings.TTS_VOICE_SIMILARITY
 
         logger.info(
             f"Synthesizing speech for Rose: {len(text)} chars, "
@@ -284,8 +284,8 @@ class TextToSpeech:
             TextToSpeechError: If the text-to-speech conversion fails
         """
         # Use default values for cache key generation
-        voice_stability = stability if stability is not None else 0.75
-        voice_similarity = similarity_boost if similarity_boost is not None else 0.5
+        voice_stability = stability if stability is not None else settings.TTS_VOICE_STABILITY
+        voice_similarity = similarity_boost if similarity_boost is not None else settings.TTS_VOICE_SIMILARITY
 
         # Generate cache key
         cache_key = self._get_cache_key(text, voice_id, voice_stability, voice_similarity)

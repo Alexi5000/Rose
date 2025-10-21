@@ -8,6 +8,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -44,7 +45,7 @@ MAX_AUDIO_SIZE = 10 * 1024 * 1024
 
 class VoiceProcessResponse(BaseModel):
     """Response model for voice processing.
-    
+
     Attributes:
         text: The transcribed and processed text response from Rose
         audio_url: URL to download the generated audio response (MP3 format)
@@ -61,7 +62,7 @@ class VoiceProcessResponse(BaseModel):
                 {
                     "text": "I hear the pain in your words. It's okay to feel this way. Tell me more about what you're experiencing.",
                     "audio_url": "/api/v1/voice/audio/550e8400-e29b-41d4-a716-446655440000",
-                    "session_id": "123e4567-e89b-12d3-a456-426614174000"
+                    "session_id": "123e4567-e89b-12d3-a456-426614174000",
                 }
             ]
         }
@@ -216,11 +217,7 @@ async def process_voice(
 
         try:
             # Create file with secure permissions (owner read/write only)
-            fd = os.open(
-                str(audio_path),
-                os.O_CREAT | os.O_WRONLY | os.O_EXCL,
-                stat.S_IRUSR | stat.S_IWUSR
-            )
+            fd = os.open(str(audio_path), os.O_CREAT | os.O_WRONLY | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
             os.write(fd, audio_bytes)
             os.close(fd)
             logger.info(f"Saved audio to {audio_path} with secure permissions")
@@ -242,7 +239,6 @@ async def process_voice(
     except Exception as e:
         logger.error(f"Unexpected error in voice processing: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
 
 
 @router.get("/voice/audio/{audio_id}")
@@ -282,15 +278,16 @@ async def get_audio(audio_id: str):
     )
 
 
-def cleanup_old_audio_files(max_age_hours: int = 24):
+def cleanup_old_audio_files(max_age_hours: Optional[int] = None) -> None:
     """Clean up audio files older than specified hours.
 
     Args:
-        max_age_hours: Maximum age of files to keep in hours
+        max_age_hours: Maximum age of files to keep in hours (defaults to settings.AUDIO_CLEANUP_MAX_AGE_HOURS)
     """
     try:
+        max_age = max_age_hours if max_age_hours is not None else settings.AUDIO_CLEANUP_MAX_AGE_HOURS
         current_time = time.time()
-        max_age_seconds = max_age_hours * 3600
+        max_age_seconds = max_age * 3600
 
         for audio_file in AUDIO_DIR.glob("*.mp3"):
             file_age = current_time - audio_file.stat().st_mtime

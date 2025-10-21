@@ -18,6 +18,8 @@ This guide covers deploying Rose the Healer Shaman to various cloud platforms.
 
 Railway provides the simplest deployment experience with automatic builds and zero-config deployments.
 
+> **📖 Comprehensive Guide**: For detailed Railway setup instructions including volume configuration, environment-specific deployments, and troubleshooting, see **[Railway Setup Guide](RAILWAY_SETUP.md)**.
+
 ### Prerequisites
 
 1. A [Railway account](https://railway.app/)
@@ -86,6 +88,30 @@ The `railway.json` file in the project root configures:
 - **Start Command**: Runs uvicorn server on Railway's assigned port
 - **Health Check**: `/api/health` endpoint for monitoring
 - **Restart Policy**: Automatic restart on failure (max 3 retries)
+
+#### Environment-Specific Configurations
+
+The project includes optimized configurations for different environments:
+
+- **Development**: `config/dev.env` - Local development with verbose logging
+- **Staging**: `config/railway-staging.json` - Testing environment with moderate resources
+- **Production**: `config/railway-prod.json` - Production-ready with strict security
+
+To deploy to a specific environment:
+```bash
+# For staging
+cp config/railway-staging.json railway.json
+
+# For production
+cp config/railway-prod.json railway.json
+
+# Commit and push
+git add railway.json
+git commit -m "Configure for [environment]"
+git push
+```
+
+See `config/README.md` for detailed configuration differences.
 
 ---
 

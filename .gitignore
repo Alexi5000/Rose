@@ -253,6 +253,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Config directory - track templates, ignore actual .env files
+!config/*.env
+!config/README.md
+!config/*.json
+
 # Spyder project settings
 .spyderproject
 .spyproject

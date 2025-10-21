@@ -19,13 +19,40 @@ from ai_companion.modules.schedules.context_generation import ScheduleContextGen
 from ai_companion.settings import settings
 
 
-async def router_node(state: AICompanionState):
+async def router_node(state: AICompanionState) -> dict[str, str]:
+    """Route the conversation to the appropriate workflow type.
+
+    Analyzes recent messages to determine if the user wants:
+    - conversation: Regular text conversation
+    - image: Image generation request
+    - audio: Audio/voice interaction
+
+    Args:
+        state: Current conversation state
+
+    Returns:
+        Dictionary with workflow type: {"workflow": "conversation"|"image"|"audio"}
+    """
     chain = get_router_chain()
     response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
     return {"workflow": response.response_type}
 
 
-def context_injection_node(state: AICompanionState):
+def context_injection_node(state: AICompanionState) -> dict[str, bool | str]:
+    """Inject current activity context into the conversation state.
+
+    Determines if the current scheduled activity has changed and should be
+    applied to the conversation context.
+
+    Args:
+        state: Current conversation state
+
+    Returns:
+        Dictionary with activity context: {
+            "apply_activity": bool,
+            "current_activity": str
+        }
+    """
     schedule_context = ScheduleContextGenerator.get_current_activity()
     if schedule_context != state.get("current_activity", ""):
         apply_activity = True
@@ -34,7 +61,19 @@ def context_injection_node(state: AICompanionState):
     return {"apply_activity": apply_activity, "current_activity": schedule_context}
 
 
-async def conversation_node(state: AICompanionState, config: RunnableConfig):
+async def conversation_node(state: AICompanionState, config: RunnableConfig) -> dict[str, AIMessage]:
+    """Generate a conversational response using Rose's character.
+
+    Processes the conversation through the character response chain with
+    memory context and current activity awareness.
+
+    Args:
+        state: Current conversation state
+        config: LangGraph runnable configuration
+
+    Returns:
+        Dictionary with AI response: {"messages": AIMessage}
+    """
     current_activity = ScheduleContextGenerator.get_current_activity()
     memory_context = state.get("memory_context", "")
 
@@ -51,7 +90,22 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig):
     return {"messages": AIMessage(content=response)}
 
 
-async def image_node(state: AICompanionState, config: RunnableConfig):
+async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[str, AIMessage | str]:
+    """Generate an image and respond with context about it.
+
+    Creates an image based on conversation context, then generates a
+    conversational response about the generated image.
+
+    Args:
+        state: Current conversation state
+        config: LangGraph runnable configuration
+
+    Returns:
+        Dictionary with response and image path: {
+            "messages": AIMessage,
+            "image_path": str
+        }
+    """
     current_activity = ScheduleContextGenerator.get_current_activity()
     memory_context = state.get("memory_context", "")
 
@@ -79,7 +133,21 @@ async def image_node(state: AICompanionState, config: RunnableConfig):
     return {"messages": AIMessage(content=response), "image_path": img_path}
 
 
-async def audio_node(state: AICompanionState, config: RunnableConfig):
+async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[str, str | bytes]:
+    """Generate a voice response with audio output.
+
+    Creates a text response and synthesizes it to audio using TTS.
+
+    Args:
+        state: Current conversation state
+        config: LangGraph runnable configuration
+
+    Returns:
+        Dictionary with response and audio: {
+            "messages": str,
+            "audio_buffer": bytes
+        }
+    """
     current_activity = ScheduleContextGenerator.get_current_activity()
     memory_context = state.get("memory_context", "")
 
@@ -99,7 +167,21 @@ async def audio_node(state: AICompanionState, config: RunnableConfig):
     return {"messages": response, "audio_buffer": output_audio}
 
 
-async def summarize_conversation_node(state: AICompanionState):
+async def summarize_conversation_node(state: AICompanionState) -> dict[str, str | list[RemoveMessage]]:
+    """Summarize conversation history and trim old messages.
+
+    Creates or extends a conversation summary and removes old messages
+    to keep the context window manageable.
+
+    Args:
+        state: Current conversation state
+
+    Returns:
+        Dictionary with summary and messages to remove: {
+            "summary": str,
+            "messages": list[RemoveMessage]
+        }
+    """
     model = get_chat_model()
     summary = state.get("summary", "")
 
@@ -122,8 +204,18 @@ async def summarize_conversation_node(state: AICompanionState):
     return {"summary": response.content, "messages": delete_messages}
 
 
-async def memory_extraction_node(state: AICompanionState):
-    """Extract and store important information from the last message."""
+async def memory_extraction_node(state: AICompanionState) -> dict:
+    """Extract and store important information from the last message.
+
+    Analyzes the most recent message and stores relevant memories
+    in the long-term memory system (Qdrant).
+
+    Args:
+        state: Current conversation state
+
+    Returns:
+        Empty dictionary (state update handled by memory manager)
+    """
     if not state["messages"]:
         return {}
 
@@ -132,8 +224,18 @@ async def memory_extraction_node(state: AICompanionState):
     return {}
 
 
-def memory_injection_node(state: AICompanionState):
-    """Retrieve and inject relevant memories into the character card."""
+def memory_injection_node(state: AICompanionState) -> dict[str, str]:
+    """Retrieve and inject relevant memories into the character card.
+
+    Searches long-term memory for relevant context based on recent
+    conversation and formats it for inclusion in the prompt.
+
+    Args:
+        state: Current conversation state
+
+    Returns:
+        Dictionary with memory context: {"memory_context": str}
+    """
     memory_manager = get_memory_manager()
 
     # Get relevant memories based on recent conversation

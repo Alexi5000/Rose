@@ -1,4 +1,11 @@
-"""Resilience patterns including circuit breakers for external service calls."""
+"""Resilience patterns including circuit breakers for external service calls.
+
+This module provides circuit breaker implementations to protect against cascading
+failures when external services (Groq, ElevenLabs, Qdrant) become unavailable.
+
+Circuit breakers prevent repeated calls to failing services, allowing them time
+to recover while providing fast failure responses to clients.
+"""
 
 import logging
 from functools import wraps
@@ -243,39 +250,73 @@ def circuit_breaker(
     return decorator
 
 
-# Global circuit breakers for external services
-groq_circuit_breaker = CircuitBreaker(
-    failure_threshold=5,
-    recovery_timeout=60,
-    expected_exception=Exception,
-    name="GroqAPI",
-)
-
-elevenlabs_circuit_breaker = CircuitBreaker(
-    failure_threshold=5,
-    recovery_timeout=60,
-    expected_exception=Exception,
-    name="ElevenLabsAPI",
-)
-
-qdrant_circuit_breaker = CircuitBreaker(
-    failure_threshold=5,
-    recovery_timeout=60,
-    expected_exception=Exception,
-    name="QdrantAPI",
-)
+# Global circuit breaker instances (lazy initialization)
+_groq_circuit_breaker: Optional[CircuitBreaker] = None
+_elevenlabs_circuit_breaker: Optional[CircuitBreaker] = None
+_qdrant_circuit_breaker: Optional[CircuitBreaker] = None
 
 
 def get_groq_circuit_breaker() -> CircuitBreaker:
-    """Get the global Groq circuit breaker instance."""
-    return groq_circuit_breaker
+    """Get the global Groq circuit breaker instance.
+
+    Circuit breaker is lazily initialized on first access to avoid
+    requiring settings at import time.
+
+    Returns:
+        CircuitBreaker instance for Groq API calls
+    """
+    global _groq_circuit_breaker
+    if _groq_circuit_breaker is None:
+        from ai_companion.settings import settings
+
+        _groq_circuit_breaker = CircuitBreaker(
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            expected_exception=Exception,
+            name="GroqAPI",
+        )
+    return _groq_circuit_breaker
 
 
 def get_elevenlabs_circuit_breaker() -> CircuitBreaker:
-    """Get the global ElevenLabs circuit breaker instance."""
-    return elevenlabs_circuit_breaker
+    """Get the global ElevenLabs circuit breaker instance.
+
+    Circuit breaker is lazily initialized on first access to avoid
+    requiring settings at import time.
+
+    Returns:
+        CircuitBreaker instance for ElevenLabs API calls
+    """
+    global _elevenlabs_circuit_breaker
+    if _elevenlabs_circuit_breaker is None:
+        from ai_companion.settings import settings
+
+        _elevenlabs_circuit_breaker = CircuitBreaker(
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            expected_exception=Exception,
+            name="ElevenLabsAPI",
+        )
+    return _elevenlabs_circuit_breaker
 
 
 def get_qdrant_circuit_breaker() -> CircuitBreaker:
-    """Get the global Qdrant circuit breaker instance."""
-    return qdrant_circuit_breaker
+    """Get the global Qdrant circuit breaker instance.
+
+    Circuit breaker is lazily initialized on first access to avoid
+    requiring settings at import time.
+
+    Returns:
+        CircuitBreaker instance for Qdrant API calls
+    """
+    global _qdrant_circuit_breaker
+    if _qdrant_circuit_breaker is None:
+        from ai_companion.settings import settings
+
+        _qdrant_circuit_breaker = CircuitBreaker(
+            failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            expected_exception=Exception,
+            name="QdrantAPI",
+        )
+    return _qdrant_circuit_breaker
