@@ -73,6 +73,8 @@ This index provides a comprehensive guide to all operational documentation for t
 |----------|-------------|----------|
 | [Operations Runbook](OPERATIONS_RUNBOOK.md) | Troubleshooting guide for common issues | On-call engineers, SRE |
 | [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) | Logging, metrics, and monitoring setup | SRE, DevOps |
+| [Monitoring and Alerting](MONITORING_AND_ALERTING.md) | Comprehensive monitoring and alerting system | SRE, DevOps |
+| [Monitoring Quick Start](MONITORING_QUICK_START.md) | Quick reference for monitoring setup | All engineers |
 | [Resource Management](RESOURCE_MANAGEMENT.md) | Memory, CPU, disk management | SRE, Backend |
 | [External API Limits](EXTERNAL_API_LIMITS.md) | Rate limits and quotas for external services | All engineers |
 
@@ -80,7 +82,10 @@ This index provides a comprehensive guide to all operational documentation for t
 - Common operational issues and solutions
 - Health check interpretation
 - Log analysis and debugging
-- Performance monitoring
+- Performance monitoring and alerting
+- Real-time metrics collection
+- Sentry error tracking integration
+- Alert threshold configuration
 - Resource usage optimization
 - External API management
 
@@ -249,8 +254,9 @@ This index provides a comprehensive guide to all operational documentation for t
 1. [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) - Pre-deployment verification
 2. [Deployment Guide](DEPLOYMENT.md) - Follow deployment steps
 3. [Railway Setup](RAILWAY_SETUP.md) - Railway-specific configuration
-4. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Set up monitoring
-5. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Prepare for operations
+4. [Monitoring Quick Start](MONITORING_QUICK_START.md) - Set up monitoring (5 minutes)
+5. [Monitoring and Alerting](MONITORING_AND_ALERTING.md) - Configure alerts and Sentry
+6. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Prepare for operations
 
 **Estimated Time:** 2-3 hours
 
@@ -262,10 +268,11 @@ This index provides a comprehensive guide to all operational documentation for t
 
 **Reading Order:**
 1. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Find common issues
-2. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Check logs and metrics
-3. [External API Limits](EXTERNAL_API_LIMITS.md) - Check API status
-4. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Follow incident process
-5. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - Rollback if needed
+2. [Monitoring and Alerting](MONITORING_AND_ALERTING.md) - Check alerts and metrics
+3. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Check logs
+4. [External API Limits](EXTERNAL_API_LIMITS.md) - Check API status
+5. [Incident Response Plan](INCIDENT_RESPONSE_PLAN.md) - Follow incident process
+6. [Rollback Procedures](ROLLBACK_PROCEDURES.md) - Rollback if needed
 
 **Estimated Time:** 15 minutes - 2 hours (depending on severity)
 
@@ -405,6 +412,8 @@ This index provides a comprehensive guide to all operational documentation for t
 | Deployment Configuration | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Railway Setup | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Monitoring and Observability | ✅ Complete | 2025-10-18 | 2026-01-18 |
+| Monitoring and Alerting | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Monitoring Quick Start | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Horizontal Scaling Strategy | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | PostgreSQL Migration Guide | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Session Affinity Guide | ✅ Complete | 2025-10-21 | 2026-01-21 |

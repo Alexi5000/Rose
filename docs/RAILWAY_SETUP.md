@@ -365,11 +365,100 @@ Should show Swagger UI with all endpoints.
 
 ## Monitoring and Maintenance
 
+### Setting Up Monitoring
+
+Rose includes comprehensive monitoring and alerting capabilities. Follow these steps to enable monitoring:
+
+#### 1. Configure Sentry (Recommended)
+
+Sentry provides error tracking and performance monitoring:
+
+1. **Create Sentry Account**:
+   - Go to https://sentry.io
+   - Sign up for free account
+   - Create new project (select "FastAPI")
+
+2. **Get DSN**:
+   - Navigate to Settings → Projects → [Your Project] → Client Keys (DSN)
+   - Copy the DSN URL
+
+3. **Add to Railway**:
+   ```bash
+   SENTRY_DSN=https://your-key@o123456.ingest.sentry.io/7654321
+   SENTRY_TRACES_SAMPLE_RATE=0.1
+   SENTRY_PROFILES_SAMPLE_RATE=0.1
+   ENVIRONMENT=production
+   APP_VERSION=1.0.0
+   ```
+
+4. **Configure Alerts**:
+   - In Sentry dashboard, go to Alerts
+   - Create alert rules for:
+     - Error rate > 5% in 5 minutes
+     - Response time P95 > 2 seconds
+     - New error types
+   - Set up notification channels (email, Slack, PagerDuty)
+
+#### 2. Configure Alert Thresholds
+
+Customize alert thresholds based on your traffic:
+
+```bash
+# Error rate alerts
+ALERT_ERROR_RATE_ENABLED=true
+ALERT_ERROR_RATE_THRESHOLD=5.0  # Percentage
+
+# Response time alerts
+ALERT_RESPONSE_TIME_ENABLED=true
+ALERT_RESPONSE_TIME_THRESHOLD=2000.0  # Milliseconds
+
+# Memory usage alerts
+ALERT_MEMORY_ENABLED=true
+ALERT_MEMORY_THRESHOLD=80.0  # Percentage
+
+# Circuit breaker alerts
+ALERT_CIRCUIT_BREAKER_ENABLED=true
+
+# Evaluation interval
+MONITORING_EVALUATION_INTERVAL=60  # Seconds
+```
+
+#### 3. Access Monitoring Dashboard
+
+Rose provides monitoring endpoints:
+
+- **Metrics**: `GET /api/v1/monitoring/metrics`
+- **Status**: `GET /api/v1/monitoring/status`
+- **Alerts**: `GET /api/v1/monitoring/alerts?hours=24`
+- **Evaluate**: `POST /api/v1/monitoring/evaluate`
+
+Example:
+```bash
+# Check monitoring status
+curl https://your-app.railway.app/api/v1/monitoring/status
+
+# View recent alerts
+curl https://your-app.railway.app/api/v1/monitoring/alerts?hours=24
+```
+
+#### 4. Set Up External Health Monitoring
+
+Use services like UptimeRobot or Pingdom:
+
+1. Create account at https://uptimerobot.com (free tier available)
+2. Add new monitor:
+   - Type: HTTP(s)
+   - URL: `https://your-app.railway.app/api/v1/health`
+   - Interval: 5 minutes
+3. Configure alerts (email, SMS, Slack)
+
 ### Daily Checks
 
 - Review error logs for anomalies
-- Check health check status
-- Monitor memory usage trends
+- Check health check status (`/api/v1/health`)
+- Monitor memory usage trends in Railway dashboard
+- Review Sentry dashboard for new errors
+- Check active alerts (`/api/v1/monitoring/status`)
 
 ### Weekly Checks
 
@@ -377,6 +466,8 @@ Should show Swagger UI with all endpoints.
 - Check backup file count
 - Verify volume usage is within limits
 - Review API usage and costs
+- Analyze alert history for patterns
+- Review Sentry performance metrics
 
 ### Monthly Checks
 
@@ -384,6 +475,8 @@ Should show Swagger UI with all endpoints.
 - Review and update dependencies
 - Test rollback procedure
 - Review and optimize resource allocation
+- Tune alert thresholds based on traffic
+- Review and update incident response procedures
 
 ## Support and Resources
 
@@ -396,12 +489,18 @@ Should show Swagger UI with all endpoints.
 
 After successful deployment:
 
-1. Set up monitoring alerts (Sentry, Datadog, etc.)
+1. **Set up monitoring** (see [Monitoring and Alerting](./MONITORING_AND_ALERTING.md)):
+   - Configure Sentry for error tracking
+   - Set up alert thresholds
+   - Configure notification channels
+   - Set up external health monitoring (UptimeRobot)
 2. Configure custom domain
 3. Set up SSL certificate (automatic with Railway)
 4. Implement backup download strategy
 5. Create staging environment for testing
 6. Document incident response procedures
+7. Test alert notifications
+8. Create monitoring dashboard bookmarks
 
 ## Configuration Files Reference
 

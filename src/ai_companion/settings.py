@@ -161,6 +161,25 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE_IMAGE_SCENARIO: float = 0.4  # Temperature for image scenario generation
     LLM_TEMPERATURE_IMAGE_PROMPT: float = 0.25  # Temperature for image prompt generation
 
+    # Monitoring and alerting configuration
+    SENTRY_DSN: str | None = None  # Sentry DSN for error tracking
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1  # Percentage of transactions to trace (0.0-1.0)
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1  # Percentage of transactions to profile (0.0-1.0)
+    ENVIRONMENT: str = "production"  # Environment name (development, staging, production)
+    APP_VERSION: str = "1.0.0"  # Application version for tracking
+    
+    # Alert configuration
+    ALERT_ERROR_RATE_ENABLED: bool = True  # Enable error rate alerts
+    ALERT_ERROR_RATE_THRESHOLD: float = 5.0  # Error rate threshold percentage
+    ALERT_RESPONSE_TIME_ENABLED: bool = True  # Enable response time alerts
+    ALERT_RESPONSE_TIME_THRESHOLD: float = 2000.0  # Response time threshold in ms
+    ALERT_MEMORY_ENABLED: bool = True  # Enable memory usage alerts
+    ALERT_MEMORY_THRESHOLD: float = 80.0  # Memory usage threshold percentage
+    ALERT_CIRCUIT_BREAKER_ENABLED: bool = True  # Enable circuit breaker alerts
+    
+    # Monitoring scheduler configuration
+    MONITORING_EVALUATION_INTERVAL: int = 60  # Seconds between alert evaluations
+
     # Image-to-text configuration
     ITT_TIMEOUT_SECONDS: float = 60.0  # Timeout for image-to-text API calls
     ITT_MAX_RETRIES: int = 3  # Maximum retry attempts for image-to-text

@@ -27,6 +27,8 @@ dependencies = [
     "apscheduler==3.10.4",
     "slowapi==0.1.9",
     "structlog==24.1.0",
+    "psutil==6.1.0",
+    "sentry-sdk[fastapi]==2.19.2",
 ]
 
 [project.optional-dependencies]

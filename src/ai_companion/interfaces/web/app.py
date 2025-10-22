@@ -21,9 +21,10 @@ from ai_companion.core.error_responses import (
 )
 from ai_companion.core.exceptions import AICompanionError
 from ai_companion.core.logging_config import configure_logging, get_logger
+from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
-from ai_companion.interfaces.web.routes import health, metrics as metrics_route, session, voice
+from ai_companion.interfaces.web.routes import health, metrics as metrics_route, monitoring, session, voice
 from ai_companion.settings import settings
 
 # Configure structured logging before any other imports
@@ -82,7 +83,15 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info("scheduler_started", jobs=["audio_cleanup", "database_backup", "session_cleanup"])
     
+    # Start monitoring scheduler
+    await monitoring_scheduler.start()
+    logger.info("monitoring_scheduler_started", evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL)
+    
     yield
+    
+    # Shutdown monitoring scheduler
+    await monitoring_scheduler.stop()
+    logger.info("monitoring_scheduler_stopped")
     
     # Shutdown scheduler
     scheduler.shutdown()
@@ -173,12 +182,14 @@ def create_app() -> FastAPI:
     app.include_router(session.router, prefix="/api/v1", tags=["Session Management"])
     app.include_router(voice.router, prefix="/api/v1", tags=["Voice Processing"])
     app.include_router(metrics_route.router, prefix="/api/v1", tags=["Metrics"])
+    app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
     
     # Maintain backward compatibility with non-versioned routes (deprecated)
     app.include_router(health.router, prefix="/api", tags=["Health (Deprecated)"], deprecated=True)
     app.include_router(session.router, prefix="/api", tags=["Session Management (Deprecated)"], deprecated=True)
     app.include_router(voice.router, prefix="/api", tags=["Voice Processing (Deprecated)"], deprecated=True)
     app.include_router(metrics_route.router, prefix="/api", tags=["Metrics (Deprecated)"], deprecated=True)
+    app.include_router(monitoring.router, prefix="/api", tags=["Monitoring (Deprecated)"], deprecated=True)
     
     logger.info("api_routes_registered", version="v1", backward_compatible=True)
 
