@@ -8,11 +8,16 @@ import aiofiles
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
-from together import Together
 
 from ai_companion.core.exceptions import TextToImageError
 from ai_companion.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
 from ai_companion.settings import settings
+
+# Conditional import for optional dependency
+try:
+    from together import Together
+except ImportError:
+    Together = None  # type: ignore
 
 
 class ScenarioPrompt(BaseModel):
@@ -38,6 +43,11 @@ class TextToImage:
 
     def __init__(self):
         """Initialize the TextToImage class and validate environment variables."""
+        if Together is None:
+            raise ImportError(
+                "The 'together' package is required for image generation. "
+                "Install it with: uv pip install together"
+            )
         self._validate_env_vars()
         self._together_client: Optional[Together] = None
         self.logger = logging.getLogger(__name__)

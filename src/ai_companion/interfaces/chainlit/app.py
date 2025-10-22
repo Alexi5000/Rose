@@ -107,6 +107,103 @@ def get_image_to_text() -> ImageToText:
     return instance
 
 
+async def generate_voice_response(text_content: str, thread_id: int) -> tuple[str, cl.Audio | None]:
+    """Generate voice response with TTS audio element.
+
+    This function provides centralized TTS generation logic for all message handlers,
+    ensuring consistent voice-first behavior across text, voice, and image inputs.
+
+    Args:
+        text_content: The text response to convert to speech
+        thread_id: Thread ID for logging context
+
+    Returns:
+        Tuple of (text_content, audio_element or None)
+        - audio_element is None if TTS generation fails
+
+    Note:
+        This function never raises exceptions. All errors are handled internally
+        with appropriate logging, and text-only response is returned on failure.
+    """
+    import time
+
+    from ai_companion.core.resilience import get_elevenlabs_circuit_breaker
+
+    start_time = time.time()
+
+    try:
+        # Get session-scoped TextToSpeech instance
+        text_to_speech_module = get_text_to_speech()
+
+        # Get circuit breaker to check state
+        circuit_breaker = get_elevenlabs_circuit_breaker()
+        circuit_state_before = circuit_breaker.state
+
+        # Log circuit breaker state if not CLOSED
+        if circuit_state_before != "CLOSED":
+            cl.logger.warning(
+                f"TTS circuit breaker state before call - thread_id={thread_id}, "
+                f"state={circuit_state_before}, text_length={len(text_content)}"
+            )
+
+        # Generate TTS with timeout
+        try:
+            audio_buffer = await asyncio.wait_for(
+                text_to_speech_module.synthesize(text_content), timeout=10.0
+            )
+
+            # Check if circuit breaker state changed after successful call
+            circuit_state_after = circuit_breaker.state
+            if circuit_state_before != circuit_state_after:
+                cl.logger.info(
+                    f"TTS circuit breaker state changed - thread_id={thread_id}, "
+                    f"from={circuit_state_before}, to={circuit_state_after}"
+                )
+
+            # Create audio element with auto-play
+            audio_element = cl.Audio(name="Rose's Voice", auto_play=True, mime="audio/mpeg3", content=audio_buffer)
+
+            # Log success metrics
+            duration_ms = (time.time() - start_time) * 1000
+            cl.logger.info(
+                f"TTS generation successful - thread_id={thread_id}, "
+                f"duration={duration_ms:.0f}ms, text_length={len(text_content)}, "
+                f"audio_size={len(audio_buffer)} bytes"
+            )
+
+            return text_content, audio_element
+
+        except asyncio.TimeoutError:
+            duration_ms = (time.time() - start_time) * 1000
+            cl.logger.error(
+                f"TTS generation timeout after 10s - thread_id={thread_id}, "
+                f"duration={duration_ms:.0f}ms, text_length={len(text_content)}"
+            )
+            return text_content, None
+
+    except CircuitBreakerError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        circuit_breaker = get_elevenlabs_circuit_breaker()
+        cl.logger.error(
+            f"TTS circuit breaker open - thread_id={thread_id}, "
+            f"duration={duration_ms:.0f}ms, text_length={len(text_content)}, "
+            f"circuit_state={circuit_breaker.state}, error={str(e)}"
+        )
+        return text_content, None
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        circuit_breaker = get_elevenlabs_circuit_breaker()
+        cl.logger.error(
+            f"TTS generation failed - thread_id={thread_id}, "
+            f"duration={duration_ms:.0f}ms, text_length={len(text_content)}, "
+            f"circuit_state={circuit_breaker.state}, "
+            f"error_type={type(e).__name__}, error={str(e)}",
+            exc_info=True,
+        )
+        return text_content, None
+
+
 @cl.on_chat_start
 async def on_chat_start():
     """Initialize the chat session with session-scoped module instances.
@@ -197,22 +294,18 @@ async def on_message(message: cl.Message):
         ).send()
         return
 
-    if output_state.values.get("workflow") == "audio":
-        response = output_state.values["messages"][-1].content
-        audio_buffer = output_state.values["audio_buffer"]
-        output_audio_el = cl.Audio(
-            name="Audio",
-            auto_play=True,
-            mime="audio/mpeg3",
-            content=audio_buffer,
-        )
-        await cl.Message(content=response, elements=[output_audio_el]).send()
-    elif output_state.values.get("workflow") == "image":
-        response = output_state.values["messages"][-1].content
-        image = cl.Image(path=output_state.values["image_path"], display="inline")
-        await cl.Message(content=response, elements=[image]).send()
-    else:
-        await msg.send()
+    # Generate voice response for all message types (voice-first design)
+    response_text = output_state.values["messages"][-1].content
+    text, audio = await generate_voice_response(response_text, thread_id)
+
+    # Build elements list with audio (always) and image (if applicable)
+    elements = []
+    if audio:
+        elements.append(audio)
+    if output_state.values.get("workflow") == "image":
+        elements.append(cl.Image(path=output_state.values["image_path"], display="inline"))
+
+    await cl.Message(content=text, elements=elements).send()
 
 
 @cl.on_audio_chunk
@@ -268,17 +361,12 @@ async def on_audio_end(elements):
                 ).send()
                 return
 
-        # Use session-scoped TextToSpeech instance
-        text_to_speech_module = get_text_to_speech()
-        audio_buffer = await text_to_speech_module.synthesize(output_state["messages"][-1].content)
+        # Generate voice response using centralized function
+        response_text = output_state["messages"][-1].content
+        text, audio = await generate_voice_response(response_text, thread_id)
 
-        output_audio_el = cl.Audio(
-            name="Audio",
-            auto_play=True,
-            mime="audio/mpeg3",
-            content=audio_buffer,
-        )
-        await cl.Message(content=output_state["messages"][-1].content, elements=[output_audio_el]).send()
+        elements = [audio] if audio else []
+        await cl.Message(content=text, elements=elements).send()
 
     except CircuitBreakerError as e:
         cl.logger.error(f"Circuit breaker open during audio workflow: {e}")
