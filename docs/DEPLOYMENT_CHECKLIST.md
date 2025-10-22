@@ -15,9 +15,12 @@ Use this checklist before deploying Rose to production.
 ### 2. Configuration ✅
 - [x] Environment variables documented in `.env.example`
 - [x] Configuration files organized in `config/`
-- [x] Railway configuration at `config/railway.json`
+- [x] Environment-specific configs (dev/staging/prod)
+- [x] Railway configuration with health check grace period
+- [x] Resource limits configured in Railway config
 - [x] Security settings configured (CORS, rate limiting)
 - [x] Logging configured (JSON format for production)
+- [x] Docker image optimized (build dependencies removed)
 
 ### 3. Security ✅
 - [x] No secrets in code or git history
@@ -139,21 +142,37 @@ railway up
 
 ### Step 5: Configure Railway
 
-1. **Add Persistent Volume**
+1. **Choose Configuration**
+   - For staging: `cp config/railway-staging.json railway.json`
+   - For production: `cp config/railway-prod.json railway.json`
+   - See [DEPLOYMENT_CONFIGURATION.md](DEPLOYMENT_CONFIGURATION.md) for details
+
+2. **Add Persistent Volume**
    - Go to Railway dashboard
    - Select your service
-   - Add volume: `/app/data`
-   - Redeploy
+   - Settings → Volumes → Add Volume
+   - Mount path: `/app/data`
+   - Size: 1GB (staging) or 5GB (production)
+   - Redeploy after adding volume
+   - See [RAILWAY_SETUP.md](RAILWAY_SETUP.md#volume-configuration) for detailed steps
 
-2. **Set Environment Variables**
-   - Copy from `config/prod.env`
-   - Set in Railway dashboard
-   - Update `ALLOWED_ORIGINS` with your domain
+3. **Set Environment Variables**
+   - Copy from `config/staging.env` or `config/prod.env`
+   - Set in Railway dashboard under Variables tab
+   - Update `ALLOWED_ORIGINS` with your actual domain(s)
+   - Verify all required API keys are set
 
-3. **Configure Custom Domain** (Optional)
+4. **Configure Resource Limits** (Optional)
+   - Railway automatically manages resources
+   - Monitor usage in Metrics tab
+   - Adjust workers in railway.json if needed
+   - See [DEPLOYMENT_CONFIGURATION.md](DEPLOYMENT_CONFIGURATION.md#resource-limits)
+
+5. **Configure Custom Domain** (Optional)
    - Add custom domain in Railway
    - Update DNS records
-   - Update `ALLOWED_ORIGINS`
+   - Update `ALLOWED_ORIGINS` environment variable
+   - SSL certificate is automatic
 
 ### Step 6: Verify Deployment
 

@@ -52,6 +52,9 @@ const StatusIndicator = ({ state, errorMessage, onRetry }: StatusIndicatorProps)
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
           style={{ color: getStatusColor() }}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           {getStatusMessage()}
         </motion.div>
@@ -65,6 +68,7 @@ const StatusIndicator = ({ state, errorMessage, onRetry }: StatusIndicatorProps)
           animate={{ opacity: 1, scale: 1 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          aria-label="Retry voice input"
         >
           Try Again
         </motion.button>

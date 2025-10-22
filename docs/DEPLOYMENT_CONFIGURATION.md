@@ -1,219 +1,347 @@
 # Deployment Configuration Guide
 
-Quick reference for configuring Rose the Healer Shaman for different deployment environments.
+This document provides detailed information about deployment configuration for Rose the Healer Shaman, including environment-specific settings, resource limits, and optimization strategies.
 
-## Configuration Files Overview
+## Table of Contents
 
-```
-config/
-├── dev.env                    # Local development settings
-├── staging.env                # Staging environment settings
-├── prod.env                   # Production environment settings
-├── railway-staging.json       # Railway staging configuration
-├── railway-prod.json          # Railway production configuration
-└── README.md                  # Detailed configuration documentation
-```
+1. [Overview](#overview)
+2. [Environment-Specific Configuration](#environment-specific-configuration)
+3. [Railway Configuration](#railway-configuration)
+4. [Docker Configuration](#docker-configuration)
+5. [Resource Limits](#resource-limits)
+6. [Health Check Configuration](#health-check-configuration)
+7. [Volume Setup](#volume-setup)
+8. [Optimization Strategies](#optimization-strategies)
 
-## Quick Start
+## Overview
 
-### Local Development
+Rose supports three deployment environments:
+- **Development**: Local development with relaxed security and verbose logging
+- **Staging**: Pre-production testing with production-like settings
+- **Production**: Live deployment with strict security and optimized performance
 
-```bash
-# Copy development configuration
-cp config/dev.env .env
+Each environment has specific configuration files in the `config/` directory.
 
-# Add your API keys to .env
-# Then run locally
-uv run uvicorn ai_companion.interfaces.web.app:app --reload
-```
+## Environment-Specific Configuration
 
-### Deploy to Staging
+### Development Environment
 
-```bash
-# Use staging Railway configuration
-cp config/railway-staging.json railway.json
+**File**: `config/dev.env`
 
-# Set environment variables in Railway dashboard from config/staging.env
-# Commit and push
-git add railway.json
-git commit -m "Deploy to staging"
-git push
-```
+**Purpose**: Local development and testing
 
-### Deploy to Production
-
-```bash
-# Use production Railway configuration
-cp config/railway-prod.json railway.json
-
-# Set environment variables in Railway dashboard from config/prod.env
-# Update ALLOWED_ORIGINS with your actual domain
-# Commit and push
-git add railway.json
-git commit -m "Deploy to production"
-git push
-```
-
-## Configuration Comparison
-
-| Feature | Development | Staging | Production |
-|---------|------------|---------|------------|
-| **Logging** |
-| Log Level | DEBUG | INFO | INFO |
-| Log Format | console | json | json |
-| **Security** |
-| CORS Origins | * (all) | Restricted | Restricted |
-| Rate Limiting | Disabled | 20/min | 10/min |
-| Security Headers | Disabled | Enabled | Enabled |
-| API Docs | Enabled | Enabled | Disabled |
-| **Resources** |
-| Workers | 1 | 2 | 4 |
-| Timeout | 120s | 60s | 60s |
-| Max Request Size | 50MB | 10MB | 10MB |
-| Session Retention | 1 day | 3 days | 7 days |
-| **Database** |
-| Qdrant | Local | Cloud | Cloud |
-| Backups | Optional | Daily | Daily |
-
-## Environment Variables Checklist
-
-### Required for All Environments
-
-```bash
-# AI Services
-GROQ_API_KEY=                  # Groq API key for LLM and STT
-ELEVENLABS_API_KEY=            # ElevenLabs API key for TTS
-ELEVENLABS_VOICE_ID=           # Voice ID for Rose's voice
-
-# Vector Database
-QDRANT_URL=                    # Qdrant instance URL
-QDRANT_API_KEY=                # Qdrant API key (if using cloud)
-```
-
-### Environment-Specific
-
-#### Development
+**Key Settings**:
 ```bash
 ENVIRONMENT=development
-ALLOWED_ORIGINS=*
 LOG_LEVEL=DEBUG
-ENABLE_API_DOCS=true
+LOG_FORMAT=console
+ALLOWED_ORIGINS="*"
 RATE_LIMIT_ENABLED=false
+ENABLE_API_DOCS=true
+WORKFLOW_TIMEOUT_SECONDS=120
+SESSION_RETENTION_DAYS=1
 ```
 
-#### Staging
+**Characteristics**:
+- Verbose logging for debugging
+- No rate limiting
+- Relaxed CORS policy
+- Longer timeouts for debugging
+- Daily session cleanup for testing
+- API documentation enabled
+
+**Use Cases**:
+- Local development
+- Feature testing
+- Debugging issues
+- Integration testing
+
+### Staging Environment
+
+**File**: `config/staging.env`
+
+**Purpose**: Pre-production testing and validation
+
+**Key Settings**:
 ```bash
 ENVIRONMENT=staging
-ALLOWED_ORIGINS=https://staging.yourdomain.com
 LOG_LEVEL=INFO
-ENABLE_API_DOCS=true
+LOG_FORMAT=json
+ALLOWED_ORIGINS="https://staging.yourdomain.com"
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_PER_MINUTE=20
+ENABLE_API_DOCS=true
+WORKFLOW_TIMEOUT_SECONDS=60
+SESSION_RETENTION_DAYS=3
 ```
 
-#### Production
+**Characteristics**:
+- Structured JSON logging
+- Moderate rate limiting
+- Restricted CORS to staging domain
+- Production-like timeouts
+- Shorter session retention
+- API docs enabled for testing
+
+**Use Cases**:
+- Pre-production testing
+- QA validation
+- Performance testing
+- Integration testing with real services
+- Client demos
+
+### Production Environment
+
+**File**: `config/prod.env`
+
+**Purpose**: Live production deployment
+
+**Key Settings**:
 ```bash
 ENVIRONMENT=production
-ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 LOG_LEVEL=INFO
-ENABLE_API_DOCS=false
+LOG_FORMAT=json
+ALLOWED_ORIGINS="https://yourdomain.com,https://www.yourdomain.com"
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_PER_MINUTE=10
+ENABLE_API_DOCS=false
+WORKFLOW_TIMEOUT_SECONDS=60
+SESSION_RETENTION_DAYS=7
 ```
 
-## Railway-Specific Configuration
+**Characteristics**:
+- Structured JSON logging
+- Strict rate limiting
+- Restricted CORS to production domains
+- Strict timeouts
+- Standard session retention
+- API docs disabled for security
 
-### Health Checks
+**Use Cases**:
+- Live production traffic
+- Real user interactions
+- Production monitoring
+- Business operations
 
-All environments use:
-- **Path**: `/api/health`
-- **Timeout**: 30 seconds
-- **Interval**: 10 seconds
-- **Max Retries**: 3
+## Railway Configuration
 
-### Resource Allocation
+### Configuration Files
 
-#### Staging
-- **Workers**: 2 uvicorn workers
-- **Memory**: Recommended 512MB-1GB
-- **Expected Load**: 10-20 concurrent users
+Railway uses JSON configuration files to define build and deployment settings:
 
-#### Production
-- **Workers**: 4 uvicorn workers
-- **Memory**: Recommended 1GB-2GB
-- **Expected Load**: 50-100 concurrent users
+| File | Environment | Workers | Use Case |
+|------|-------------|---------|----------|
+| `config/railway.json` | Default | 2 | General purpose |
+| `config/railway-staging.json` | Staging | 2 | Pre-production |
+| `config/railway-prod.json` | Production | 4 | Live production |
 
-### Volume Configuration
-
-**Critical**: All environments require persistent volume:
-- **Mount Path**: `/app/data`
-- **Minimum Size**: 1GB
-- **Purpose**: SQLite database, backups, temporary files
-
-See [Railway Setup Guide](RAILWAY_SETUP.md) for detailed volume setup.
-
-## Docker Configuration
-
-### Optimized Multi-Stage Build
-
-The Dockerfile uses a 3-stage build:
-
-1. **Frontend Builder**: Builds React application
-2. **Python Builder**: Installs Python dependencies with build tools
-3. **Runtime**: Minimal image with only runtime dependencies
-
-Benefits:
-- Smaller image size (~300MB vs ~1GB)
-- Faster deployments
-- Improved security (no build tools in production)
-- Non-root user for security
-
-### Docker Compose (Local Development)
-
-```bash
-# Start all services (Qdrant + Rose)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-## Security Checklist
-
-Before deploying to production:
-
-- [ ] All API keys set as environment variables (not in code)
-- [ ] CORS origins restricted to your domain(s)
-- [ ] API documentation disabled (`ENABLE_API_DOCS=false`)
-- [ ] Rate limiting enabled with appropriate limits
-- [ ] Security headers enabled
-- [ ] Log level set to INFO (not DEBUG)
-- [ ] HTTPS enabled (automatic on Railway)
-- [ ] Volume configured for data persistence
-- [ ] Backup strategy in place
-
-## Monitoring Configuration
-
-### Structured Logging
-
-Production and staging use JSON-formatted logs for easy parsing:
+### Railway Configuration Structure
 
 ```json
 {
-  "timestamp": "2024-10-21T10:30:00Z",
-  "level": "INFO",
-  "message": "Voice processing completed",
-  "session_id": "abc123",
-  "request_id": "xyz789",
-  "duration_ms": 1234
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "uv sync --frozen && cd frontend && npm install && npm run build"
+  },
+  "deploy": {
+    "startCommand": "uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port $PORT --workers 4",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 30,
+    "healthcheckInterval": 10,
+    "startPeriod": 40,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "numReplicas": 1,
+    "sleepApplication": false
+  }
 }
 ```
 
-### Health Check Response
+### Configuration Parameters
 
+#### Build Configuration
+
+- **builder**: `NIXPACKS` - Railway's automatic builder
+- **buildCommand**: Multi-step build process:
+  1. `uv sync --frozen` - Install Python dependencies
+  2. `cd frontend && npm install` - Install frontend dependencies
+  3. `npm run build` - Build frontend assets
+
+#### Deploy Configuration
+
+- **startCommand**: Uvicorn server with configurable workers
+- **healthcheckPath**: Endpoint for health verification
+- **healthcheckTimeout**: Maximum time for health check response (30s)
+- **healthcheckInterval**: Time between health checks (10s)
+- **startPeriod**: Grace period before first health check (40s)
+- **restartPolicyType**: Restart on failure
+- **restartPolicyMaxRetries**: Maximum restart attempts (3)
+- **numReplicas**: Number of instances (1 for now)
+- **sleepApplication**: Keep service always running (false)
+
+### Worker Configuration
+
+Workers are Uvicorn worker processes that handle concurrent requests:
+
+| Environment | Workers | RAM Required | Capacity |
+|-------------|---------|--------------|----------|
+| Development | 1 | 256MB | 5-10 users |
+| Staging | 2 | 512MB-2GB | 10-20 users |
+| Production | 4 | 4-8GB | 50-100 users |
+
+**Worker Calculation**:
+- Formula: `workers = (2 × CPU cores) + 1`
+- Each worker uses ~100-200MB RAM
+- More workers = better concurrency but higher memory usage
+
+## Docker Configuration
+
+### Multi-Stage Build
+
+The Dockerfile uses a 3-stage build process:
+
+1. **Frontend Builder**: Builds React frontend
+2. **Python Builder**: Installs Python dependencies
+3. **Runtime**: Minimal runtime image without build tools
+
+### Stage 1: Frontend Builder
+
+```dockerfile
+FROM node:20-slim AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+```
+
+**Purpose**: Build optimized frontend assets
+**Output**: `/frontend/dist` directory with production build
+
+### Stage 2: Python Builder
+
+```dockerfile
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS python-builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y build-essential g++
+COPY uv.lock pyproject.toml README.md /app/
+RUN uv sync --frozen --no-cache
+COPY src/ /app/src/
+RUN uv pip install -e .
+```
+
+**Purpose**: Install Python dependencies with build tools
+**Output**: `/app/.venv` virtual environment
+
+### Stage 3: Runtime
+
+```dockerfile
+FROM python:3.12-slim-bookworm
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1
+COPY --from=python-builder /app/.venv /app/.venv
+COPY --from=python-builder /app/src /app/src
+COPY --from=frontend-builder /frontend/dist /app/frontend/build
+RUN mkdir -p /app/data /app/data/backups
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+VOLUME ["/app/data"]
+```
+
+**Purpose**: Minimal runtime image without build dependencies
+**Size Optimization**:
+- No build tools (gcc, g++, make)
+- Only runtime dependencies (libgomp1)
+- Non-root user for security
+- Clean apt cache
+
+### Docker Compose Configuration
+
+```yaml
+services:
+  whatsapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes: 
+      - ./short_term_memory:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+```
+
+**Resource Limits**:
+- **Memory Limit**: 512MB maximum
+- **Memory Reservation**: 256MB guaranteed
+- **Purpose**: Prevent OOM kills and resource exhaustion
+
+## Resource Limits
+
+### Memory Limits
+
+Memory limits prevent resource exhaustion and ensure predictable performance:
+
+#### Railway Plans
+
+| Plan | RAM | Recommended Workers | Expected Capacity |
+|------|-----|---------------------|-------------------|
+| Starter | 512MB | 1-2 | 10-20 users |
+| Developer | 8GB | 2-4 | 50-100 users |
+| Pro | 32GB | 4-8 | 200-500 users |
+
+#### Memory Usage Breakdown
+
+Per worker memory usage:
+- **Base Python Runtime**: ~50MB
+- **Dependencies (LangChain, FastAPI)**: ~100MB
+- **Per Request**: ~10-20MB
+- **Total per Worker**: ~150-200MB
+
+Example for 4 workers:
+- Workers: 4 × 200MB = 800MB
+- Overhead: ~200MB
+- **Total**: ~1GB minimum
+
+### CPU Limits
+
+Railway provides shared or dedicated CPU based on plan:
+- **Starter**: Shared CPU (throttled)
+- **Developer**: Dedicated CPU (1-2 cores)
+- **Pro**: Dedicated CPU (4+ cores)
+
+### Disk Limits
+
+Volume storage for persistent data:
+- **Minimum**: 1GB (development/staging)
+- **Recommended**: 5GB (production)
+- **Growth Rate**: ~1MB per 100 conversations
+
+### Network Limits
+
+Railway provides generous bandwidth:
+- **Included**: 100GB/month (Starter)
+- **Overage**: $0.10/GB
+- **Typical Usage**: ~10-50GB/month for moderate traffic
+
+## Health Check Configuration
+
+### Health Check Endpoint
+
+**Path**: `/api/health`
+
+**Response**:
 ```json
 {
   "status": "healthy",
@@ -223,102 +351,225 @@ Production and staging use JSON-formatted logs for easy parsing:
     "qdrant": "connected",
     "database": "connected"
   },
-  "timestamp": "2024-10-21T10:30:00Z"
+  "timestamp": "2024-10-21T12:00:00Z"
 }
 ```
 
+### Health Check Parameters
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| healthcheckPath | `/api/health` | Endpoint to check |
+| healthcheckTimeout | 30s | Max response time |
+| healthcheckInterval | 10s | Time between checks |
+| startPeriod | 40s | Grace period on startup |
+
+### Start Period (Grace Period)
+
+The `startPeriod` gives your application time to initialize before health checks begin.
+
+**Why 40 seconds?**
+- Python runtime initialization: ~5s
+- Dependency loading: ~10s
+- Database connections: ~5s
+- External service verification: ~10s
+- Buffer: ~10s
+
+**When to increase**:
+- Large model loading
+- Slow external services
+- Cold start issues
+- Complex initialization
+
+**How to adjust**:
+```json
+{
+  "deploy": {
+    "startPeriod": 60  // Increase to 60s if needed
+  }
+}
+```
+
+### Health Check Failure Handling
+
+Railway's restart policy:
+1. Health check fails
+2. Wait for next interval (10s)
+3. Retry health check
+4. If still failing, restart service
+5. Maximum 3 restart attempts
+6. If all retries fail, mark service as unhealthy
+
+## Volume Setup
+
+### Why Volumes Are Critical
+
+Without persistent volumes, you lose:
+- Conversation history (SQLite database)
+- User session data
+- Backup files
+- Temporary audio files
+
+### Volume Configuration
+
+**Mount Path**: `/app/data`
+
+**Contents**:
+```
+/app/data/
+├── short_term_memory.db    # SQLite checkpoints
+├── backups/                # Automated backups
+│   ├── memory_20241021_030000.db
+│   └── memory_20241022_030000.db
+└── temp/                   # Temporary audio files
+```
+
+### Setting Up Volumes in Railway
+
+1. Navigate to service in Railway dashboard
+2. Go to "Settings" tab
+3. Scroll to "Volumes" section
+4. Click "Add Volume"
+5. Configure:
+   - **Mount Path**: `/app/data`
+   - **Size**: 1GB (staging) or 5GB (production)
+6. Click "Add"
+
+### Volume Best Practices
+
+1. **Size Planning**:
+   - 1GB: ~10,000 conversations
+   - 5GB: ~50,000 conversations
+   - 10GB: ~100,000 conversations
+
+2. **Monitoring**:
+   - Check usage weekly
+   - Set up alerts at 80% capacity
+   - Plan for growth
+
+3. **Backup Strategy**:
+   - Automated daily backups
+   - 7-day retention
+   - Stored in `/app/data/backups/`
+
+4. **Cleanup**:
+   - Automatic session cleanup (configurable)
+   - Temporary file cleanup (hourly)
+   - Old backup cleanup (weekly)
+
+## Optimization Strategies
+
+### Memory Optimization
+
+1. **Reduce Workers**: Lower worker count if memory is constrained
+2. **Session Cleanup**: Decrease retention days to reduce database size
+3. **Lazy Loading**: Load heavy dependencies only when needed
+4. **Connection Pooling**: Reuse database connections
+
+### Performance Optimization
+
+1. **Worker Tuning**: Adjust workers based on CPU cores
+2. **Caching**: Implement response caching for common queries
+3. **Database Indexing**: Add indexes for frequent queries
+4. **CDN**: Use CDN for static frontend assets
+
+### Cost Optimization
+
+1. **Right-Size Plan**: Choose appropriate Railway plan
+2. **Sleep Unused Services**: Enable sleep for staging
+3. **Optimize Images**: Minimize Docker image size
+4. **Efficient Logging**: Use appropriate log levels
+
+### Startup Optimization
+
+1. **Lazy Imports**: Import heavy libraries only when needed
+2. **Async Initialization**: Initialize services in parallel
+3. **Connection Pooling**: Reuse connections across requests
+4. **Preload Models**: Load ML models during startup, not per request
+
+## Configuration Checklist
+
+### Before Deployment
+
+- [ ] Choose appropriate environment (staging/production)
+- [ ] Copy correct railway.json configuration
+- [ ] Set all required environment variables
+- [ ] Configure CORS origins for your domain
+- [ ] Set up persistent volume
+- [ ] Configure resource limits
+- [ ] Enable security headers
+- [ ] Set appropriate log level
+- [ ] Configure rate limiting
+- [ ] Disable API docs in production
+
+### After Deployment
+
+- [ ] Verify health check passes
+- [ ] Test API endpoints
+- [ ] Verify volume persistence
+- [ ] Check logs for errors
+- [ ] Monitor memory usage
+- [ ] Test voice interaction
+- [ ] Verify session persistence
+- [ ] Set up monitoring alerts
+
 ## Troubleshooting
 
-### Configuration Not Applied
+### High Memory Usage
 
-**Problem**: Changes to railway.json not taking effect
+**Symptoms**: Service crashes with OOM error
 
-**Solution**:
-1. Ensure railway.json is in repository root
-2. Commit and push changes
-3. Trigger new deployment in Railway dashboard
-4. Check deployment logs for configuration errors
+**Solutions**:
+1. Reduce number of workers
+2. Decrease session retention days
+3. Verify cleanup jobs are running
+4. Upgrade Railway plan
 
-### Wrong Environment Detected
+### Slow Startup
 
-**Problem**: Application using wrong settings
+**Symptoms**: Health checks timeout during startup
 
-**Solution**:
-1. Check `ENVIRONMENT` variable in Railway dashboard
-2. Verify it matches intended environment
-3. Review logs for environment-specific behavior
-4. Ensure correct railway.json is deployed
+**Solutions**:
+1. Increase `startPeriod` to 60-90s
+2. Optimize dependency loading
+3. Use lazy imports
+4. Check external service latency
 
-### Volume Not Persisting Data
+### Volume Not Persisting
 
-**Problem**: Data lost after deployment
+**Symptoms**: Data lost after restart
 
-**Solution**:
-1. Verify volume is mounted at `/app/data`
+**Solutions**:
+1. Verify volume mount path is `/app/data`
 2. Check volume status in Railway dashboard
-3. Ensure database path points to `/app/data/`
-4. Review deployment logs for mount errors
+3. Ensure database path points to volume
+4. Review deployment logs
 
-## Performance Tuning
+### Health Check Failures
 
-### Adjusting Workers
+**Symptoms**: Service marked unhealthy
 
-Workers handle concurrent requests. Adjust based on memory:
-
-```bash
-# Low memory (512MB)
---workers 1
-
-# Medium memory (1GB)
---workers 2
-
-# High memory (2GB+)
---workers 4
-```
-
-### Optimizing Session Retention
-
-Reduce database size by adjusting retention:
-
-```bash
-# Development (fast cleanup)
-SESSION_RETENTION_DAYS=1
-
-# Staging (moderate retention)
-SESSION_RETENTION_DAYS=3
-
-# Production (standard retention)
-SESSION_RETENTION_DAYS=7
-```
-
-### Rate Limiting
-
-Adjust based on expected traffic:
-
-```bash
-# Low traffic
-RATE_LIMIT_PER_MINUTE=10
-
-# Medium traffic
-RATE_LIMIT_PER_MINUTE=20
-
-# High traffic (with authentication)
-RATE_LIMIT_PER_MINUTE=50
-```
+**Solutions**:
+1. Check external service connectivity
+2. Verify API keys are valid
+3. Increase health check timeout
+4. Review application logs
 
 ## Additional Resources
 
-- **[Railway Setup Guide](RAILWAY_SETUP.md)**: Comprehensive Railway deployment guide
-- **[Deployment Guide](DEPLOYMENT.md)**: Multi-platform deployment instructions
-- **[Operations Runbook](OPERATIONS_RUNBOOK.md)**: Troubleshooting and operations
-- **[Data Persistence](DATA_PERSISTENCE.md)**: Backup and recovery procedures
-- **[Config README](../config/README.md)**: Detailed configuration documentation
+- [Railway Setup Guide](RAILWAY_SETUP.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [Operations Runbook](OPERATIONS_RUNBOOK.md)
+- [Rollback Procedures](ROLLBACK_PROCEDURES.md)
 
-## Support
+## Summary
 
-For deployment issues:
-1. Check [Operations Runbook](OPERATIONS_RUNBOOK.md)
-2. Review Railway logs
-3. Verify environment variables
-4. Test health endpoint
-5. Open GitHub issue with logs and configuration
+Proper deployment configuration is critical for production readiness:
+
+1. **Use environment-specific configs** for development, staging, and production
+2. **Configure health checks** with appropriate grace periods
+3. **Set up persistent volumes** to prevent data loss
+4. **Optimize resource limits** based on your Railway plan
+5. **Monitor and adjust** based on actual usage patterns
+
+Following these guidelines ensures a stable, performant, and cost-effective deployment.

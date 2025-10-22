@@ -50,17 +50,18 @@ This index provides a comprehensive guide to all operational documentation for t
 |----------|-------------|----------|
 | [Deployment Guide](DEPLOYMENT.md) | Complete deployment instructions for Railway and other platforms | DevOps, Backend |
 | [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) | Pre-deployment verification checklist | DevOps, QA |
-| [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) | Environment-specific configuration | DevOps |
-| [Railway Setup](RAILWAY_SETUP.md) | Railway-specific setup instructions | DevOps |
+| [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) | Environment-specific configuration, resource limits, optimization | DevOps, SRE |
+| [Railway Setup](RAILWAY_SETUP.md) | Railway-specific setup instructions and volume configuration | DevOps |
 | [GCP Setup](gcp_setup.md) | Google Cloud Platform deployment (alternative) | DevOps |
 
 **Key Topics:**
 - Railway deployment process
-- Environment variable configuration
+- Environment-specific configuration (dev/staging/prod)
+- Resource limits and optimization
+- Health check configuration with grace periods
 - Persistent volume setup
-- Health check configuration
 - CI/CD pipeline setup
-- Docker configuration
+- Docker multi-stage builds and optimization
 
 ---
 
@@ -284,8 +285,8 @@ This index provides a comprehensive guide to all operational documentation for t
 **Reading Order:**
 1. [Architecture Documentation](ARCHITECTURE.md) - Review scaling architecture
 2. [Resource Management](RESOURCE_MANAGEMENT.md) - Optimize resources
-3. [External API Limits](EXTERNAL_API_LIMITS.md) - Plan for API limits
-4. [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) - Adjust configuration
+3. [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) - Adjust workers and resource limits
+4. [External API Limits](EXTERNAL_API_LIMITS.md) - Plan for API limits
 5. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Monitor performance
 
 **Estimated Time:** 1-2 days
@@ -378,6 +379,8 @@ This index provides a comprehensive guide to all operational documentation for t
 | Rollback Procedures | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | External API Limits | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Deployment Guide | ✅ Complete | 2025-10-15 | 2026-01-15 |
+| Deployment Configuration | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Railway Setup | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Monitoring and Observability | ✅ Complete | 2025-10-18 | 2026-01-18 |
 
 ---

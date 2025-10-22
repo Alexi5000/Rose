@@ -1,3 +1,16 @@
+/* Screen reader only - visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .voice-button-container {
   position: relative;
   width: 200px;
@@ -36,6 +49,15 @@
 .voice-button:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.voice-button:focus {
+  outline: none;
+}
+
+.voice-button:focus-visible {
+  outline: 3px solid #e8d5c4;
+  outline-offset: 4px;
 }
 
 .voice-button.listening {

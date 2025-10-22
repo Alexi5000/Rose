@@ -156,6 +156,10 @@ Railway automatically manages resources, but you can optimize for your plan:
 - Configuration:
   - Workers: 2
   - Expected capacity: ~10-20 concurrent users
+- Resource limits:
+  - Memory: 512MB (Railway enforced)
+  - CPU: Shared
+  - Disk: 1GB volume recommended
 
 ### Developer Plan (8GB RAM)
 
@@ -163,21 +167,57 @@ Railway automatically manages resources, but you can optimize for your plan:
 - Configuration:
   - Workers: 4
   - Expected capacity: ~50-100 concurrent users
+- Resource limits:
+  - Memory: 8GB (Railway enforced)
+  - CPU: Dedicated
+  - Disk: 5GB volume recommended
+
+### Pro Plan (32GB RAM)
+
+- Suitable for: High-traffic production
+- Configuration:
+  - Workers: 8
+  - Expected capacity: ~200-500 concurrent users
+- Resource limits:
+  - Memory: 32GB (Railway enforced)
+  - CPU: Dedicated with priority
+  - Disk: 10GB+ volume recommended
 
 ### Resource Monitoring
 
 1. **Check Metrics**
    - Go to "Metrics" tab in Railway dashboard
    - Monitor: CPU usage, Memory usage, Network traffic
+   - Set up alerts for >80% memory usage
 
 2. **Set Up Alerts**
    - Railway will notify you if service crashes
    - Monitor logs for memory warnings
+   - Configure external monitoring (Sentry, Datadog)
 
 3. **Optimize If Needed**
    - Reduce workers if memory usage is high
    - Increase SESSION_RETENTION_DAYS to reduce cleanup frequency
    - Consider upgrading plan if consistently hitting limits
+   - Review and optimize database queries
+   - Implement caching for frequently accessed data
+
+### Health Check Grace Period
+
+The `startPeriod` configuration gives your application time to initialize before health checks begin:
+
+- **Default**: 40 seconds
+- **Purpose**: Allows time for:
+  - Python runtime initialization
+  - Dependency loading
+  - Database connections
+  - External service verification
+- **Configuration**: Set in `railway.json` under `deploy.startPeriod`
+
+If your application takes longer to start:
+1. Increase `startPeriod` to 60-90 seconds
+2. Monitor startup logs to identify slow initialization
+3. Optimize startup time by lazy-loading heavy dependencies
 
 ## Deployment
 

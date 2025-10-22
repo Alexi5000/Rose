@@ -51,10 +51,12 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
 
 # Install only runtime dependencies (no build tools)
-RUN apt-get update && apt-get install -y \
+# libgomp1 is required for some ML libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && apt-get autoremove -y
 
 # Copy virtual environment from builder
 COPY --from=python-builder /app/.venv /app/.venv

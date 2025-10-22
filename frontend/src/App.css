@@ -1,3 +1,21 @@
+/* Skip link for keyboard navigation accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #e8d5c4;
+  color: #1a1a2e;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+  font-weight: 500;
+  z-index: 100;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 .app {
   width: 100%;
   min-height: 100vh;
@@ -6,6 +24,7 @@
   justify-content: center;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   padding: 20px;
+  position: relative;
 }
 
 .container {
@@ -58,6 +77,70 @@
   font-size: 1rem;
 }
 
+.keyboard-shortcuts {
+  margin-top: 20px;
+  color: #a89f91;
+  font-size: 0.9rem;
+}
+
+.keyboard-shortcuts details {
+  cursor: pointer;
+}
+
+.keyboard-shortcuts summary {
+  padding: 8px 12px;
+  background: rgba(232, 213, 196, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(232, 213, 196, 0.1);
+  list-style: none;
+  user-select: none;
+}
+
+.keyboard-shortcuts summary::-webkit-details-marker {
+  display: none;
+}
+
+.keyboard-shortcuts summary::before {
+  content: '▶ ';
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.keyboard-shortcuts details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.keyboard-shortcuts summary:hover {
+  background: rgba(232, 213, 196, 0.1);
+}
+
+.keyboard-shortcuts summary:focus {
+  outline: 2px solid #e8d5c4;
+  outline-offset: 2px;
+}
+
+.keyboard-shortcuts ul {
+  margin-top: 12px;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.keyboard-shortcuts li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.keyboard-shortcuts kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(232, 213, 196, 0.15);
+  border: 1px solid rgba(232, 213, 196, 0.3);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85em;
+  color: #e8d5c4;
+}
+
 @media (max-width: 768px) {
   .title {
     font-size: 2.5rem;
@@ -69,5 +152,9 @@
 
   .response-text {
     max-width: 100%;
+  }
+
+  .keyboard-shortcuts {
+    font-size: 0.85rem;
   }
 }

@@ -140,15 +140,20 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="app">
+        {/* Skip link for keyboard navigation */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+
         <NetworkStatus isOnline={isOnline} wasOffline={wasOffline} />
         
         <div className="container">
-          <header className="header">
+          <header className="header" role="banner">
             <h1 className="title">Rose</h1>
             <p className="subtitle">Healer Shaman</p>
           </header>
 
-          <main className="main">
+          <main className="main" id="main-content" role="main">
             <AudioVisualizer 
               isActive={voiceState === 'listening' || voiceState === 'speaking'}
               isListening={voiceState === 'listening'}
@@ -175,10 +180,20 @@ function App() {
             )}
 
             {responseText && voiceState === 'idle' && (
-              <div className="response-text">
+              <div className="response-text" role="region" aria-label="Rose's response">
                 <p>{responseText}</p>
               </div>
             )}
+
+            <div className="keyboard-shortcuts" role="complementary" aria-label="Keyboard shortcuts">
+              <details>
+                <summary>Keyboard Shortcuts</summary>
+                <ul>
+                  <li><kbd>Space</kbd> or <kbd>Enter</kbd> - Press and hold to speak, release to send</li>
+                  <li><kbd>Tab</kbd> - Navigate between interactive elements</li>
+                </ul>
+              </details>
+            </div>
           </main>
         </div>
       </div>

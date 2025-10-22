@@ -17,11 +17,13 @@ const TimeoutIndicator = ({ showWarning, showTimeout, elapsedSeconds }: TimeoutI
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
           transition={{ duration: 0.2 }}
+          role="status"
+          aria-live="polite"
         >
-          <div className="timeout-icon">⏱️</div>
+          <div className="timeout-icon" aria-hidden="true">⏱️</div>
           <div className="timeout-text">
             <strong>This is taking longer than expected</strong>
-            <span>Processing for {elapsedSeconds}s... Please wait or try again</span>
+            <span>Processing for {elapsedSeconds} seconds. Please wait or try again</span>
           </div>
         </motion.div>
       )}
@@ -32,10 +34,12 @@ const TimeoutIndicator = ({ showWarning, showTimeout, elapsedSeconds }: TimeoutI
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
           transition={{ duration: 0.2 }}
+          role="status"
+          aria-live="polite"
         >
-          <div className="timeout-icon">⏳</div>
+          <div className="timeout-icon" aria-hidden="true">⏳</div>
           <div className="timeout-text">
-            <span>Processing your request... ({elapsedSeconds}s)</span>
+            <span>Processing your request for {elapsedSeconds} seconds</span>
           </div>
         </motion.div>
       )}

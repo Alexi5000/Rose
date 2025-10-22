@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useEffect } from 'react'
 import { VoiceState } from '../App'
 import './VoiceButton.css'
 
@@ -25,6 +26,67 @@ const VoiceButton = ({ state, onPress, onRelease }: VoiceButtonProps) => {
         return 'idle'
     }
   }
+
+  // Get accessible label for current state
+  const getAriaLabel = () => {
+    switch (state) {
+      case 'idle':
+        return 'Press and hold to speak with Rose'
+      case 'listening':
+        return 'Listening... Release to send your message'
+      case 'processing':
+        return 'Processing your message, please wait'
+      case 'speaking':
+        return 'Rose is speaking, please wait'
+      case 'error':
+        return 'Error occurred. Press to try again'
+      default:
+        return 'Voice input button'
+    }
+  }
+
+  // Get live region announcement for screen readers
+  const getLiveRegionText = () => {
+    switch (state) {
+      case 'listening':
+        return 'Recording started. Release button when finished speaking.'
+      case 'processing':
+        return 'Processing your message.'
+      case 'speaking':
+        return 'Rose is responding.'
+      case 'error':
+        return 'An error occurred. Please try again.'
+      default:
+        return ''
+    }
+  }
+
+  // Keyboard shortcuts: Space or Enter to activate
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if button is not disabled and key is Space or Enter
+      if ((e.code === 'Space' || e.code === 'Enter') && (state === 'idle' || state === 'error')) {
+        e.preventDefault()
+        onPress()
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Release on key up if we're listening
+      if ((e.code === 'Space' || e.code === 'Enter') && state === 'listening') {
+        e.preventDefault()
+        onRelease()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [state, onPress, onRelease])
 
   const buttonVariants = {
     idle: {
@@ -121,10 +183,21 @@ const VoiceButton = ({ state, onPress, onRelease }: VoiceButtonProps) => {
 
   return (
     <div className="voice-button-container">
+      {/* Screen reader live region for state announcements */}
+      <div 
+        className="sr-only" 
+        role="status" 
+        aria-live="polite" 
+        aria-atomic="true"
+      >
+        {getLiveRegionText()}
+      </div>
+
       <motion.div
         className={`voice-button-pulse ${getButtonVariant()}`}
         variants={pulseVariants}
         animate={getButtonVariant()}
+        aria-hidden="true"
       />
       
       <motion.button
@@ -138,6 +211,11 @@ const VoiceButton = ({ state, onPress, onRelease }: VoiceButtonProps) => {
         onTouchEnd={handleTouchEnd}
         disabled={isDisabled}
         whileTap={!isDisabled ? { scale: 0.95 } : {}}
+        aria-label={getAriaLabel()}
+        aria-pressed={state === 'listening'}
+        aria-disabled={isDisabled}
+        role="button"
+        tabIndex={0}
       >
         <div className="button-icon">
           {state === 'idle' && (

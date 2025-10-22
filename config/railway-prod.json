@@ -9,6 +9,7 @@
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "healthcheckInterval": 10,
+    "startPeriod": 40,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
     "numReplicas": 1,
