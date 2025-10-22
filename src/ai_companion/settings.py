@@ -11,22 +11,23 @@ All settings can be configured via:
 
 Example:
     Load settings in your module:
-    
+
     >>> from ai_companion.settings import settings
     >>> print(settings.GROQ_API_KEY)
 """
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, ValidationError
 import sys
+
+from pydantic import ValidationError, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings with environment variable loading and validation.
-    
+
     This class defines all configuration parameters for the application,
     including API keys, model names, memory configuration, and server settings.
-    
+
     Attributes:
         GROQ_API_KEY: API key for Groq services (LLM, STT)
         ELEVENLABS_API_KEY: API key for ElevenLabs TTS
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
         LOG_LEVEL: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         LOG_FORMAT: Log output format (json or console)
     """
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_file_encoding="utf-8")
 
     # Required API keys
@@ -111,6 +113,24 @@ class Settings(BaseSettings):
     # Session cleanup configuration
     SESSION_RETENTION_DAYS: int = 7  # Delete sessions older than 7 days
 
+    # Feature Flags
+    FEATURE_WHATSAPP_ENABLED: bool = False  # Enable WhatsApp integration (frozen for future release)
+    FEATURE_IMAGE_GENERATION_ENABLED: bool = False  # Enable image generation (frozen for future release)
+    FEATURE_TTS_CACHE_ENABLED: bool = True  # Enable TTS response caching
+    FEATURE_DATABASE_TYPE: str = "sqlite"  # Database backend: "sqlite" or "postgresql"
+    FEATURE_SESSION_AFFINITY_ENABLED: bool = False  # Enable sticky sessions
+    FEATURE_READ_REPLICA_ENABLED: bool = False  # Use read replicas for queries
+    FEATURE_MULTI_REGION_ENABLED: bool = False  # Enable multi-region routing
+
+    # Database configuration (for PostgreSQL)
+    DATABASE_URL: str | None = None  # PostgreSQL connection string
+    DATABASE_READ_REPLICA_URL: str | None = None  # Read replica connection string
+    DATABASE_POOL_SIZE: int = 10  # Connection pool size
+    DATABASE_MAX_OVERFLOW: int = 20  # Max overflow connections
+    DATABASE_URL_US: str | None = None  # US region database
+    DATABASE_URL_EU: str | None = None  # EU region database
+    DATABASE_URL_ASIA: str | None = None  # Asia region database
+
     # Speech-to-text configuration
     STT_MAX_RETRIES: int = 3  # Maximum retry attempts for STT
     STT_INITIAL_BACKOFF: float = 1.0  # Initial backoff in seconds
@@ -132,31 +152,62 @@ class Settings(BaseSettings):
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5  # Failures before opening circuit
     CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 60  # Seconds before attempting recovery
 
+    # LLM timeout and retry configuration
+    LLM_TIMEOUT_SECONDS: float = 30.0  # Timeout for LLM API calls
+    LLM_MAX_RETRIES: int = 3  # Maximum retry attempts for LLM calls
+    LLM_TEMPERATURE_DEFAULT: float = 0.7  # Default temperature for LLM responses
+    LLM_TEMPERATURE_ROUTER: float = 0.3  # Temperature for routing decisions
+    LLM_TEMPERATURE_MEMORY: float = 0.1  # Temperature for memory extraction
+    LLM_TEMPERATURE_IMAGE_SCENARIO: float = 0.4  # Temperature for image scenario generation
+    LLM_TEMPERATURE_IMAGE_PROMPT: float = 0.25  # Temperature for image prompt generation
+
+    # Image-to-text configuration
+    ITT_TIMEOUT_SECONDS: float = 60.0  # Timeout for image-to-text API calls
+    ITT_MAX_RETRIES: int = 3  # Maximum retry attempts for image-to-text
+
     @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
     @classmethod
     def validate_required_fields(cls, v: str, info) -> str:
         """Validate that required fields are not empty.
-        
+
         Args:
             v: Field value to validate
             info: Field information from Pydantic
-            
+
         Returns:
             Validated field value
-            
+
         Raises:
             ValueError: If field is empty or whitespace-only
         """
         if not v or v.strip() == "":
             raise ValueError(f"{info.field_name} is required and cannot be empty")
         return v
-    
+
+    @field_validator("FEATURE_DATABASE_TYPE")
+    @classmethod
+    def validate_database_type(cls, v: str) -> str:
+        """Validate database type is either sqlite or postgresql.
+
+        Args:
+            v: Database type value
+
+        Returns:
+            Validated database type
+
+        Raises:
+            ValueError: If database type is not supported
+        """
+        if v not in ["sqlite", "postgresql"]:
+            raise ValueError("FEATURE_DATABASE_TYPE must be 'sqlite' or 'postgresql'")
+        return v
+
     def get_allowed_origins(self) -> list[str]:
         """Parse ALLOWED_ORIGINS into a list of origin URLs.
-        
+
         Returns:
             List of allowed origin URLs, or ["*"] for all origins
-            
+
         Example:
             >>> settings.ALLOWED_ORIGINS = "http://localhost:3000,https://example.com"
             >>> settings.get_allowed_origins()
@@ -169,17 +220,17 @@ class Settings(BaseSettings):
 
 def load_settings() -> Settings:
     """Load and validate settings with helpful error messages.
-    
+
     This function loads settings from environment variables and the .env file,
     validates all required fields, and provides clear error messages if
     configuration is missing or invalid.
-    
+
     Returns:
         Validated Settings instance
-        
+
     Raises:
         SystemExit: If required settings are missing or invalid
-        
+
     Example:
         >>> settings = load_settings()
         >>> print(settings.TEXT_MODEL_NAME)

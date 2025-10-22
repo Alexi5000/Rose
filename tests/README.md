@@ -15,6 +15,11 @@ tests/
 ├── test_frontend_manual.md        # Manual frontend testing checklist
 ├── test_performance.py            # Performance and load tests
 ├── test_deployment.py             # Deployment validation tests
+├── test_integration.py            # Integration tests with real APIs
+├── test_e2e_playwright.py         # End-to-end tests with Playwright
+├── test_post_deployment_smoke.py  # Post-deployment smoke tests
+├── run_integration_tests.sh       # Script to run integration/E2E tests (Unix)
+├── run_integration_tests.bat      # Script to run integration/E2E tests (Windows)
 └── locustfile.py                  # Load testing configuration
 ```
 
@@ -24,14 +29,21 @@ tests/
 
 ```bash
 # Install test dependencies
-pip install pytest pytest-asyncio pytest-mock
+pip install pytest pytest-asyncio pytest-mock pytest-cov
 
-# For frontend automation tests (optional)
+# For integration tests (requires real API keys)
+# Set environment variables: GROQ_API_KEY, ELEVENLABS_API_KEY, QDRANT_URL, QDRANT_API_KEY
+
+# For E2E tests (optional)
 pip install playwright pytest-playwright
 playwright install
 
 # For load testing (optional)
 pip install locust
+
+# Or install all test dependencies at once
+uv sync
+uv pip install -e ".[test,playwright]"
 ```
 
 ### Run All Tests
@@ -56,6 +68,9 @@ pytest tests/test_voice_interaction.py::TestVoiceInteractionFlow::test_complete_
 ### Run Tests by Category
 
 ```bash
+# Unit tests only
+pytest tests/ -v -m unit
+
 # Voice interaction tests
 pytest tests/test_voice_interaction.py -v
 
@@ -70,6 +85,18 @@ pytest tests/test_performance.py -v
 
 # Deployment tests
 pytest tests/test_deployment.py -v
+
+# Integration tests (requires API keys)
+pytest tests/test_integration.py -v -m integration
+
+# E2E tests (requires server running)
+pytest tests/test_e2e_playwright.py -v -m e2e --headed
+
+# Smoke tests
+pytest tests/ -v -m smoke
+
+# Post-deployment smoke tests
+pytest tests/test_post_deployment_smoke.py -v -m smoke
 ```
 
 ## Test Categories
@@ -252,6 +279,155 @@ export RAILWAY_URL=https://your-app.railway.app
 pytest tests/test_deployment.py::TestDeployedInstance -v
 ```
 
+### 8. Integration Tests (`test_integration.py`)
+
+Tests with real external APIs (requires valid API keys):
+- Groq API (LLM and STT)
+- ElevenLabs API (TTS)
+- Qdrant (vector database)
+- Circuit breaker integration
+- End-to-end voice workflow
+- Session continuity with memory
+- Error recovery
+- Concurrent requests
+
+**Key Test Classes:**
+- `TestGroqIntegration`: Groq API tests
+- `TestElevenLabsIntegration`: ElevenLabs API tests
+- `TestQdrantIntegration`: Qdrant database tests
+- `TestEndToEndVoiceFlow`: Complete voice workflow
+- `TestHealthCheckIntegration`: Health checks with real services
+- `TestErrorRecoveryIntegration`: Error handling
+- `TestConcurrentRequestsIntegration`: Concurrent sessions
+
+**Setup:**
+```bash
+# Set required environment variables
+export GROQ_API_KEY=your_key
+export ELEVENLABS_API_KEY=your_key
+export ELEVENLABS_VOICE_ID=your_voice_id
+export QDRANT_URL=your_url
+export QDRANT_API_KEY=your_key
+```
+
+**Run:**
+```bash
+# Run all integration tests
+pytest tests/test_integration.py -v -m integration
+
+# Run specific test class
+pytest tests/test_integration.py::TestGroqIntegration -v
+
+# Use helper script
+./tests/run_integration_tests.sh integration  # Unix
+tests\run_integration_tests.bat integration   # Windows
+```
+
+**Note:** Integration tests make real API calls and may incur costs. They are skipped if API keys are not set.
+
+### 9. End-to-End Tests (`test_e2e_playwright.py`)
+
+Browser-based E2E tests using Playwright:
+- Voice interface interaction
+- Session management
+- Responsive design (mobile, tablet, desktop)
+- Accessibility (ARIA labels, keyboard navigation)
+- Error handling
+- Performance
+- Visual regression
+
+**Key Test Classes:**
+- `TestVoiceInterfaceE2E`: Voice button and interaction
+- `TestResponsiveDesignE2E`: Multiple viewports
+- `TestAccessibilityE2E`: Accessibility features
+- `TestErrorHandlingE2E`: Error scenarios
+- `TestPerformanceE2E`: Page load and performance
+- `TestSessionManagementE2E`: Session persistence
+- `TestVisualRegressionE2E`: Visual appearance
+- `TestPostDeploymentSmokeE2E`: Post-deployment checks
+
+**Setup:**
+```bash
+# Install Playwright
+pip install playwright pytest-playwright
+playwright install
+
+# Or with uv
+uv pip install -e ".[playwright]"
+playwright install
+```
+
+**Run:**
+```bash
+# Start server first
+uvicorn ai_companion.interfaces.web.app:app --port 8080
+
+# In another terminal, run E2E tests
+pytest tests/test_e2e_playwright.py -v -m e2e
+
+# Run with visible browser (headed mode)
+pytest tests/test_e2e_playwright.py -v -m e2e --headed
+
+# Run specific test
+pytest tests/test_e2e_playwright.py::TestVoiceInterfaceE2E::test_page_loads_successfully -v --headed
+
+# Use helper script
+./tests/run_integration_tests.sh e2e  # Unix
+tests\run_integration_tests.bat e2e   # Windows
+```
+
+### 10. Post-Deployment Smoke Tests (`test_post_deployment_smoke.py`)
+
+Smoke tests for production verification after deployment:
+- Health endpoint verification
+- Critical API endpoints
+- Frontend deployment
+- Security headers
+- CORS configuration
+- Rate limiting
+- Data persistence
+- Error handling
+- Performance benchmarks
+
+**Key Test Classes:**
+- `TestDeploymentHealth`: Health checks
+- `TestCriticalEndpoints`: API endpoints
+- `TestFrontendDeployment`: Frontend loading
+- `TestSecurityHeaders`: Security configuration
+- `TestRateLimiting`: Rate limit verification
+- `TestDataPersistence`: Session persistence
+- `TestErrorHandling`: Error responses
+- `TestMonitoring`: Request IDs and observability
+- `TestPerformance`: Response times
+- `TestDeploymentReadiness`: Comprehensive summary
+
+**Run Against Local:**
+```bash
+pytest tests/test_post_deployment_smoke.py -v -m smoke
+```
+
+**Run Against Deployed Instance:**
+```bash
+# Set deployed URL
+export DEPLOYED_URL=https://your-app.railway.app
+
+# Run smoke tests
+pytest tests/test_post_deployment_smoke.py -v -m smoke
+
+# Use helper script
+./tests/run_integration_tests.sh smoke  # Unix
+tests\run_integration_tests.bat smoke   # Windows
+```
+
+**CI/CD Integration:**
+```yaml
+# Add to GitHub Actions after deployment
+- name: Run smoke tests
+  env:
+    DEPLOYED_URL: ${{ steps.deploy.outputs.url }}
+  run: pytest tests/test_post_deployment_smoke.py -v -m smoke
+```
+
 ## Test Coverage
 
 Generate test coverage report:
@@ -268,7 +444,7 @@ start htmlcov/index.html  # Windows
 
 ## Continuous Integration
 
-### GitHub Actions (Example)
+### GitHub Actions
 
 ```yaml
 name: Tests
@@ -276,21 +452,100 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.12'
       - name: Install dependencies
         run: |
           pip install uv
           uv sync
-      - name: Run tests
-        run: pytest tests/ -v --cov=ai_companion
+          uv pip install -e ".[test]"
+      - name: Run unit tests
+        run: pytest tests/ -v -m "not integration and not e2e" --cov=ai_companion --cov-report=xml
       - name: Upload coverage
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+          uv pip install -e ".[test]"
+      - name: Run integration tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: pytest tests/test_integration.py -v -m integration
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+          uv pip install -e ".[test,playwright]"
+          playwright install --with-deps
+      - name: Start server
+        run: |
+          uvicorn ai_companion.interfaces.web.app:app --port 8080 &
+          sleep 10
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      - name: Run E2E tests
+        run: pytest tests/test_e2e_playwright.py -v -m e2e
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-screenshots
+          path: tests/screenshots/
+
+  smoke-tests:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+          uv pip install -e ".[test]"
+      - name: Deploy to staging
+        id: deploy
+        run: |
+          # Your deployment command here
+          echo "url=https://staging.your-app.com" >> $GITHUB_OUTPUT
+      - name: Run smoke tests
+        env:
+          DEPLOYED_URL: ${{ steps.deploy.outputs.url }}
+        run: pytest tests/test_post_deployment_smoke.py -v -m smoke
 ```
 
 ## Testing Best Practices

@@ -184,7 +184,29 @@ This index provides a comprehensive guide to all operational documentation for t
 
 ---
 
-### 9. Recent Changes and Improvements
+### 9. Scaling and Infrastructure
+
+**Purpose:** Scale the application horizontally and manage infrastructure
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Horizontal Scaling Strategy](HORIZONTAL_SCALING_STRATEGY.md) | Strategy for scaling to multiple instances | DevOps, SRE, Architects |
+| [PostgreSQL Migration Guide](POSTGRESQL_MIGRATION_GUIDE.md) | Migrate from SQLite to PostgreSQL | DevOps, Backend |
+| [Session Affinity Guide](SESSION_AFFINITY_GUIDE.md) | Configure sticky sessions (optional) | DevOps, SRE |
+| [Feature Flags](FEATURE_FLAGS.md) | Feature flag system and usage | All engineers |
+
+**Key Topics:**
+- Horizontal scaling architecture
+- Database migration (SQLite → PostgreSQL)
+- Multi-instance deployment
+- Session affinity configuration
+- Multi-region deployment planning
+- Feature flag management
+- Gradual rollout strategies
+
+---
+
+### 10. Recent Changes and Improvements
 
 **Purpose:** Track recent changes and improvements
 
@@ -283,13 +305,14 @@ This index provides a comprehensive guide to all operational documentation for t
 **Goal:** Scale to support more users
 
 **Reading Order:**
-1. [Architecture Documentation](ARCHITECTURE.md) - Review scaling architecture
-2. [Resource Management](RESOURCE_MANAGEMENT.md) - Optimize resources
-3. [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) - Adjust workers and resource limits
-4. [External API Limits](EXTERNAL_API_LIMITS.md) - Plan for API limits
-5. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Monitor performance
+1. [Horizontal Scaling Strategy](HORIZONTAL_SCALING_STRATEGY.md) - Understand scaling approach
+2. [PostgreSQL Migration Guide](POSTGRESQL_MIGRATION_GUIDE.md) - Migrate to PostgreSQL
+3. [Feature Flags](FEATURE_FLAGS.md) - Enable database migration flag
+4. [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md) - Configure multiple instances
+5. [Session Affinity Guide](SESSION_AFFINITY_GUIDE.md) - Optionally configure sticky sessions
+6. [Monitoring and Observability](MONITORING_AND_OBSERVABILITY.md) - Monitor performance
 
-**Estimated Time:** 1-2 days
+**Estimated Time:** 1-2 weeks (including testing)
 
 ---
 
@@ -382,6 +405,10 @@ This index provides a comprehensive guide to all operational documentation for t
 | Deployment Configuration | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Railway Setup | ✅ Complete | 2025-10-21 | 2026-01-21 |
 | Monitoring and Observability | ✅ Complete | 2025-10-18 | 2026-01-18 |
+| Horizontal Scaling Strategy | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| PostgreSQL Migration Guide | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Session Affinity Guide | ✅ Complete | 2025-10-21 | 2026-01-21 |
+| Feature Flags | ✅ Complete | 2025-10-21 | 2026-01-21 |
 
 ---
 

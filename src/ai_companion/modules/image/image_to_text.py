@@ -3,9 +3,10 @@ import logging
 import os
 from typing import Optional, Union
 
+from groq import Groq
+
 from ai_companion.core.exceptions import ImageToTextError
 from ai_companion.settings import settings
-from groq import Groq
 
 
 class ImageToText:
@@ -29,7 +30,11 @@ class ImageToText:
     def client(self) -> Groq:
         """Get or create Groq client instance using singleton pattern."""
         if self._client is None:
-            self._client = Groq(api_key=settings.GROQ_API_KEY, timeout=60.0, max_retries=3)
+            self._client = Groq(
+                api_key=settings.GROQ_API_KEY,
+                timeout=settings.ITT_TIMEOUT_SECONDS,
+                max_retries=settings.ITT_MAX_RETRIES,
+            )
         return self._client
 
     async def analyze_image(self, image_data: Union[str, bytes], prompt: str = "") -> str:

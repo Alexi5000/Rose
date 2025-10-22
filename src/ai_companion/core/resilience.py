@@ -11,16 +11,12 @@ import logging
 from functools import wraps
 from typing import Any, Callable, Optional, TypeVar
 
+from ai_companion.core.exceptions import CircuitBreakerError
+
 logger = logging.getLogger(__name__)
 
 # Type variable for generic function signatures
 F = TypeVar("F", bound=Callable[..., Any])
-
-
-class CircuitBreakerError(Exception):
-    """Raised when a circuit breaker is open and prevents execution."""
-
-    pass
 
 
 class CircuitBreaker:

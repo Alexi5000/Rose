@@ -3,12 +3,13 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from ai_companion.core.prompts import MEMORY_ANALYSIS_PROMPT
-from ai_companion.modules.memory.long_term.vector_store import get_vector_store
-from ai_companion.settings import settings
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
+
+from ai_companion.core.prompts import MEMORY_ANALYSIS_PROMPT
+from ai_companion.modules.memory.long_term.vector_store import get_vector_store
+from ai_companion.settings import settings
 
 
 class MemoryAnalysis(BaseModel):
@@ -30,9 +31,9 @@ class MemoryManager:
         self.llm = ChatGroq(
             model=settings.SMALL_TEXT_MODEL_NAME,
             api_key=settings.GROQ_API_KEY,
-            temperature=0.1,
-            timeout=30.0,  # 30 second timeout
-            max_retries=3,  # Consistent retry strategy
+            temperature=settings.LLM_TEMPERATURE_MEMORY,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
+            max_retries=settings.LLM_MAX_RETRIES,
         ).with_structured_output(MemoryAnalysis)
 
     async def _analyze_memory(self, message: str) -> MemoryAnalysis:

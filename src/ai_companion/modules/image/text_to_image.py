@@ -3,13 +3,14 @@ import logging
 import os
 from typing import Optional
 
-from ai_companion.core.exceptions import TextToImageError
-from ai_companion.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
-from ai_companion.settings import settings
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 from together import Together
+
+from ai_companion.core.exceptions import TextToImageError
+from ai_companion.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
+from ai_companion.settings import settings
 
 
 class ScenarioPrompt(BaseModel):
@@ -93,9 +94,9 @@ class TextToImage:
             llm = ChatGroq(
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,
-                temperature=0.4,
-                timeout=30.0,
-                max_retries=3,
+                temperature=settings.LLM_TEMPERATURE_IMAGE_SCENARIO,
+                timeout=settings.LLM_TIMEOUT_SECONDS,
+                max_retries=settings.LLM_MAX_RETRIES,
             )
 
             structured_llm = llm.with_structured_output(ScenarioPrompt)
@@ -124,9 +125,9 @@ class TextToImage:
             llm = ChatGroq(
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,
-                temperature=0.25,
-                timeout=30.0,
-                max_retries=3,
+                temperature=settings.LLM_TEMPERATURE_IMAGE_PROMPT,
+                timeout=settings.LLM_TIMEOUT_SECONDS,
+                max_retries=settings.LLM_MAX_RETRIES,
             )
 
             structured_llm = llm.with_structured_output(EnhancedPrompt)

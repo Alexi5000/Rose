@@ -17,9 +17,20 @@ class ExternalAPIError(AICompanionError):
     pass
 
 
+class CircuitBreakerError(ExternalAPIError):
+    """Exception raised when circuit breaker is open.
+
+    This indicates that a service has failed repeatedly and the circuit breaker
+    has opened to prevent cascading failures. The service will be retried after
+    the recovery timeout period.
+    """
+
+    pass
+
+
 class SpeechToTextError(ExternalAPIError):
     """Exception raised when speech-to-text conversion fails.
-    
+
     This typically indicates issues with:
     - Groq Whisper API connectivity
     - Invalid audio format or corrupted audio data
@@ -31,7 +42,7 @@ class SpeechToTextError(ExternalAPIError):
 
 class TextToSpeechError(ExternalAPIError):
     """Exception raised when text-to-speech conversion fails.
-    
+
     This typically indicates issues with:
     - ElevenLabs API connectivity
     - Invalid text input or length limits
@@ -43,7 +54,7 @@ class TextToSpeechError(ExternalAPIError):
 
 class TextToImageError(ExternalAPIError):
     """Exception raised when text-to-image generation fails.
-    
+
     This typically indicates issues with:
     - Together AI API connectivity
     - Invalid prompt or generation parameters
@@ -55,7 +66,7 @@ class TextToImageError(ExternalAPIError):
 
 class ImageToTextError(ExternalAPIError):
     """Exception raised when image-to-text conversion fails.
-    
+
     This typically indicates issues with:
     - Groq Vision API connectivity
     - Invalid image format or corrupted image data
@@ -67,7 +78,7 @@ class ImageToTextError(ExternalAPIError):
 
 class MemoryError(AICompanionError):
     """Exception raised when memory operations fail.
-    
+
     This typically indicates issues with:
     - Qdrant vector database connectivity
     - SQLite checkpointer errors
@@ -79,7 +90,7 @@ class MemoryError(AICompanionError):
 
 class WorkflowError(AICompanionError):
     """Exception raised when LangGraph workflow execution fails.
-    
+
     This typically indicates issues with:
     - Workflow timeout
     - Node execution failures
