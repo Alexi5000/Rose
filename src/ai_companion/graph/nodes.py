@@ -1,4 +1,58 @@
+"""LangGraph workflow nodes for the AI companion.
+
+This module defines all the node functions used in the LangGraph workflow.
+Each node represents a discrete processing step in the conversation flow:
+
+- router_node: Determines workflow type (conversation/image/audio)
+- context_injection_node: Injects current activity context
+- conversation_node: Generates text responses
+- image_node: Generates images with contextual responses
+- audio_node: Generates voice responses with TTS
+- summarize_conversation_node: Summarizes and trims conversation history
+- memory_extraction_node: Extracts and stores important information
+- memory_injection_node: Retrieves and injects relevant memories
+
+All nodes follow the LangGraph pattern of taking state and optional config,
+and returning a dictionary of state updates.
+
+Module Dependencies:
+- ai_companion.graph.state: AICompanionState type definition
+- ai_companion.graph.utils.chains: LLM chain construction (router, character response)
+- ai_companion.graph.utils.helpers: Module factories (chat model, TTS, image generation)
+- ai_companion.modules.memory.long_term.memory_manager: Memory operations
+- ai_companion.modules.schedules.context_generation: Activity scheduling
+- ai_companion.settings: Configuration for message limits, timeouts
+- langchain_core.messages: Message types (AIMessage, HumanMessage, RemoveMessage)
+- langchain_core.runnables: RunnableConfig for LangGraph
+- Standard library: asyncio, os, typing, uuid
+
+Dependents (modules that import this):
+- ai_companion.graph.graph: Graph construction and node registration
+- Test modules: tests/integration/test_workflow_integration.py
+
+Architecture:
+This module is part of the graph layer and orchestrates the conversation workflow
+by coordinating between modules (memory, speech, image) and core utilities. Each
+node is a pure function that takes state and returns state updates, following
+functional programming principles for testability.
+
+For detailed architecture documentation, see:
+- docs/ARCHITECTURE.md: LangGraph Workflow Architecture section
+- docs/PROJECT_STRUCTURE.md: Graph Architecture section
+
+Example:
+    Nodes are typically used within a LangGraph workflow:
+
+    >>> from langgraph.graph import StateGraph
+    >>> workflow = StateGraph(AICompanionState)
+    >>> workflow.add_node("router", router_node)
+    >>> workflow.add_node("conversation", conversation_node)
+    >>> # ... add more nodes and edges
+"""
+
+import asyncio
 import os
+from typing import Any
 from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
@@ -113,7 +167,8 @@ async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[st
     text_to_image_module = get_text_to_image_module()
 
     scenario = await text_to_image_module.create_scenario(state["messages"][-5:])
-    os.makedirs("generated_images", exist_ok=True)
+    # Create directory asynchronously to avoid blocking event loop
+    await asyncio.to_thread(os.makedirs, "generated_images", exist_ok=True)
     img_path = f"generated_images/image_{str(uuid4())}.png"
     await text_to_image_module.generate_image(scenario.image_prompt, img_path)
 
@@ -204,7 +259,7 @@ async def summarize_conversation_node(state: AICompanionState) -> dict[str, str 
     return {"summary": response.content, "messages": delete_messages}
 
 
-async def memory_extraction_node(state: AICompanionState) -> dict:
+async def memory_extraction_node(state: AICompanionState) -> dict[str, Any]:
     """Extract and store important information from the last message.
 
     Analyzes the most recent message and stores relevant memories

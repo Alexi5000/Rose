@@ -1,8 +1,10 @@
+import asyncio
 import base64
 import logging
 import os
 from typing import Optional, Union
 
+import aiofiles
 from groq import Groq
 
 from ai_companion.core.exceptions import ImageToTextError
@@ -56,8 +58,9 @@ class ImageToText:
             if isinstance(image_data, str):
                 if not os.path.exists(image_data):
                     raise ValueError(f"Image file not found: {image_data}")
-                with open(image_data, "rb") as f:
-                    image_bytes = f.read()
+                # Use async file reading to avoid blocking event loop
+                async with aiofiles.open(image_data, "rb") as f:
+                    image_bytes = await f.read()
             else:
                 image_bytes = image_data
 
@@ -86,10 +89,14 @@ class ImageToText:
             ]
 
             # Make the API call
-            response = self.client.chat.completions.create(
-                model=settings.ITT_MODEL_NAME,
-                messages=messages,
-                max_tokens=1000,
+            # Note: Groq SDK is synchronous, so we use asyncio.to_thread() to run it
+            # in a thread pool, preventing event loop blocking.
+            response = await asyncio.to_thread(
+                lambda: self.client.chat.completions.create(
+                    model=settings.ITT_MODEL_NAME,
+                    messages=messages,
+                    max_tokens=1000,
+                )
             )
 
             if not response.choices:

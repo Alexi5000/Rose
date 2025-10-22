@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import Dict, Optional
 
 from ai_companion.core.schedules import (
@@ -26,7 +26,7 @@ class ScheduleContextGenerator:
     }
 
     @staticmethod
-    def _parse_time_range(time_range: str) -> tuple[datetime.time, datetime.time]:
+    def _parse_time_range(time_range: str) -> tuple[time, time]:
         """Parse a time range string (e.g., '06:00-07:00') into start and end times."""
         start_str, end_str = time_range.split("-")
         start_time = datetime.strptime(start_str, "%H:%M").time()

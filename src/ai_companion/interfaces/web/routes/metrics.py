@@ -1,6 +1,6 @@
 """Metrics endpoints for monitoring and observability."""
 
-from typing import Any, Dict
+from typing import Dict
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -9,7 +9,6 @@ from slowapi.util import get_remote_address
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics
-from ai_companion.settings import settings
 
 logger = get_logger(__name__)
 
@@ -21,7 +20,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 class MetricsResponse(BaseModel):
     """Response model for metrics endpoint.
-    
+
     Attributes:
         counters: Counter metrics (sessions, requests, errors)
         gauges: Gauge metrics (current values)
@@ -91,9 +90,9 @@ async def get_metrics(request: Request) -> MetricsResponse:
         HTTPException 429: Rate limit exceeded (60 requests/minute)
     """
     logger.info("metrics_requested")
-    
+
     summary = metrics.get_metrics_summary()
-    
+
     return MetricsResponse(
         counters=summary["counters"],
         gauges=summary["gauges"],

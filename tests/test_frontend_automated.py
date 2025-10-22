@@ -1,7 +1,7 @@
 """Automated tests for frontend functionality (to be run with Playwright or Selenium)."""
 
+
 import pytest
-from unittest.mock import MagicMock, patch
 
 # Note: These tests require Playwright or Selenium to be installed
 # Install with: pip install playwright pytest-playwright
@@ -16,7 +16,6 @@ class TestFrontendBasics:
 
     def test_frontend_build_exists(self):
         """Test that frontend build directory exists."""
-        from pathlib import Path
         from ai_companion.interfaces.web.app import FRONTEND_BUILD_DIR
 
         # This test will pass if build exists, or skip if not built yet
@@ -75,7 +74,7 @@ class TestFrontendRendering:
         button = page.locator('[data-testid="voice-button"]')
         box = button.bounding_box()
         viewport = page.viewport_size
-        
+
         # Check if button is roughly centered
         assert box is not None
         center_x = box['x'] + box['width'] / 2
@@ -85,10 +84,10 @@ class TestFrontendRendering:
         '''Test responsive design on mobile viewport.'''
         page.set_viewport_size({"width": 375, "height": 667})  # iPhone size
         page.goto("http://localhost:8080")
-        
+
         button = page.locator('[data-testid="voice-button"]')
         expect(button).to_be_visible()
-        
+
         # Button should be appropriately sized for mobile
         box = button.bounding_box()
         assert box is not None
@@ -99,7 +98,7 @@ class TestFrontendRendering:
         '''Test responsive design on tablet viewport.'''
         page.set_viewport_size({"width": 768, "height": 1024})  # iPad size
         page.goto("http://localhost:8080")
-        
+
         button = page.locator('[data-testid="voice-button"]')
         expect(button).to_be_visible()
 
@@ -107,7 +106,7 @@ class TestFrontendRendering:
         '''Test responsive design on desktop viewport.'''
         page.set_viewport_size({"width": 1920, "height": 1080})
         page.goto("http://localhost:8080")
-        
+
         button = page.locator('[data-testid="voice-button"]')
         expect(button).to_be_visible()
 
@@ -119,7 +118,7 @@ class TestVoiceButtonInteraction:
         '''Test button shows idle state initially.'''
         page.goto("http://localhost:8080")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         # Check for idle state class or attribute
         expect(button).to_have_attribute("data-state", "idle")
 
@@ -127,32 +126,32 @@ class TestVoiceButtonInteraction:
         '''Test that pressing button starts recording.'''
         page.goto("http://localhost:8080")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         # Mock microphone permission
         page.context.grant_permissions(["microphone"])
-        
+
         # Press and hold button
         button.hover()
         page.mouse.down()
-        
+
         # Should show listening state
         expect(button).to_have_attribute("data-state", "listening")
-        
+
         page.mouse.up()
 
     def test_button_release_stops_recording(self, page: Page):
         '''Test that releasing button stops recording.'''
         page.goto("http://localhost:8080")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         page.context.grant_permissions(["microphone"])
-        
+
         # Press and release
         button.hover()
         page.mouse.down()
         page.wait_for_timeout(1000)  # Hold for 1 second
         page.mouse.up()
-        
+
         # Should transition to processing state
         expect(button).to_have_attribute("data-state", "processing")
 
@@ -160,11 +159,11 @@ class TestVoiceButtonInteraction:
         '''Test keyboard interaction with voice button.'''
         page.goto("http://localhost:8080")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         # Focus button with Tab
         page.keyboard.press("Tab")
         expect(button).to_be_focused()
-        
+
         # Activate with Space or Enter
         page.keyboard.press("Space")
         # Should start recording or show permission prompt
@@ -177,23 +176,23 @@ class TestMicrophonePermissions:
         '''Test that permission prompt appears on first use.'''
         page.goto("http://localhost:8080")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         # Click button should trigger permission prompt
         button.click()
-        
+
         # Note: Actual permission prompt is browser-native and hard to test
         # This test verifies the button triggers the request
 
     def test_denied_permission_shows_error(self, page: Page):
         '''Test error message when microphone permission is denied.'''
         page.goto("http://localhost:8080")
-        
+
         # Deny microphone permission
         page.context.grant_permissions([])
-        
+
         button = page.locator('[data-testid="voice-button"]')
         button.click()
-        
+
         # Should show error message
         error = page.locator('[data-testid="error-message"]')
         expect(error).to_be_visible()
@@ -207,13 +206,13 @@ class TestErrorHandling:
         '''Test that network errors are displayed to user.'''
         # Mock network failure
         page.route("**/api/voice/process", lambda route: route.abort())
-        
+
         page.goto("http://localhost:8080")
         page.context.grant_permissions(["microphone"])
-        
+
         button = page.locator('[data-testid="voice-button"]')
         button.click()
-        
+
         # Should show error message
         error = page.locator('[data-testid="error-message"]')
         expect(error).to_be_visible()
@@ -221,7 +220,7 @@ class TestErrorHandling:
     def test_retry_after_error(self, page: Page):
         '''Test retry functionality after error.'''
         page.goto("http://localhost:8080")
-        
+
         # Simulate error state
         # Then verify retry button appears and works
         retry_button = page.locator('[data-testid="retry-button"]')
@@ -236,24 +235,24 @@ class TestAccessibility:
     def test_aria_labels(self, page: Page):
         '''Test that interactive elements have ARIA labels.'''
         page.goto("http://localhost:8080")
-        
+
         button = page.locator('[data-testid="voice-button"]')
         expect(button).to_have_attribute("aria-label")
 
     def test_focus_visible(self, page: Page):
         '''Test that focus indicators are visible.'''
         page.goto("http://localhost:8080")
-        
+
         page.keyboard.press("Tab")
         button = page.locator('[data-testid="voice-button"]')
-        
+
         # Should have visible focus indicator
         expect(button).to_be_focused()
 
     def test_color_contrast(self, page: Page):
         '''Test color contrast meets WCAG standards.'''
         page.goto("http://localhost:8080")
-        
+
         # Use axe-core or similar tool to check contrast
         # This is a placeholder for actual accessibility testing
 
@@ -264,19 +263,19 @@ class TestPerformance:
     def test_page_load_time(self, page: Page):
         '''Test that page loads within acceptable time.'''
         import time
-        
+
         start = time.time()
         page.goto("http://localhost:8080")
         page.wait_for_load_state("networkidle")
         load_time = time.time() - start
-        
+
         # Should load in less than 3 seconds
         assert load_time < 3.0
 
     def test_animation_performance(self, page: Page):
         '''Test that animations are smooth (no jank).'''
         page.goto("http://localhost:8080")
-        
+
         # Monitor frame rate during animation
         # This requires performance API access
         metrics = page.evaluate("() => performance.getEntriesByType('navigation')")
@@ -290,6 +289,7 @@ class TestAPIIntegration:
     def test_session_start_endpoint(self):
         """Test session start endpoint returns valid session ID."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()
@@ -305,6 +305,7 @@ class TestAPIIntegration:
     def test_health_endpoint(self):
         """Test health check endpoint."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()

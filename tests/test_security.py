@@ -2,7 +2,6 @@
 
 import os
 import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -168,7 +167,7 @@ class TestSecureFileHandling:
             set_secure_file_permissions(tmp_path)
 
             # Check permissions (on Unix-like systems)
-            if os.name != 'nt':  # Skip on Windows
+            if os.name != "nt":  # Skip on Windows
                 stat_info = os.stat(tmp_path)
                 mode = stat_info.st_mode
                 # Check that only owner has read/write permissions

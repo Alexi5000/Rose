@@ -1,6 +1,47 @@
+"""Chainlit web interface for the AI companion.
+
+This module provides the Chainlit-based web chat interface for interacting with
+the AI companion. It handles text messages, images, and audio input/output with
+session-scoped module instances for better resource management.
+
+Module Dependencies:
+- ai_companion.core.resilience: CircuitBreakerError for error handling
+- ai_companion.graph: graph_builder for workflow execution
+- ai_companion.modules.image: ImageToText for image analysis
+- ai_companion.modules.speech: SpeechToText, TextToSpeech for audio processing
+- ai_companion.settings: Configuration for timeouts, database paths
+- chainlit: Web interface framework
+- langchain_core.messages: Message types (AIMessageChunk, HumanMessage)
+- langgraph.checkpoint.sqlite.aio: AsyncSqliteSaver for conversation persistence
+- Standard library: asyncio, io
+
+Architecture:
+This module is part of the interfaces layer and provides a user-facing web interface.
+It uses session-scoped module instances (stored in cl.user_session) to ensure proper
+resource management and testability. Factory functions (get_speech_to_text, etc.)
+provide access to these instances.
+
+Note on Direct Module Dependencies:
+This interface directly imports modules.speech and modules.image for interface-specific
+needs (audio/image handling). While the graph layer orchestrates most workflow logic,
+these direct imports are acceptable for interface-specific preprocessing (e.g., image
+analysis before sending to graph, audio transcription).
+
+For detailed architecture documentation, see:
+- docs/ARCHITECTURE.md: Module Initialization Patterns section
+- docs/PROJECT_STRUCTURE.md: Interfaces section
+- .kiro/specs/technical-debt-management/design.md: Module Initialization Optimization
+
+Example:
+    Run the Chainlit interface:
+
+    $ chainlit run src/ai_companion/interfaces/chainlit/app.py
+"""
+
 import asyncio
 from io import BytesIO
 
+import aiofiles
 import chainlit as cl
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -11,22 +52,86 @@ from ai_companion.modules.image import ImageToText
 from ai_companion.modules.speech import SpeechToText, TextToSpeech
 from ai_companion.settings import settings
 
-# Global module instances
-speech_to_text = SpeechToText()
-text_to_speech = TextToSpeech()
-image_to_text = ImageToText()
+
+def get_speech_to_text() -> SpeechToText:
+    """Factory function to get or create SpeechToText instance for the current session.
+
+    Module Lifecycle:
+    - Created once per session in on_chat_start
+    - Stored in cl.user_session for reuse across message handlers
+    - Automatically cleaned up when session ends
+
+    Returns:
+        SpeechToText: Session-scoped SpeechToText instance
+    """
+    instance = cl.user_session.get("speech_to_text")
+    if instance is None:
+        instance = SpeechToText()
+        cl.user_session.set("speech_to_text", instance)
+    return instance
+
+
+def get_text_to_speech() -> TextToSpeech:
+    """Factory function to get or create TextToSpeech instance for the current session.
+
+    Module Lifecycle:
+    - Created once per session in on_chat_start
+    - Stored in cl.user_session for reuse across message handlers
+    - Automatically cleaned up when session ends
+
+    Returns:
+        TextToSpeech: Session-scoped TextToSpeech instance
+    """
+    instance = cl.user_session.get("text_to_speech")
+    if instance is None:
+        instance = TextToSpeech()
+        cl.user_session.set("text_to_speech", instance)
+    return instance
+
+
+def get_image_to_text() -> ImageToText:
+    """Factory function to get or create ImageToText instance for the current session.
+
+    Module Lifecycle:
+    - Created once per session in on_chat_start
+    - Stored in cl.user_session for reuse across message handlers
+    - Automatically cleaned up when session ends
+
+    Returns:
+        ImageToText: Session-scoped ImageToText instance
+    """
+    instance = cl.user_session.get("image_to_text")
+    if instance is None:
+        instance = ImageToText()
+        cl.user_session.set("image_to_text", instance)
+    return instance
 
 
 @cl.on_chat_start
 async def on_chat_start():
-    """Initialize the chat session"""
-    # thread_id = cl.user_session.get("id")
+    """Initialize the chat session with session-scoped module instances.
+
+    This handler creates and stores module instances in the user session,
+    ensuring each session has its own isolated instances for better
+    testability and resource management.
+    """
+    # Set thread ID for conversation continuity
     cl.user_session.set("thread_id", 1)
+
+    # Initialize session-scoped module instances
+    # These will be reused across all message handlers in this session
+    cl.user_session.set("speech_to_text", SpeechToText())
+    cl.user_session.set("text_to_speech", TextToSpeech())
+    cl.user_session.set("image_to_text", ImageToText())
 
 
 @cl.on_message
 async def on_message(message: cl.Message):
-    """Handle text messages and images"""
+    """Handle text messages and images.
+
+    Uses session-scoped module instances retrieved via factory functions
+    for better testability and resource management.
+    """
     msg = cl.Message(content="")
 
     # Process any attached images
@@ -34,14 +139,15 @@ async def on_message(message: cl.Message):
     if message.elements:
         for elem in message.elements:
             if isinstance(elem, cl.Image):
-                # Read image file content
-                with open(elem.path, "rb") as f:
-                    image_bytes = f.read()
+                # Read image file content asynchronously
+                async with aiofiles.open(elem.path, "rb") as f:
+                    image_bytes = await f.read()
 
                 # Analyze image and add to message content
                 try:
-                    # Use global ImageToText instance
-                    description = await image_to_text.analyze_image(
+                    # Use session-scoped ImageToText instance
+                    image_to_text_module = get_image_to_text()
+                    description = await image_to_text_module.analyze_image(
                         image_bytes,
                         "Please describe what you see in this image in the context of our conversation.",
                     )
@@ -122,7 +228,11 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
 
 @cl.on_audio_end
 async def on_audio_end(elements):
-    """Process completed audio input"""
+    """Process completed audio input.
+
+    Uses session-scoped module instances retrieved via factory functions
+    for speech-to-text transcription and text-to-speech synthesis.
+    """
     # Get audio data
     audio_buffer = cl.user_session.get("audio_buffer")
     audio_buffer.seek(0)
@@ -132,8 +242,9 @@ async def on_audio_end(elements):
     input_audio_el = cl.Audio(mime="audio/mpeg3", content=audio_data)
     await cl.Message(author="You", content="", elements=[input_audio_el, *elements]).send()
 
-    # Use global SpeechToText instance
-    transcription = await speech_to_text.transcribe(audio_data)
+    # Use session-scoped SpeechToText instance
+    speech_to_text_module = get_speech_to_text()
+    transcription = await speech_to_text_module.transcribe(audio_data)
 
     thread_id = cl.user_session.get("thread_id")
 
@@ -157,8 +268,9 @@ async def on_audio_end(elements):
                 ).send()
                 return
 
-        # Use global TextToSpeech instance
-        audio_buffer = await text_to_speech.synthesize(output_state["messages"][-1].content)
+        # Use session-scoped TextToSpeech instance
+        text_to_speech_module = get_text_to_speech()
+        audio_buffer = await text_to_speech_module.synthesize(output_state["messages"][-1].content)
 
         output_audio_el = cl.Audio(
             name="Audio",

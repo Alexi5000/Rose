@@ -1,9 +1,9 @@
 """Deployment validation tests for Railway platform."""
 
 import os
+
 import pytest
 import requests
-from unittest.mock import patch
 
 
 class TestEnvironmentConfiguration:
@@ -63,6 +63,7 @@ class TestHealthCheckEndpoint:
     def test_health_endpoint_exists(self):
         """Test that health endpoint is accessible."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()
@@ -74,6 +75,7 @@ class TestHealthCheckEndpoint:
     def test_health_endpoint_format(self):
         """Test health endpoint returns correct format."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()
@@ -90,6 +92,7 @@ class TestHealthCheckEndpoint:
     def test_health_check_service_connectivity(self):
         """Test health check verifies service connectivity."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()
@@ -110,7 +113,6 @@ class TestDeploymentConfiguration:
 
     def test_railway_json_exists(self):
         """Test that railway.json configuration exists."""
-        import os
         from pathlib import Path
 
         railway_config = Path("config/railway.json")
@@ -148,8 +150,7 @@ class TestProductionReadiness:
         app = create_app()
 
         # Check that CORS middleware is added
-        middleware_types = [type(m) for m in app.user_middleware]
-        from fastapi.middleware.cors import CORSMiddleware
+        [type(m) for m in app.user_middleware]
 
         # CORS should be configured (even if permissive for now)
         # In production, should be restricted to specific origins
@@ -165,6 +166,7 @@ class TestProductionReadiness:
     def test_error_handling(self):
         """Test that error handling is in place."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()
@@ -181,7 +183,7 @@ class TestProductionReadiness:
         app = create_app()
 
         # Check that static file routes are configured
-        routes = [route.path for route in app.routes]
+        [route.path for route in app.routes]
         # Should have catch-all route for React app
 
 
@@ -209,6 +211,7 @@ class TestAPIEndpoints:
     def test_all_endpoints_registered(self):
         """Test that all required endpoints are registered."""
         from fastapi.testclient import TestClient
+
         from ai_companion.interfaces.web.app import create_app
 
         app = create_app()

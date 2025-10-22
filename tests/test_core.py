@@ -1,12 +1,12 @@
 import unittest
 
-from ai_companion.core.retry import retry_with_exponential_backoff
 from ai_companion.core.exceptions import (
-    SpeechToTextError,
-    TextToSpeechError,
-    TextToImageError,
     ImageToTextError,
+    SpeechToTextError,
+    TextToImageError,
+    TextToSpeechError,
 )
+from ai_companion.core.retry import retry_with_exponential_backoff
 
 
 class TestRetryUtilities(unittest.TestCase):

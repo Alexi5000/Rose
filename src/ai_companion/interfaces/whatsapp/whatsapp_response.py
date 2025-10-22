@@ -1,9 +1,50 @@
+"""WhatsApp webhook handler for the AI companion.
+
+This module provides the WhatsApp Cloud API webhook integration for the AI companion.
+It handles incoming messages (text, audio, images) and sends responses back through
+the WhatsApp Business API.
+
+Module Dependencies:
+- ai_companion.core.resilience: CircuitBreakerError for error handling
+- ai_companion.graph: graph_builder for workflow execution
+- ai_companion.modules.image: ImageToText for image analysis
+- ai_companion.modules.speech: SpeechToText, TextToSpeech for audio processing
+- ai_companion.settings: Configuration for timeouts, database paths, WhatsApp credentials
+- fastapi: APIRouter, Request, Response for webhook handling
+- langchain_core.messages: HumanMessage for message construction
+- langgraph.checkpoint.sqlite.aio: AsyncSqliteSaver for conversation persistence
+- httpx: HTTP client for WhatsApp API calls
+- Standard library: asyncio, logging, os, io, typing
+
+Architecture:
+This module is part of the interfaces layer and provides WhatsApp integration.
+Unlike the Chainlit interface which uses session-scoped instances, this module
+uses global module instances (speech_to_text, text_to_speech, image_to_text)
+since WhatsApp webhooks are stateless HTTP requests without session context.
+
+Note on Direct Module Dependencies:
+This interface directly imports modules.speech and modules.image for interface-specific
+needs (audio/image handling in WhatsApp messages). While the graph layer orchestrates
+most workflow logic, these direct imports are acceptable for interface-specific
+preprocessing (e.g., downloading and analyzing WhatsApp media).
+
+For detailed architecture documentation, see:
+- docs/ARCHITECTURE.md: WhatsApp Integration section
+- docs/PROJECT_STRUCTURE.md: Interfaces section
+
+Example:
+    Configure WhatsApp webhook URL:
+
+    https://your-domain.com/whatsapp_response
+"""
+
 import asyncio
 import logging
 import os
 from io import BytesIO
 from typing import Dict
 
+import aiofiles
 import httpx
 from fastapi import APIRouter, Request, Response
 from langchain_core.messages import HumanMessage
@@ -120,8 +161,8 @@ async def whatsapp_handler(request: Request) -> Response:
                 success = await send_response(from_number, response_message, "audio", audio_buffer)
             elif workflow == "image":
                 image_path = output_state.values["image_path"]
-                with open(image_path, "rb") as f:
-                    image_data = f.read()
+                async with aiofiles.open(image_path, "rb") as f:
+                    image_data = await f.read()
                 success = await send_response(from_number, response_message, "image", image_data)
             else:
                 success = await send_response(from_number, response_message, "text")
@@ -222,7 +263,7 @@ async def send_response(
             "text": {"body": response_text},
         }
 
-    
+
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages",

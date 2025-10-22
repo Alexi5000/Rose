@@ -9,8 +9,8 @@ To run:
 """
 
 import io
-import random
-from locust import HttpUser, task, between, events
+
+from locust import HttpUser, between, events, task
 
 
 class RoseUser(HttpUser):

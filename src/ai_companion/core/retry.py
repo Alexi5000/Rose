@@ -64,11 +64,11 @@ def retry_with_exponential_backoff(
                         time.sleep(backoff_time)
 
             # All retries exhausted
-            error_msg = f"{func.__name__} failed after {max_retries} attempts"
-            if last_exception:
-                error_msg += f": {str(last_exception)}"
+            if last_exception is None:
+                raise RuntimeError(f"{func.__name__} failed after {max_retries} attempts with no exception captured")
+            error_msg = f"{func.__name__} failed after {max_retries} attempts: {str(last_exception)}"
             logger.error(error_msg)
-            raise last_exception  # type: ignore
+            raise last_exception
 
         return cast(Callable[..., T], wrapper)
 
@@ -76,7 +76,7 @@ def retry_with_exponential_backoff(
 
 
 async def async_retry_with_exponential_backoff(
-    func: Callable[..., T],
+    func: Callable[..., Any],  # Async callable that returns T when awaited
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     max_backoff: float = 10.0,
@@ -84,7 +84,7 @@ async def async_retry_with_exponential_backoff(
     skip_exceptions: tuple = (ValueError, TypeError),
     *args: Any,
     **kwargs: Any,
-) -> T:
+) -> Any:
     """Async function to retry with exponential backoff.
 
     Args:
@@ -137,8 +137,8 @@ async def async_retry_with_exponential_backoff(
                 await asyncio.sleep(backoff_time)
 
     # All retries exhausted
-    error_msg = f"{func.__name__} failed after {max_retries} attempts"
-    if last_exception:
-        error_msg += f": {str(last_exception)}"
+    if last_exception is None:
+        raise RuntimeError(f"{func.__name__} failed after {max_retries} attempts with no exception captured")
+    error_msg = f"{func.__name__} failed after {max_retries} attempts: {str(last_exception)}"
     logger.error(error_msg)
-    raise last_exception  # type: ignore
+    raise last_exception

@@ -1,8 +1,10 @@
+import asyncio
 import base64
 import logging
 import os
 from typing import Optional
 
+import aiofiles
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
@@ -61,22 +63,28 @@ class TextToImage:
         try:
             self.logger.info(f"Generating image for prompt: '{prompt}'")
 
-            response = self.together_client.images.generate(
-                prompt=prompt,
-                model=settings.TTI_MODEL_NAME,
-                width=1024,
-                height=768,
-                steps=4,
-                n=1,
-                response_format="b64_json",
+            # Note: Together SDK is synchronous, so we use asyncio.to_thread() to run it
+            # in a thread pool, preventing event loop blocking.
+            response = await asyncio.to_thread(
+                lambda: self.together_client.images.generate(
+                    prompt=prompt,
+                    model=settings.TTI_MODEL_NAME,
+                    width=1024,
+                    height=768,
+                    steps=4,
+                    n=1,
+                    response_format="b64_json",
+                )
             )
 
             image_data = base64.b64decode(response.data[0].b64_json)
 
             if output_path:
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                with open(output_path, "wb") as f:
-                    f.write(image_data)
+                # Create directory asynchronously to avoid blocking event loop
+                await asyncio.to_thread(os.makedirs, os.path.dirname(output_path), exist_ok=True)
+                # Write file asynchronously
+                async with aiofiles.open(output_path, "wb") as f:
+                    await f.write(image_data)
                 self.logger.info(f"Image saved to {output_path}")
 
             return image_data

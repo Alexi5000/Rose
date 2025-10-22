@@ -1,8 +1,6 @@
 """Session management endpoints."""
 
-import logging
 import uuid
-from typing import Dict
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -23,7 +21,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 class SessionStartResponse(BaseModel):
     """Response model for session start.
-    
+
     Attributes:
         session_id: Unique identifier for the healing session (UUID v4 format)
         message: Welcome message confirming session initialization
@@ -52,7 +50,7 @@ async def start_session(request: Request) -> SessionStartResponse:
 
     Generates a unique session_id (UUID v4) that will be used to track conversation
     state, memory context, and therapeutic progress across multiple interactions.
-    
+
     **Validation Rules:**
     - No request body required
     - Rate limit: 10 requests per minute per IP address
@@ -77,10 +75,10 @@ async def start_session(request: Request) -> SessionStartResponse:
         HTTPException 500: Internal server error
     """
     session_id = str(uuid.uuid4())
-    
+
     # Record session metrics
     metrics.record_session_started(session_id)
-    
+
     logger.info("session_started", session_id=session_id)
 
     return SessionStartResponse(

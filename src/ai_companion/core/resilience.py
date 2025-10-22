@@ -5,6 +5,31 @@ failures when external services (Groq, ElevenLabs, Qdrant) become unavailable.
 
 Circuit breakers prevent repeated calls to failing services, allowing them time
 to recover while providing fast failure responses to clients.
+
+Module Dependencies:
+- ai_companion.core.exceptions: CircuitBreakerError exception type
+- ai_companion.settings: Configuration for failure thresholds and timeouts (lazy import)
+- Standard library: logging, functools, typing, time
+
+Dependents (modules that import this):
+- ai_companion.modules.speech.speech_to_text: Groq circuit breaker for STT
+- ai_companion.modules.speech.text_to_speech: ElevenLabs circuit breaker for TTS
+- ai_companion.modules.memory.long_term.vector_store: Qdrant circuit breaker
+- ai_companion.interfaces.chainlit.app: Circuit breaker error handling
+- ai_companion.interfaces.whatsapp.whatsapp_response: Circuit breaker error handling
+
+Architecture:
+This module is part of the core layer and provides resilience patterns for external
+service calls. It uses lazy initialization for circuit breaker instances to avoid
+circular dependencies with settings. The refactored implementation eliminates code
+duplication between sync and async paths by extracting common state management logic.
+
+For detailed architecture documentation, see:
+- docs/ARCHITECTURE.md: Circuit Breaker Pattern section
+- docs/ARCHITECTURE.md: Architectural Patterns section
+
+Design Reference:
+- .kiro/specs/technical-debt-management/design.md: Circuit Breaker Refactoring
 """
 
 import logging
@@ -64,6 +89,78 @@ class CircuitBreaker:
 
         return (time.time() - self._last_failure_time) >= self.recovery_timeout
 
+    def _check_circuit_state(self) -> None:
+        """Check circuit state and transition to HALF_OPEN if recovery timeout elapsed.
+
+        State transition logic:
+        - CLOSED: Normal operation, no action needed
+        - OPEN: Check if recovery_timeout has elapsed
+          - If yes: Transition to HALF_OPEN (allow one test request)
+          - If no: Raise CircuitBreakerError (block request)
+        - HALF_OPEN: No action needed (will be handled by success/failure)
+
+        Raises:
+            CircuitBreakerError: If circuit is OPEN and recovery timeout has not elapsed
+        """
+        if self._state == "OPEN":
+            # Check if enough time has passed to attempt recovery
+            if self._should_attempt_reset():
+                # Transition to HALF_OPEN: allow one request to test service recovery
+                logger.info(f"{self.name}: Attempting recovery (HALF_OPEN)")
+                self._state = "HALF_OPEN"
+            else:
+                # Still in recovery period: block request and fail fast
+                logger.warning(f"{self.name}: Circuit is OPEN, blocking request")
+                raise CircuitBreakerError(f"{self.name}: Circuit breaker is open, service unavailable")
+
+    def _handle_success(self) -> None:
+        """Handle successful call, resetting circuit if in HALF_OPEN state.
+
+        State transition logic:
+        - CLOSED: No action needed (already in normal state)
+        - HALF_OPEN: Success indicates service has recovered
+          - Transition to CLOSED (resume normal operation)
+          - Reset failure count and timestamp
+        - OPEN: Should not reach here (blocked by _check_circuit_state)
+        """
+        if self._state == "HALF_OPEN":
+            # Test request succeeded: service has recovered
+            logger.info(f"{self.name}: Recovery successful, closing circuit")
+            self._state = "CLOSED"
+            self._failure_count = 0
+            self._last_failure_time = None
+
+    def _handle_failure(self, exception: Exception) -> None:
+        """Handle failed call, opening circuit if threshold reached.
+
+        State transition logic:
+        - CLOSED: Increment failure count
+          - If threshold reached: Transition to OPEN
+          - Otherwise: Stay CLOSED (allow more attempts)
+        - HALF_OPEN: Single failure indicates service not recovered
+          - Transition back to OPEN (reset recovery timer)
+
+        Args:
+            exception: The exception that was raised
+        """
+        # Increment failure counter regardless of current state
+        self._failure_count += 1
+        logger.warning(
+            f"{self.name}: Failure {self._failure_count}/{self.failure_threshold} - {type(exception).__name__}: {str(exception)}"
+        )
+
+        # Open circuit if threshold reached (prevents cascading failures)
+        # This gives the failing service time to recover without being overwhelmed
+        if self._failure_count >= self.failure_threshold:
+            import time
+
+            self._state = "OPEN"
+            self._last_failure_time = time.time()  # Start recovery timer
+            logger.error(
+                f"{self.name}: Circuit breaker OPENED after {self._failure_count} failures. "
+                f"Will retry in {self.recovery_timeout}s"
+            )
+
     def call(self, func: Callable, *args, **kwargs) -> Any:
         """Execute function with circuit breaker protection.
 
@@ -79,45 +176,14 @@ class CircuitBreaker:
             CircuitBreakerError: If circuit is open
             Exception: Original exception if circuit is closed
         """
-        # Check if circuit is open
-        if self._state == "OPEN":
-            if self._should_attempt_reset():
-                logger.info(f"{self.name}: Attempting recovery (HALF_OPEN)")
-                self._state = "HALF_OPEN"
-            else:
-                logger.warning(f"{self.name}: Circuit is OPEN, blocking request")
-                raise CircuitBreakerError(f"{self.name}: Circuit breaker is open, service unavailable")
+        self._check_circuit_state()
 
         try:
             result = func(*args, **kwargs)
-
-            # Success - reset failure count if in HALF_OPEN state
-            if self._state == "HALF_OPEN":
-                logger.info(f"{self.name}: Recovery successful, closing circuit")
-                self._state = "CLOSED"
-                self._failure_count = 0
-                self._last_failure_time = None
-
+            self._handle_success()
             return result
-
         except self.expected_exception as e:
-            self._failure_count += 1
-            logger.warning(
-                f"{self.name}: Failure {self._failure_count}/{self.failure_threshold} - {type(e).__name__}: {str(e)}"
-            )
-
-            # Open circuit if threshold reached
-            if self._failure_count >= self.failure_threshold:
-                import time
-
-                self._state = "OPEN"
-                self._last_failure_time = time.time()
-                logger.error(
-                    f"{self.name}: Circuit breaker OPENED after {self._failure_count} failures. "
-                    f"Will retry in {self.recovery_timeout}s"
-                )
-
-            # Re-raise the original exception
+            self._handle_failure(e)
             raise
 
     async def call_async(self, func: Callable, *args, **kwargs) -> Any:
@@ -135,45 +201,14 @@ class CircuitBreaker:
             CircuitBreakerError: If circuit is open
             Exception: Original exception if circuit is closed
         """
-        # Check if circuit is open
-        if self._state == "OPEN":
-            if self._should_attempt_reset():
-                logger.info(f"{self.name}: Attempting recovery (HALF_OPEN)")
-                self._state = "HALF_OPEN"
-            else:
-                logger.warning(f"{self.name}: Circuit is OPEN, blocking request")
-                raise CircuitBreakerError(f"{self.name}: Circuit breaker is open, service unavailable")
+        self._check_circuit_state()
 
         try:
             result = await func(*args, **kwargs)
-
-            # Success - reset failure count if in HALF_OPEN state
-            if self._state == "HALF_OPEN":
-                logger.info(f"{self.name}: Recovery successful, closing circuit")
-                self._state = "CLOSED"
-                self._failure_count = 0
-                self._last_failure_time = None
-
+            self._handle_success()
             return result
-
         except self.expected_exception as e:
-            self._failure_count += 1
-            logger.warning(
-                f"{self.name}: Failure {self._failure_count}/{self.failure_threshold} - {type(e).__name__}: {str(e)}"
-            )
-
-            # Open circuit if threshold reached
-            if self._failure_count >= self.failure_threshold:
-                import time
-
-                self._state = "OPEN"
-                self._last_failure_time = time.time()
-                logger.error(
-                    f"{self.name}: Circuit breaker OPENED after {self._failure_count} failures. "
-                    f"Will retry in {self.recovery_timeout}s"
-                )
-
-            # Re-raise the original exception
+            self._handle_failure(e)
             raise
 
     def reset(self) -> None:

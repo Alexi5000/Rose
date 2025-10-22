@@ -1,13 +1,65 @@
+"""Speech-to-text conversion using Groq's Whisper model.
+
+This module provides the SpeechToText class for converting audio to text using
+Groq's Whisper API. It includes automatic retry logic with exponential backoff,
+circuit breaker protection, and audio format detection.
+
+The module handles various audio formats (WAV, MP3, WebM, M4A, OGG, FLAC) and
+automatically detects the format from file headers when not explicitly provided.
+
+Key features:
+- Automatic retry with exponential backoff (configurable via settings)
+- Circuit breaker protection to prevent cascading failures
+- Audio format auto-detection from file headers
+- Async/await support with thread pool execution for sync Groq SDK
+- Comprehensive error handling and logging
+
+Module Dependencies:
+- ai_companion.core.exceptions: SpeechToTextError for error handling
+- ai_companion.core.resilience: Circuit breaker for Groq API calls
+- ai_companion.settings: Configuration for API keys, timeouts, retry settings
+- groq: Groq SDK for Whisper API access
+- Standard library: asyncio, logging, os, tempfile, typing
+
+Dependents (modules that import this):
+- ai_companion.interfaces.chainlit.app: Audio message handling
+- ai_companion.interfaces.whatsapp.whatsapp_response: WhatsApp audio messages
+- ai_companion.interfaces.web.routes.voice: Voice API endpoint
+- Test modules: tests/unit/test_speech_to_text.py
+
+Architecture:
+This module is part of the modules layer and provides speech-to-text functionality
+with resilience patterns (retry + circuit breaker). It uses asyncio.to_thread() to
+run the synchronous Groq SDK in a thread pool, preventing event loop blocking.
+
+For detailed architecture documentation, see:
+- docs/ARCHITECTURE.md: Retry Pattern with Exponential Backoff section
+- docs/ARCHITECTURE.md: Circuit Breaker Pattern section
+
+Design Reference:
+- .kiro/specs/technical-debt-management/design.md: Test Infrastructure section
+
+Example:
+    Basic usage of speech-to-text:
+
+    >>> stt = SpeechToText()
+    >>> with open("audio.wav", "rb") as f:
+    ...     audio_data = f.read()
+    >>> text = await stt.transcribe(audio_data)
+    >>> print(text)
+    'Hello, how are you today?'
+"""
+
+import asyncio
 import logging
 import os
 import tempfile
-import time
 from typing import Optional
 
 from groq import Groq
 
 from ai_companion.core.exceptions import SpeechToTextError
-from ai_companion.core.resilience import CircuitBreakerError, get_groq_circuit_breaker
+from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_groq_circuit_breaker
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -25,10 +77,10 @@ class SpeechToText:
     # Supported audio formats
     SUPPORTED_FORMATS = [".wav", ".mp3", ".webm", ".m4a", ".ogg", ".flac"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the SpeechToText class and validate environment variables."""
         self._client: Optional[Groq] = None
-        self._circuit_breaker = get_groq_circuit_breaker()
+        self._circuit_breaker: CircuitBreaker = get_groq_circuit_breaker()
 
     @property
     def client(self) -> Groq:
@@ -95,29 +147,38 @@ class SpeechToText:
         logger.info(f"Transcribing audio: size={len(audio_data)} bytes, format={file_ext}")
 
         # Retry loop with exponential backoff (configured via settings)
+        # This provides resilience against transient network errors and API rate limits
         last_exception = None
         for attempt in range(settings.STT_MAX_RETRIES):
             try:
                 # Create a temporary file with appropriate extension
+                # Note: We use synchronous tempfile here as it's a quick operation and
+                # asyncio doesn't provide a native async alternative for NamedTemporaryFile
                 with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temp_file:
                     temp_file.write(audio_data)
                     temp_file_path = temp_file.name
 
                 try:
-                    # Open the temporary file for the API request
-                    with open(temp_file_path, "rb") as audio_file:
-                        logger.info(f"Attempt {attempt + 1}/{settings.STT_MAX_RETRIES}: Calling Groq Whisper API")
+                    logger.info(f"Attempt {attempt + 1}/{settings.STT_MAX_RETRIES}: Calling Groq Whisper API")
 
-                        # Use circuit breaker for API call
-                        def _call_groq_api():
-                            return self.client.audio.transcriptions.create(
-                                file=audio_file,
-                                model=settings.STT_MODEL_NAME,
-                                language="en",
-                                response_format="text",
-                            )
+                    # Use circuit breaker for API call (async version)
+                    # Note: Groq SDK is synchronous, so we use asyncio.to_thread() to run it
+                    # in a thread pool, preventing event loop blocking. This is necessary
+                    # because the Groq client doesn't provide native async support.
+                    async def _call_groq_api() -> str:
+                        # Run sync Groq API call in thread pool to avoid blocking event loop
+                        # We need to open the file inside the thread to avoid file handle issues
+                        def _sync_transcribe() -> str:
+                            with open(temp_file_path, "rb") as audio_file:
+                                return self.client.audio.transcriptions.create(  # type: ignore[return-value]  # Groq returns Transcription object with text attribute
+                                    file=audio_file,
+                                    model=settings.STT_MODEL_NAME,
+                                    language="en",
+                                    response_format="text",
+                                )
+                        return await asyncio.to_thread(_sync_transcribe)
 
-                        transcription = self._circuit_breaker.call(_call_groq_api)
+                    transcription: str = await self._circuit_breaker.call_async(_call_groq_api)
 
                     if not transcription:
                         raise SpeechToTextError("Transcription result is empty")
@@ -126,14 +187,15 @@ class SpeechToText:
                     return transcription
 
                 finally:
-                    # Clean up the temporary file
+                    # Clean up the temporary file asynchronously
                     try:
-                        os.unlink(temp_file_path)
+                        await asyncio.to_thread(os.unlink, temp_file_path)
                     except Exception as cleanup_error:
                         logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
 
             except CircuitBreakerError as e:
                 # Circuit breaker is open - fail fast without retrying
+                # This prevents wasting time on retries when the service is known to be down
                 logger.error(f"Circuit breaker is open for Groq API: {str(e)}")
                 raise SpeechToTextError("Speech-to-text service is temporarily unavailable") from e
 
@@ -144,15 +206,18 @@ class SpeechToText:
                     exc_info=attempt == settings.STT_MAX_RETRIES - 1,  # Full traceback on last attempt
                 )
 
-                # Don't retry on validation errors
+                # Don't retry on validation errors (they won't succeed on retry)
                 if isinstance(e, ValueError):
                     raise
 
                 # If not the last attempt, wait with exponential backoff
+                # Exponential backoff formula: initial_backoff * (2 ^ attempt)
+                # Example with initial=1s: 1s, 2s, 4s, 8s, 16s (capped at max_backoff)
+                # This gives the service time to recover and reduces load during outages
                 if attempt < settings.STT_MAX_RETRIES - 1:
                     backoff_time = min(settings.STT_INITIAL_BACKOFF * (2**attempt), settings.STT_MAX_BACKOFF)
                     logger.info(f"Retrying in {backoff_time:.1f} seconds...")
-                    time.sleep(backoff_time)
+                    await asyncio.sleep(backoff_time)
 
         # All retries exhausted
         error_msg = f"Speech-to-text conversion failed after {settings.STT_MAX_RETRIES} attempts"

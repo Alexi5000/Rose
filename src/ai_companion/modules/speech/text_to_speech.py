@@ -1,12 +1,48 @@
+"""Text-to-speech conversion using ElevenLabs with Rose's therapeutic voice.
+
+This module provides the TextToSpeech class for converting text to speech using
+ElevenLabs API. It includes caching for common phrases, circuit breaker protection,
+and graceful fallback to text-only responses when audio generation fails.
+
+The module is specifically configured for Rose's therapeutic voice profile with
+high stability settings for a calming, grounding effect. It supports cache warming
+for common therapeutic phrases to improve response times.
+
+Key features:
+- Response caching with configurable TTL (reduces API costs)
+- Circuit breaker protection for service unavailability
+- Graceful fallback to text-only responses
+- Cache warming for common therapeutic phrases
+- Async/await support with thread pool execution for sync ElevenLabs SDK
+- Rose-specific voice configuration (stability, similarity boost)
+
+Example:
+    Basic usage of text-to-speech:
+
+    >>> tts = TextToSpeech()
+    >>> audio_bytes = await tts.synthesize("Hello, I'm here to listen.")
+    >>> with open("response.mp3", "wb") as f:
+    ...     f.write(audio_bytes)
+
+    With fallback handling:
+
+    >>> audio, text = await tts.synthesize_with_fallback("How are you feeling?")
+    >>> if audio:
+    ...     # Play audio
+    ... else:
+    ...     # Display text (TTS unavailable)
+"""
+
+import asyncio
 import hashlib
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
 
 from ai_companion.core.exceptions import TextToSpeechError
-from ai_companion.core.resilience import CircuitBreakerError, get_elevenlabs_circuit_breaker
+from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_elevenlabs_circuit_breaker
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -25,7 +61,7 @@ class TextToSpeech:
         self,
         enable_cache: Optional[bool] = None,
         cache_ttl_hours: Optional[int] = None,
-    ):
+    ) -> None:
         """Initialize the TextToSpeech class.
 
         Args:
@@ -33,17 +69,17 @@ class TextToSpeech:
             cache_ttl_hours: Cache TTL in hours (defaults to settings.TTS_CACHE_TTL_HOURS)
         """
         self._client: Optional[ElevenLabs] = None
-        self._tts_available = True  # Track TTS availability for fallback logic
-        self._circuit_breaker = get_elevenlabs_circuit_breaker()
+        self._tts_available: bool = True  # Track TTS availability for fallback logic
+        self._circuit_breaker: CircuitBreaker = get_elevenlabs_circuit_breaker()
 
         # Cache configuration (use settings defaults if not provided)
-        self._cache_enabled = enable_cache if enable_cache is not None else settings.TTS_CACHE_ENABLED
-        cache_ttl = cache_ttl_hours if cache_ttl_hours is not None else settings.TTS_CACHE_TTL_HOURS
-        self._cache_ttl = timedelta(hours=cache_ttl)
-        self._cache: dict[str, tuple[bytes, datetime]] = {}  # {cache_key: (audio_bytes, timestamp)}
+        self._cache_enabled: bool = enable_cache if enable_cache is not None else settings.TTS_CACHE_ENABLED
+        cache_ttl: int = cache_ttl_hours if cache_ttl_hours is not None else settings.TTS_CACHE_TTL_HOURS
+        self._cache_ttl: timedelta = timedelta(hours=cache_ttl)
+        self._cache: Dict[str, Tuple[bytes, datetime]] = {}  # {cache_key: (audio_bytes, timestamp)}
 
         # Common therapeutic phrases to pre-cache (can be expanded)
-        self._common_phrases = [
+        self._common_phrases: List[str] = [
             "Hello, I'm Rose. How are you feeling today?",
             "I'm here to listen and support you.",
             "Take your time. There's no rush.",
@@ -103,23 +139,30 @@ class TextToSpeech:
         )
 
         try:
-            # Use circuit breaker for API call
-            def _call_elevenlabs_api():
-                audio_generator = self.client.generate(
-                    text=text,
-                    voice=Voice(
-                        voice_id=selected_voice_id,
-                        settings=VoiceSettings(
-                            stability=voice_stability,
-                            similarity_boost=voice_similarity,
+            # Use circuit breaker for API call (async version)
+            # Note: ElevenLabs SDK is synchronous, so we use asyncio.to_thread() to run it
+            # in a thread pool, preventing event loop blocking. This is necessary because
+            # the ElevenLabs client doesn't provide native async support.
+            async def _call_elevenlabs_api() -> bytes:
+                # Run sync ElevenLabs API call in thread pool to avoid blocking event loop
+                def _sync_generate() -> bytes:
+                    audio_generator = self.client.generate(
+                        text=text,
+                        voice=Voice(
+                            voice_id=selected_voice_id,
+                            settings=VoiceSettings(
+                                stability=voice_stability,
+                                similarity_boost=voice_similarity,
+                            ),
                         ),
-                    ),
-                    model=settings.TTS_MODEL_NAME,
-                )
-                # Convert generator to bytes
-                return b"".join(audio_generator)
+                        model=settings.TTS_MODEL_NAME,
+                    )
+                    # Convert generator to bytes
+                    return b"".join(audio_generator)
 
-            audio_bytes = self._circuit_breaker.call(_call_elevenlabs_api)
+                return await asyncio.to_thread(_sync_generate)
+
+            audio_bytes: bytes = await self._circuit_breaker.call_async(_call_elevenlabs_api)
 
             if not audio_bytes:
                 raise TextToSpeechError("Generated audio is empty")
@@ -146,7 +189,7 @@ class TextToSpeech:
         voice_id: Optional[str] = None,
         stability: Optional[float] = None,
         similarity_boost: Optional[float] = None,
-    ) -> tuple[Optional[bytes], str]:
+    ) -> Tuple[Optional[bytes], str]:
         """Convert text to speech with graceful fallback to text-only response.
 
         This method handles TTS failures gracefully and provides a text-only fallback
@@ -317,6 +360,7 @@ class TextToSpeech:
 
         logger.info(f"Warming TTS cache with {len(self._common_phrases)} common phrases...")
 
+        phrase: str
         for phrase in self._common_phrases:
             try:
                 await self.synthesize_cached(phrase)
@@ -332,11 +376,11 @@ class TextToSpeech:
         self._cache.clear()
         logger.info(f"Cleared TTS cache ({cache_size} entries)")
 
-    def get_cache_stats(self) -> dict:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get statistics about the TTS cache.
 
         Returns:
-            dict: Cache statistics including size, enabled status, and TTL
+            Dict[str, any]: Cache statistics including size, enabled status, and TTL
         """
         return {
             "enabled": self._cache_enabled,

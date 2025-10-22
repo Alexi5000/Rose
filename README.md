@@ -141,6 +141,42 @@ make rose-stop         # Stop containers
 make rose-delete       # Clean up volumes and containers
 ```
 
+### Testing
+
+Rose has a comprehensive test suite with >70% code coverage:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage report
+uv run pytest --cov=src --cov-report=html
+
+# Run specific test categories
+uv run pytest tests/unit/                    # Unit tests only
+uv run pytest tests/integration/             # Integration tests only
+uv run pytest tests/test_performance_benchmarks.py  # Performance tests
+
+# Run type checking
+uv run mypy src/
+
+# View coverage report
+# Open htmlcov/index.html in your browser
+```
+
+**Test Organization**:
+- `tests/unit/` - Unit tests for individual modules (memory, speech, error handling)
+- `tests/integration/` - End-to-end workflow tests
+- `tests/fixtures/` - Shared test fixtures and mock data
+- `tests/test_performance_benchmarks.py` - Performance benchmarks for critical operations
+
+**Test Fixtures**:
+- Mock Groq, ElevenLabs, and Qdrant clients
+- Sample audio files (WAV, MP3)
+- Test configuration overrides
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
+
 ## Deployment
 
 ### Railway Deployment

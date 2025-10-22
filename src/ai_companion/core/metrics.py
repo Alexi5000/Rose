@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from ai_companion.core.logging_config import get_logger
 
@@ -27,7 +27,7 @@ class MetricsCollector:
         self._gauges: Dict[str, float] = {}
         self._histograms: Dict[str, list] = defaultdict(list)
 
-    def increment_counter(self, name: str, value: int = 1, tags: Dict[str, Any] = None) -> None:
+    def increment_counter(self, name: str, value: int = 1, tags: Optional[Dict[str, Any]] = None) -> None:
         """Increment a counter metric.
 
         Args:
@@ -44,7 +44,7 @@ class MetricsCollector:
             tags=tags or {}
         )
 
-    def set_gauge(self, name: str, value: float, tags: Dict[str, Any] = None) -> None:
+    def set_gauge(self, name: str, value: float, tags: Optional[Dict[str, Any]] = None) -> None:
         """Set a gauge metric.
 
         Args:
@@ -60,7 +60,7 @@ class MetricsCollector:
             tags=tags or {}
         )
 
-    def record_histogram(self, name: str, value: float, tags: Dict[str, Any] = None) -> None:
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, Any]] = None) -> None:
         """Record a histogram value.
 
         Args:
@@ -118,7 +118,7 @@ class MetricsCollector:
             duration_ms=duration_ms
         )
 
-    def record_error(self, error_type: str, endpoint: str = None) -> None:
+    def record_error(self, error_type: str, endpoint: Optional[str] = None) -> None:
         """Record an error occurrence.
 
         Args:
@@ -180,7 +180,7 @@ class MetricsCollector:
 metrics = MetricsCollector()
 
 
-def track_performance(metric_name: str = None):
+def track_performance(metric_name: Optional[str] = None) -> Callable:
     """Decorator to track endpoint performance.
 
     Args:

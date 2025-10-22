@@ -3,6 +3,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.settings import settings
@@ -13,7 +14,7 @@ logger = get_logger(__name__)
 class SessionCleanupManager:
     """Manager for cleaning up old session data from SQLite checkpointer."""
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: Optional[str] = None):
         """Initialize session cleanup manager.
 
         Args:
@@ -21,7 +22,7 @@ class SessionCleanupManager:
         """
         self.db_path = db_path or settings.SHORT_TERM_MEMORY_DB_PATH
 
-    def cleanup_old_sessions(self, retention_days: int = None) -> dict:
+    def cleanup_old_sessions(self, retention_days: Optional[int] = None) -> Dict[str, Any]:
         """Clean up sessions older than specified retention period.
 
         Args:
@@ -33,7 +34,7 @@ class SessionCleanupManager:
         retention_days = retention_days or settings.SESSION_RETENTION_DAYS
         cutoff_date = datetime.now() - timedelta(days=retention_days)
 
-        stats = {"sessions_deleted": 0, "checkpoints_deleted": 0, "errors": []}
+        stats: Dict[str, Any] = {"sessions_deleted": 0, "checkpoints_deleted": 0, "errors": []}
 
         # Check if database exists
         db_file = Path(self.db_path)
@@ -146,7 +147,7 @@ class SessionCleanupManager:
         return stats
 
 
-def cleanup_old_sessions(retention_days: int = None) -> dict:
+def cleanup_old_sessions(retention_days: Optional[int] = None) -> Dict[str, Any]:
     """Convenience function to clean up old sessions.
 
     Args:

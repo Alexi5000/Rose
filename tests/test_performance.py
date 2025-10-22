@@ -1,6 +1,5 @@
 """Performance and load testing for Rose the Healer Shaman."""
 
-import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -168,9 +167,9 @@ class TestResourceConsumption:
 
     def test_memory_cleanup(self):
         """Test that temporary audio files are cleaned up."""
-        from ai_companion.interfaces.web.routes.voice import AUDIO_DIR, cleanup_old_audio_files
         import uuid
-        from pathlib import Path
+
+        from ai_companion.interfaces.web.routes.voice import AUDIO_DIR, cleanup_old_audio_files
 
         # Create some old test files
         old_file = AUDIO_DIR / f"{uuid.uuid4()}.mp3"
@@ -279,8 +278,9 @@ class TestRailwayLimits:
 
     def test_memory_usage_reasonable(self):
         """Test that memory usage is within reasonable limits."""
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         memory_mb = process.memory_info().rss / 1024 / 1024
@@ -381,14 +381,14 @@ To run comprehensive load tests:
 2. Create a locustfile.py:
    ```python
    from locust import HttpUser, task, between
-   
+
    class RoseUser(HttpUser):
        wait_time = between(1, 3)
-       
+
        @task
        def health_check(self):
            self.client.get("/api/health")
-       
+
        @task(3)
        def voice_interaction(self):
            # Simulate voice interaction

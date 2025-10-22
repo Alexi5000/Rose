@@ -1,6 +1,5 @@
 """FastAPI application for Rose the Healer Shaman web interface."""
 
-import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -24,7 +23,8 @@ from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
-from ai_companion.interfaces.web.routes import health, metrics as metrics_route, monitoring, session, voice
+from ai_companion.interfaces.web.routes import health, monitoring, session, voice
+from ai_companion.interfaces.web.routes import metrics as metrics_route
 from ai_companion.settings import settings
 
 # Configure structured logging before any other imports
@@ -40,59 +40,59 @@ FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent.parent.parent / "fronte
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     logger.info("app_starting", service="rose_web_interface")
-    
+
     # Initialize scheduler for background jobs
     scheduler = AsyncIOScheduler()
-    
+
     # Schedule automatic audio file cleanup (runs every hour)
     scheduler.add_job(
         voice.cleanup_old_audio_files,
-        'interval',
+        "interval",
         hours=1,
         args=[24],  # Clean files older than 24 hours
-        id='audio_cleanup',
-        name='Cleanup old audio files',
+        id="audio_cleanup",
+        name="Cleanup old audio files",
         replace_existing=True
     )
-    
+
     # Schedule automatic database backups (runs daily at 2 AM)
     scheduler.add_job(
         backup_manager.backup_database,
-        'cron',
+        "cron",
         hour=2,
         minute=0,
         args=[7],  # Keep 7 days of backups
-        id='database_backup',
-        name='Daily database backup',
+        id="database_backup",
+        name="Daily database backup",
         replace_existing=True
     )
-    
+
     # Schedule automatic session cleanup (runs daily at 3 AM)
     scheduler.add_job(
         cleanup_old_sessions,
-        'cron',
+        "cron",
         hour=3,
         minute=0,
         args=[settings.SESSION_RETENTION_DAYS],
-        id='session_cleanup',
-        name='Daily session cleanup',
+        id="session_cleanup",
+        name="Daily session cleanup",
         replace_existing=True
     )
-    
+
     # Start the scheduler
     scheduler.start()
     logger.info("scheduler_started", jobs=["audio_cleanup", "database_backup", "session_cleanup"])
-    
+
     # Start monitoring scheduler
     await monitoring_scheduler.start()
     logger.info("monitoring_scheduler_started", evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL)
-    
+
     yield
-    
+
     # Shutdown monitoring scheduler
     await monitoring_scheduler.stop()
     logger.info("monitoring_scheduler_stopped")
-    
+
     # Shutdown scheduler
     scheduler.shutdown()
     logger.info("app_shutdown", service="rose_web_interface")
@@ -111,12 +111,12 @@ def create_app() -> FastAPI:
         redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,
         openapi_url="/api/v1/openapi.json" if settings.ENABLE_API_DOCS else None,
     )
-    
+
     # Configure request size limits to prevent memory exhaustion
     # This is set at the application level and applies to all endpoints
     app.state.max_request_size = settings.MAX_REQUEST_SIZE
     logger.info("request_size_limit_configured", max_size_mb=settings.MAX_REQUEST_SIZE / 1024 / 1024)
-    
+
     if settings.ENABLE_API_DOCS:
         logger.info("api_documentation_enabled", docs_url="/api/v1/docs", redoc_url="/api/v1/redoc")
     else:
@@ -125,7 +125,7 @@ def create_app() -> FastAPI:
     # Add request ID middleware (should be first to track all requests)
     app.add_middleware(RequestIDMiddleware)
     logger.info("request_id_middleware_enabled")
-    
+
     # Add request size limit middleware
     @app.middleware("http")
     async def limit_request_size(request: Request, call_next):
@@ -142,11 +142,11 @@ def create_app() -> FastAPI:
                     }
                 )
         return await call_next(request)
-    
+
     # Configure CORS with environment-based origins
     allowed_origins = settings.get_allowed_origins()
     logger.info("cors_configured", allowed_origins=allowed_origins)
-    
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
@@ -154,12 +154,12 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type", "Authorization"],
     )
-    
+
     # Add security headers middleware
     if settings.ENABLE_SECURITY_HEADERS:
         app.add_middleware(SecurityHeadersMiddleware)
         logger.info("security_headers_enabled")
-    
+
     # Configure rate limiting
     if settings.RATE_LIMIT_ENABLED:
         limiter = Limiter(key_func=get_remote_address)
@@ -183,14 +183,14 @@ def create_app() -> FastAPI:
     app.include_router(voice.router, prefix="/api/v1", tags=["Voice Processing"])
     app.include_router(metrics_route.router, prefix="/api/v1", tags=["Metrics"])
     app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
-    
+
     # Maintain backward compatibility with non-versioned routes (deprecated)
     app.include_router(health.router, prefix="/api", tags=["Health (Deprecated)"], deprecated=True)
     app.include_router(session.router, prefix="/api", tags=["Session Management (Deprecated)"], deprecated=True)
     app.include_router(voice.router, prefix="/api", tags=["Voice Processing (Deprecated)"], deprecated=True)
     app.include_router(metrics_route.router, prefix="/api", tags=["Metrics (Deprecated)"], deprecated=True)
     app.include_router(monitoring.router, prefix="/api", tags=["Monitoring (Deprecated)"], deprecated=True)
-    
+
     logger.info("api_routes_registered", version="v1", backward_compatible=True)
 
     # Serve React frontend static files (if build directory exists)
@@ -200,13 +200,13 @@ def create_app() -> FastAPI:
         # Mount static assets (JS, CSS, images, etc.) with cache headers
         # Static files are immutable and can be cached for 1 year
         app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR / "static", html=False), name="static")
-        
+
         # Add cache headers for static files
         @app.middleware("http")
         async def add_cache_headers(request: Request, call_next):
             """Add cache headers for static assets."""
             response = await call_next(request)
-            
+
             # Cache static assets (JS, CSS, images) for 1 year
             if request.url.path.startswith("/static/"):
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -216,7 +216,7 @@ def create_app() -> FastAPI:
             # Cache index.html for 5 minutes (allows updates to propagate quickly)
             elif request.url.path == "/" or request.url.path.endswith(".html"):
                 response.headers["Cache-Control"] = "public, max-age=300"
-            
+
             return response
 
         # Catch-all route for React Router (SPA)

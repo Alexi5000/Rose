@@ -6,6 +6,7 @@ speech modules, and text parsers.
 """
 
 import re
+from typing import Optional
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
@@ -16,7 +17,7 @@ from ai_companion.modules.speech import TextToSpeech
 from ai_companion.settings import settings
 
 
-def get_chat_model(temperature: float | None = None) -> ChatGroq:
+def get_chat_model(temperature: Optional[float] = None) -> ChatGroq:
     """Get ChatGroq model with retry and timeout configuration.
 
     Args:
@@ -26,7 +27,7 @@ def get_chat_model(temperature: float | None = None) -> ChatGroq:
     Returns:
         ChatGroq: Configured chat model with retry logic and timeout
     """
-    temp = temperature if temperature is not None else settings.LLM_TEMPERATURE_DEFAULT
+    temp: float = temperature if temperature is not None else settings.LLM_TEMPERATURE_DEFAULT
     return ChatGroq(
         api_key=settings.GROQ_API_KEY,
         model_name=settings.TEXT_MODEL_NAME,

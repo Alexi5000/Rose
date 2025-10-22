@@ -1,9 +1,8 @@
 """Health check endpoints."""
 
-import logging
 import sqlite3
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -24,7 +23,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 class HealthCheckResponse(BaseModel):
     """Response model for health check.
-    
+
     Attributes:
         status: Overall system health status ('healthy' or 'degraded')
         version: API version number (semantic versioning)
@@ -128,17 +127,17 @@ async def health_check(request: Request) -> HealthCheckResponse:
     # Check SQLite database connectivity
     try:
         db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
-        
+
         # Check if database file exists or can be created
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Try to connect and execute a simple query
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchone()
         conn.close()
-        
+
         services["sqlite"] = "connected"
     except Exception as e:
         logger.error("sqlite_health_check_failed", error=str(e))
