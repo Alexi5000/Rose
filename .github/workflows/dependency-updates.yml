@@ -1,0 +1,190 @@
+name: Dependency Updates
+
+on:
+  # Run weekly on Monday at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      
+      - name: Update Python dependencies
+        id: update-python
+        run: |
+          echo "Updating Python dependencies..."
+          uv lock --upgrade
+          
+          # Check if there are changes
+          if git diff --quiet uv.lock; then
+            echo "python_updated=false" >> $GITHUB_OUTPUT
+            echo "No Python dependency updates available"
+          else
+            echo "python_updated=true" >> $GITHUB_OUTPUT
+            echo "Python dependencies updated"
+          fi
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Update frontend dependencies
+        id: update-frontend
+        working-directory: frontend
+        run: |
+          echo "Updating frontend dependencies..."
+          npm update
+          
+          # Check if there are changes
+          if git diff --quiet package-lock.json; then
+            echo "frontend_updated=false" >> $GITHUB_OUTPUT
+            echo "No frontend dependency updates available"
+          else
+            echo "frontend_updated=true" >> $GITHUB_OUTPUT
+            echo "Frontend dependencies updated"
+          fi
+      
+      - name: Check if any updates were made
+        id: check-updates
+        run: |
+          if [[ "${{ steps.update-python.outputs.python_updated }}" == "true" ]] || \
+             [[ "${{ steps.update-frontend.outputs.frontend_updated }}" == "true" ]]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Dependencies were updated"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No dependency updates available"
+          fi
+      
+      - name: Install Python dependencies
+        if: steps.check-updates.outputs.has_updates == 'true'
+        run: uv sync
+      
+      - name: Install frontend dependencies
+        if: steps.check-updates.outputs.has_updates == 'true'
+        working-directory: frontend
+        run: npm ci
+      
+      - name: Run Python tests
+        if: steps.check-updates.outputs.has_updates == 'true'
+        run: |
+          uv run pytest tests/unit/ -n auto --cov=src --cov-report=term-missing --quiet
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      
+      - name: Run code quality checks
+        if: steps.check-updates.outputs.has_updates == 'true'
+        run: |
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+      
+      - name: Generate update summary
+        if: steps.check-updates.outputs.has_updates == 'true'
+        id: summary
+        run: |
+          echo "## Dependency Updates" > update_summary.md
+          echo "" >> update_summary.md
+          
+          if [[ "${{ steps.update-python.outputs.python_updated }}" == "true" ]]; then
+            echo "### Python Dependencies" >> update_summary.md
+            echo "" >> update_summary.md
+            echo "Updated via \`uv lock --upgrade\`" >> update_summary.md
+            echo "" >> update_summary.md
+            echo "\`\`\`diff" >> update_summary.md
+            git diff uv.lock | head -n 50 >> update_summary.md
+            echo "\`\`\`" >> update_summary.md
+            echo "" >> update_summary.md
+          fi
+          
+          if [[ "${{ steps.update-frontend.outputs.frontend_updated }}" == "true" ]]; then
+            echo "### Frontend Dependencies" >> update_summary.md
+            echo "" >> update_summary.md
+            echo "Updated via \`npm update\`" >> update_summary.md
+            echo "" >> update_summary.md
+            echo "\`\`\`diff" >> update_summary.md
+            git diff frontend/package-lock.json | head -n 50 >> update_summary.md
+            echo "\`\`\`" >> update_summary.md
+            echo "" >> update_summary.md
+          fi
+          
+          echo "### Test Results" >> update_summary.md
+          echo "" >> update_summary.md
+          echo "✅ All tests passed with updated dependencies" >> update_summary.md
+          echo "✅ Code quality checks passed" >> update_summary.md
+          echo "" >> update_summary.md
+          echo "---" >> update_summary.md
+          echo "" >> update_summary.md
+          echo "This PR was automatically created by the dependency update workflow." >> update_summary.md
+          echo "Please review the changes and merge if everything looks good." >> update_summary.md
+          
+          cat update_summary.md
+      
+      - name: Create Pull Request
+        if: steps.check-updates.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          branch: automated/dependency-updates
+          delete-branch: true
+          title: 'chore: automated dependency updates'
+          body-path: update_summary.md
+          labels: dependencies
+          assignees: ${{ github.actor }}
+          draft: false
+      
+      - name: Workflow summary
+        if: always()
+        run: |
+          echo "## Dependency Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.check-updates.outputs.has_updates }}" == "true" ]]; then
+            echo "✅ Dependencies were updated and PR was created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [[ "${{ steps.update-python.outputs.python_updated }}" == "true" ]]; then
+              echo "- ✅ Python dependencies updated" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ℹ️ No Python dependency updates" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [[ "${{ steps.update-frontend.outputs.frontend_updated }}" == "true" ]]; then
+              echo "- ✅ Frontend dependencies updated" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ℹ️ No frontend dependency updates" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "ℹ️ No dependency updates available" >> $GITHUB_STEP_SUMMARY
+          fi

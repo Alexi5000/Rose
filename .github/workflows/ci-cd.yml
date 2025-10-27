@@ -1,0 +1,432 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.4.30"
+
+jobs:
+  # Job 1: Code Quality Checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run ruff linting
+        run: uv run ruff check src/ tests/
+      
+      - name: Run ruff formatting check
+        run: uv run ruff format --check src/ tests/
+      
+      - name: Run mypy type checking
+        run: uv run mypy src/
+        continue-on-error: true  # Type checking is advisory for now
+
+  # Job 2: Unit Tests with Coverage
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run unit tests with coverage
+        env:
+          ENVIRONMENT: ci
+          LOG_LEVEL: WARNING
+        run: |
+          uv run pytest tests/unit/ \
+            -n auto \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term \
+            --cov-fail-under=70
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          flags: unittests
+      
+      - name: Upload HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+      
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 7
+      
+      - name: Comment on PR with failure details
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Unit tests failed. Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            })
+
+  # Job 3: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
+    continue-on-error: true  # Non-blocking
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run integration tests
+        env:
+          ENVIRONMENT: ci
+          LOG_LEVEL: WARNING
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+        run: |
+          uv run pytest tests/integration/ -v
+      
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: pytest-report.xml
+          retention-days: 7
+
+  # Job 4: Smoke Tests
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: rose-ai-companion:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test container startup
+        run: |
+          docker run -d --name rose-test \
+            -e GROQ_API_KEY=test \
+            -e ELEVENLABS_API_KEY=test \
+            -e ELEVENLABS_VOICE_ID=test \
+            -e QDRANT_URL=http://localhost:6333 \
+            -e QDRANT_API_KEY=test \
+            -p 8000:8000 \
+            rose-ai-companion:test
+          
+          # Wait for container to start
+          sleep 10
+          
+          # Check if container is running
+          docker ps | grep rose-test
+      
+      - name: Verify health endpoint
+        run: |
+          # Wait for service to be ready
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "⏳ Waiting for service... ($i/30)"
+            sleep 2
+          done
+          echo "❌ Health check failed"
+          docker logs rose-test
+          exit 1
+      
+      - name: Run smoke tests
+        env:
+          ENVIRONMENT: ci
+          LOG_LEVEL: WARNING
+        run: |
+          uv run pytest tests/test_smoke.py -v
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop rose-test || true
+          docker rm rose-test || true
+      
+      - name: Upload smoke test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: |
+            pytest-report.xml
+          retention-days: 7
+
+  # Job 5: Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [unit-tests, smoke-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: ${{ secrets.RAILWAY_PRODUCTION_URL }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+      
+      - name: Deploy to Railway
+        id: deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service rose-production
+        timeout-minutes: 5
+      
+      - name: Wait for deployment to stabilize
+        run: sleep 30
+      
+      - name: Verify deployment health
+        id: verify
+        run: |
+          MAX_RETRIES=10
+          RETRY_DELAY=5
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Health check attempt $i/$MAX_RETRIES..."
+            
+            if curl -f "${{ secrets.RAILWAY_PRODUCTION_URL }}/api/health" > /dev/null 2>&1; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            
+            echo "⏳ Waiting ${RETRY_DELAY}s before retry..."
+            sleep $RETRY_DELAY
+          done
+          
+          echo "❌ Health check failed after $MAX_RETRIES attempts"
+          exit 1
+      
+      - name: Run post-deployment smoke tests
+        env:
+          ENVIRONMENT: production
+          LOG_LEVEL: WARNING
+          DEPLOYMENT_URL: ${{ secrets.RAILWAY_PRODUCTION_URL }}
+        run: |
+          uv run pytest tests/test_post_deployment_smoke.py -v
+      
+      - name: Notify deployment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const message = `🚨 **Production Deployment Failed**
+            
+            - **Commit**: ${context.sha.substring(0, 7)}
+            - **Workflow**: [View logs](${context.payload.repository.html_url}/actions/runs/${context.runId})
+            - **Action Required**: Check logs and consider rollback
+            
+            Deployment verification failed. Previous deployment should still be running.`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Deployment Failure: ${context.sha.substring(0, 7)}`,
+              body: message,
+              labels: ['deployment', 'critical']
+            });
+      
+      - name: Upload deployment artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-failure-logs
+          path: |
+            pytest-report.xml
+          retention-days: 30
+
+  # Job 6: Workflow Summary
+  workflow-summary:
+    name: Workflow Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, integration-tests, smoke-tests, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = {
+              'code-quality': '${{ needs.code-quality.result }}',
+              'unit-tests': '${{ needs.unit-tests.result }}',
+              'integration-tests': '${{ needs.integration-tests.result }}',
+              'smoke-tests': '${{ needs.smoke-tests.result }}',
+              'deploy-production': '${{ needs.deploy-production.result }}'
+            };
+            
+            const statusEmoji = {
+              'success': '✅',
+              'failure': '❌',
+              'skipped': '⏭️',
+              'cancelled': '🚫'
+            };
+            
+            let summary = '## CI/CD Pipeline Results\n\n';
+            
+            for (const [job, result] of Object.entries(jobs)) {
+              const emoji = statusEmoji[result] || '❓';
+              summary += `${emoji} **${job}**: ${result}\n`;
+            }
+            
+            summary += `\n**Commit**: ${context.sha.substring(0, 7)}\n`;
+            summary += `**Branch**: ${context.ref.replace('refs/heads/', '')}\n`;
+            summary += `**Triggered by**: ${context.eventName}\n`;
+            
+            core.summary.addRaw(summary).write();

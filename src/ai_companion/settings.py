@@ -22,6 +22,16 @@ from typing import Any
 from pydantic import ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ai_companion.config.server_config import (
+    API_REQUEST_TIMEOUT_SECONDS,
+    AUDIO_CLEANUP_MAX_AGE_HOURS,
+    MAX_REQUEST_SIZE_BYTES,
+    RATE_LIMIT_REQUESTS_PER_MINUTE,
+    WEB_SERVER_HOST,
+    WEB_SERVER_PORT,
+    WORKFLOW_TIMEOUT_SECONDS,
+)
+
 
 class Settings(BaseSettings):
     """Application settings with environment variable loading and validation.
@@ -89,16 +99,16 @@ class Settings(BaseSettings):
     SHORT_TERM_MEMORY_DB_PATH: str = "/app/data/memory.db"
 
     # Workflow configuration
-    WORKFLOW_TIMEOUT_SECONDS: int = 60  # Global timeout for LangGraph workflow execution
+    WORKFLOW_TIMEOUT_SECONDS: int = WORKFLOW_TIMEOUT_SECONDS  # Global timeout for LangGraph workflow execution
 
     # Server configuration (for production deployment)
-    PORT: int = 8080
-    HOST: str = "0.0.0.0"
+    PORT: int = WEB_SERVER_PORT
+    HOST: str = WEB_SERVER_HOST
 
     # Security configuration
     ALLOWED_ORIGINS: str = "*"  # Comma-separated list of allowed origins, or "*" for all
     RATE_LIMIT_ENABLED: bool = True
-    RATE_LIMIT_PER_MINUTE: int = 10  # Requests per minute per IP
+    RATE_LIMIT_PER_MINUTE: int = RATE_LIMIT_REQUESTS_PER_MINUTE  # Requests per minute per IP
     ENABLE_SECURITY_HEADERS: bool = True
 
     # Logging configuration
@@ -109,7 +119,7 @@ class Settings(BaseSettings):
     ENABLE_API_DOCS: bool = True  # Enable OpenAPI/Swagger documentation
 
     # Request size limits (in bytes)
-    MAX_REQUEST_SIZE: int = 10 * 1024 * 1024  # 10MB default
+    MAX_REQUEST_SIZE: int = MAX_REQUEST_SIZE_BYTES  # 10MB default
 
     # Session cleanup configuration
     SESSION_RETENTION_DAYS: int = 7  # Delete sessions older than 7 days
@@ -147,7 +157,7 @@ class Settings(BaseSettings):
     TTS_MAX_TEXT_LENGTH: int = 5000  # Maximum text length for TTS
 
     # Audio file cleanup configuration
-    AUDIO_CLEANUP_MAX_AGE_HOURS: int = 24  # Delete audio files older than this
+    AUDIO_CLEANUP_MAX_AGE_HOURS: int = AUDIO_CLEANUP_MAX_AGE_HOURS  # Delete audio files older than this
 
     # Circuit breaker configuration
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5  # Failures before opening circuit

@@ -1,0 +1,289 @@
+name: Release Automation
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    # Only run if the CI/CD workflow succeeded and was triggered by a push to main
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+          ref: main
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Get latest tag
+        id: get-latest-tag
+        run: |
+          # Get the latest tag, or use v1.0.0 as default if no tags exist
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+      
+      - name: Determine version bump
+        id: version-bump
+        run: |
+          LATEST_TAG="${{ steps.get-latest-tag.outputs.latest_tag }}"
+          
+          # Remove 'v' prefix for version manipulation
+          CURRENT_VERSION="${LATEST_TAG#v}"
+          
+          # Split version into major.minor.patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          # Get commits since last tag
+          if git rev-parse "$LATEST_TAG" >/dev/null 2>&1; then
+            COMMITS=$(git log "$LATEST_TAG"..HEAD --pretty=format:"%s")
+          else
+            COMMITS=$(git log --pretty=format:"%s")
+          fi
+          
+          # Determine version bump based on conventional commits
+          if echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|^BREAKING CHANGE:"; then
+            # Major version bump for breaking changes
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            BUMP_TYPE="major"
+          elif echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+            # Minor version bump for new features
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            BUMP_TYPE="minor"
+          else
+            # Patch version bump for fixes and other changes
+            PATCH=$((PATCH + 1))
+            BUMP_TYPE="patch"
+          fi
+          
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION (${BUMP_TYPE} bump)"
+      
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          NEW_VERSION="${{ steps.version-bump.outputs.new_version }}"
+          
+          if git rev-parse "$NEW_VERSION" >/dev/null 2>&1; then
+            echo "Tag $NEW_VERSION already exists, skipping release creation"
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate changelog
+        id: changelog
+        if: steps.check-tag.outputs.tag_exists == 'false'
+        run: |
+          LATEST_TAG="${{ steps.get-latest-tag.outputs.latest_tag }}"
+          NEW_VERSION="${{ steps.version-bump.outputs.new_version }}"
+          
+          # Get commits since last tag
+          if git rev-parse "$LATEST_TAG" >/dev/null 2>&1; then
+            COMMITS=$(git log "$LATEST_TAG"..HEAD --pretty=format:"%s|||%h|||%an" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"%s|||%h|||%an" --no-merges)
+          fi
+          
+          # Initialize changelog sections
+          FEATURES=""
+          FIXES=""
+          CHORES=""
+          DOCS=""
+          BREAKING=""
+          OTHER=""
+          
+          # Parse commits and categorize
+          while IFS='|||' read -r message hash author; do
+            # Check for breaking changes
+            if echo "$message" | grep -qE "^(feat|fix|chore|docs)(\(.+\))?!:|^BREAKING CHANGE:"; then
+              BREAKING="${BREAKING}- ${message} (${hash})\n"
+            # Features
+            elif echo "$message" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+              FEATURES="${FEATURES}- ${message} (${hash})\n"
+            # Fixes
+            elif echo "$message" | grep -qE "^fix(\(.+\))?:"; then
+              FIXES="${FIXES}- ${message} (${hash})\n"
+            # Documentation
+            elif echo "$message" | grep -qE "^docs(\(.+\))?:"; then
+              DOCS="${DOCS}- ${message} (${hash})\n"
+            # Chores
+            elif echo "$message" | grep -qE "^(chore|build|ci|refactor|perf|test)(\(.+\))?:"; then
+              CHORES="${CHORES}- ${message} (${hash})\n"
+            # Other
+            else
+              OTHER="${OTHER}- ${message} (${hash})\n"
+            fi
+          done <<< "$COMMITS"
+          
+          # Build changelog
+          CHANGELOG="## What's Changed\n\n"
+          
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG="${CHANGELOG}### ⚠️ Breaking Changes\n\n${BREAKING}\n"
+          fi
+          
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="${CHANGELOG}### ✨ Features\n\n${FEATURES}\n"
+          fi
+          
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n\n${FIXES}\n"
+          fi
+          
+          if [ -n "$DOCS" ]; then
+            CHANGELOG="${CHANGELOG}### 📚 Documentation\n\n${DOCS}\n"
+          fi
+          
+          if [ -n "$CHORES" ]; then
+            CHANGELOG="${CHANGELOG}### 🔧 Maintenance\n\n${CHORES}\n"
+          fi
+          
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="${CHANGELOG}### Other Changes\n\n${OTHER}\n"
+          fi
+          
+          # Add deployment information
+          CHANGELOG="${CHANGELOG}---\n\n"
+          CHANGELOG="${CHANGELOG}**Deployment Information**\n\n"
+          CHANGELOG="${CHANGELOG}- Environment: Production\n"
+          CHANGELOG="${CHANGELOG}- Deployed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")\n"
+          CHANGELOG="${CHANGELOG}- Deployed by: GitHub Actions\n"
+          CHANGELOG="${CHANGELOG}- Commit: ${GITHUB_SHA:0:7}\n"
+          
+          # Save changelog to file and output
+          echo -e "$CHANGELOG" > RELEASE_NOTES.md
+          
+          # Set output (escape newlines for GitHub Actions)
+          {
+            echo 'changelog<<EOF'
+            echo -e "$CHANGELOG"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+      
+      - name: Create git tag
+        if: steps.check-tag.outputs.tag_exists == 'false'
+        run: |
+          NEW_VERSION="${{ steps.version-bump.outputs.new_version }}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+          git push origin "$NEW_VERSION"
+      
+      - name: Create GitHub Release
+        if: steps.check-tag.outputs.tag_exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const changelog = fs.readFileSync('RELEASE_NOTES.md', 'utf8');
+            
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ steps.version-bump.outputs.new_version }}',
+              name: 'Release ${{ steps.version-bump.outputs.new_version }}',
+              body: changelog,
+              draft: false,
+              prerelease: false,
+              generate_release_notes: false
+            });
+            
+            console.log(`Created release: ${release.data.html_url}`);
+            core.summary.addRaw(`## 🎉 Release Created\n\n**Version**: ${{ steps.version-bump.outputs.new_version }}\n**Type**: ${{ steps.version-bump.outputs.bump_type }} release\n**URL**: ${release.data.html_url}\n\n${changelog}`).write();
+      
+      - name: Notify team (Slack)
+        if: steps.check-tag.outputs.tag_exists == 'false' && vars.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "🎉 New Release: ${{ steps.version-bump.outputs.new_version }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🎉 New Production Release*\n\n*Version:* ${{ steps.version-bump.outputs.new_version }}\n*Type:* ${{ steps.version-bump.outputs.bump_type }} release\n*Commit:* ${{ github.sha }}\n*Deployed by:* GitHub Actions\n\n<${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version-bump.outputs.new_version }}|View Release> | <${{ secrets.RAILWAY_PRODUCTION_URL }}|View Production>"
+                  }
+                }
+              ]
+            }
+        continue-on-error: true
+      
+      - name: Notify team (Discord)
+        if: steps.check-tag.outputs.tag_exists == 'false' && vars.DISCORD_WEBHOOK_URL != ''
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "🎉 **New Production Release**",
+              "embeds": [{
+                "title": "Release ${{ steps.version-bump.outputs.new_version }}",
+                "description": "A new version has been deployed to production",
+                "color": 5763719,
+                "fields": [
+                  {
+                    "name": "Version",
+                    "value": "${{ steps.version-bump.outputs.new_version }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Type",
+                    "value": "${{ steps.version-bump.outputs.bump_type }} release",
+                    "inline": true
+                  },
+                  {
+                    "name": "Commit",
+                    "value": "`${{ github.sha }}`",
+                    "inline": false
+                  }
+                ],
+                "url": "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version-bump.outputs.new_version }}"
+              }]
+            }'
+        continue-on-error: true
+      
+      - name: Summary
+        if: steps.check-tag.outputs.tag_exists == 'false'
+        run: |
+          echo "✅ Release ${{ steps.version-bump.outputs.new_version }} created successfully"
+          echo "📦 Type: ${{ steps.version-bump.outputs.bump_type }} release"
+          echo "🔗 View at: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version-bump.outputs.new_version }}"
+      
+      - name: Skip message
+        if: steps.check-tag.outputs.tag_exists == 'true'
+        run: |
+          echo "ℹ️ Tag ${{ steps.version-bump.outputs.new_version }} already exists, skipping release creation"

@@ -37,6 +37,7 @@ The improved architecture will feature:
 **Purpose**: Provide comprehensive test coverage for critical application components
 
 **Structure**:
+
 ```
 tests/
 ├── unit/
@@ -53,6 +54,7 @@ tests/
 ```
 
 **Key Test Scenarios**:
+
 - Memory Manager: Extract memories from messages, store in Qdrant, retrieve relevant memories
 - Speech-to-Text: Transcribe various audio formats, handle errors, retry logic
 - Text-to-Speech: Synthesize audio, cache responses, fallback behavior
@@ -67,6 +69,7 @@ tests/
 **Solution**: Use function introspection to determine async vs sync and apply appropriate wrapper
 
 **Design**:
+
 ```python
 def handle_api_errors(service_name: str, fallback_message: Optional[str] = None):
     def decorator(func: F) -> F:
@@ -74,19 +77,20 @@ def handle_api_errors(service_name: str, fallback_message: Optional[str] = None)
         async def async_wrapper(*args, **kwargs):
             # Async error handling logic
             ...
-        
+
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
             # Sync error handling logic
             ...
-        
+
         # Single decision point
         return async_wrapper if inspect.iscoroutinefunction(func) else sync_wrapper
-    
+
     return decorator
 ```
 
 **Benefits**:
+
 - Eliminates ~50% code duplication in error handlers
 - Single source of truth for error handling logic
 - Easier to maintain and extend
@@ -100,6 +104,7 @@ def handle_api_errors(service_name: str, fallback_message: Optional[str] = None)
 **Solution**: Extract common state management logic into private methods
 
 **Design**:
+
 ```python
 class CircuitBreaker:
     def _check_circuit_state(self) -> None:
@@ -108,20 +113,20 @@ class CircuitBreaker:
             self._state = "HALF_OPEN"
         elif self._state == "OPEN":
             raise CircuitBreakerError(...)
-    
+
     def _handle_success(self) -> None:
         """Common logic for successful calls"""
         if self._state == "HALF_OPEN":
             self._state = "CLOSED"
             self._failure_count = 0
-    
+
     def _handle_failure(self, exception: Exception) -> None:
         """Common logic for failed calls"""
         self._failure_count += 1
         if self._failure_count >= self.failure_threshold:
             self._state = "OPEN"
             self._last_failure_time = time.time()
-    
+
     def call(self, func, *args, **kwargs):
         self._check_circuit_state()
         try:
@@ -131,7 +136,7 @@ class CircuitBreaker:
         except self.expected_exception as e:
             self._handle_failure(e)
             raise
-    
+
     async def call_async(self, func, *args, **kwargs):
         self._check_circuit_state()
         try:
@@ -144,6 +149,7 @@ class CircuitBreaker:
 ```
 
 **Benefits**:
+
 - Eliminates duplicated state management logic
 - Easier to add new circuit breaker features
 - Consistent behavior between sync and async paths
@@ -155,12 +161,14 @@ class CircuitBreaker:
 **Scope**: Add type hints to all public functions and methods
 
 **Priority Areas**:
+
 1. `graph/nodes.py` - All node functions
 2. `modules/memory/` - Memory manager and vector store
 3. `modules/speech/` - STT and TTS modules
 4. `graph/utils/` - Helper functions and chains
 
 **Type Hint Standards**:
+
 ```python
 from typing import Optional, List, Dict, Any
 from langchain_core.messages import BaseMessage
@@ -185,6 +193,7 @@ def get_relevant_memories(self, context: str) -> List[str]:
 **Solution**: Use factory functions or dependency injection
 
 **Design**:
+
 ```python
 # Before (global instances)
 speech_to_text = SpeechToText()
@@ -205,6 +214,7 @@ async def on_chat_start():
 ```
 
 **Benefits**:
+
 - Better testability (can inject mocks)
 - Clearer lifecycle management
 - Reduced global state
@@ -216,12 +226,14 @@ async def on_chat_start():
 **Current State**: Basic Pydantic validation exists but could be more comprehensive
 
 **Enhancements**:
+
 1. Add validators for configuration value ranges
 2. Add cross-field validation (e.g., ensure database URL is set when database type is PostgreSQL)
 3. Add startup validation that tests connectivity to external services
 4. Provide detailed error messages with remediation steps
 
 **Design**:
+
 ```python
 class Settings(BaseSettings):
     @field_validator("MEMORY_TOP_K")
@@ -230,7 +242,7 @@ class Settings(BaseSettings):
         if v < 1 or v > 20:
             raise ValueError("MEMORY_TOP_K must be between 1 and 20")
         return v
-    
+
     @model_validator(mode='after')
     def validate_database_config(self) -> 'Settings':
         if self.FEATURE_DATABASE_TYPE == "postgresql" and not self.DATABASE_URL:
@@ -246,11 +258,13 @@ class Settings(BaseSettings):
 ### Test Fixtures
 
 **Audio Test Samples**:
+
 - `test_audio_wav.wav` - Valid WAV format audio
 - `test_audio_mp3.mp3` - Valid MP3 format audio
 - `test_audio_invalid.bin` - Invalid audio data for error testing
 
 **Mock API Responses**:
+
 - `mock_groq_transcription.json` - Groq STT response
 - `mock_elevenlabs_audio.mp3` - ElevenLabs TTS response
 - `mock_qdrant_search.json` - Qdrant search results
@@ -258,6 +272,7 @@ class Settings(BaseSettings):
 ### Type Definitions
 
 **Common Types**:
+
 ```python
 from typing import TypedDict, Literal
 
@@ -281,6 +296,7 @@ class MemorySearchResult(TypedDict):
 ### Error Logging Standards
 
 All error handlers should log:
+
 - Error type and message
 - Service name (for API errors)
 - Function name where error occurred
@@ -299,16 +315,19 @@ All error handlers should log:
 ### Unit Testing Approach
 
 **Test Organization**:
+
 - One test file per module
 - Group related tests using test classes
 - Use descriptive test names: `test_<function>_<scenario>_<expected_outcome>`
 
 **Test Coverage Goals**:
+
 - Core modules: >80% coverage
 - Utility modules: >70% coverage
 - Interface modules: >60% coverage (integration tests cover the rest)
 
 **Mocking Strategy**:
+
 - Mock external API calls (Groq, ElevenLabs, Qdrant)
 - Use `pytest-mock` for function mocking
 - Create reusable fixtures for common mocks
@@ -316,12 +335,14 @@ All error handlers should log:
 ### Integration Testing Approach
 
 **Workflow Integration Tests**:
+
 - Test complete conversation flows
 - Test memory extraction and retrieval
 - Test error handling and fallback behavior
 - Use real LangGraph execution with mocked external services
 
 **Test Scenarios**:
+
 1. Happy path: User message → Memory extraction → Router → Response
 2. Audio workflow: Audio input → STT → Processing → TTS → Audio output
 3. Error scenarios: API failures, circuit breaker activation, timeout handling
@@ -330,6 +351,7 @@ All error handlers should log:
 ### Test Fixtures and Utilities
 
 **Pytest Fixtures**:
+
 ```python
 @pytest.fixture
 def mock_groq_client():
@@ -355,6 +377,7 @@ def sample_audio_data():
 ### Performance Testing
 
 **Benchmarks**:
+
 - Memory extraction: <500ms per message
 - Memory retrieval: <200ms for top-K search
 - STT transcription: <2s for 10s audio
@@ -364,23 +387,27 @@ def sample_audio_data():
 ## Implementation Phases
 
 ### Phase 1: Test Infrastructure (Foundation)
+
 - Set up test directory structure
 - Create test fixtures and mocks
 - Implement unit tests for Memory Manager
 - Implement unit tests for Speech modules
 
 ### Phase 2: Code Quality Improvements (Refactoring)
+
 - Refactor error handlers to eliminate duplication
 - Refactor circuit breakers to extract common logic
 - Add type hints to all modules
 - Run mypy validation
 
 ### Phase 3: Module Initialization (Architecture)
+
 - Refactor Chainlit interface to use factory pattern
 - Update graph utilities to support dependency injection
 - Document module lifecycle patterns
 
 ### Phase 4: Configuration and Documentation (Polish)
+
 - Enhance configuration validation
 - Add comprehensive docstrings
 - Update architecture documentation
@@ -389,6 +416,7 @@ def sample_audio_data():
 ## Dependencies
 
 **New Test Dependencies**:
+
 - `pytest-asyncio` - For async test support
 - `pytest-mock` - For mocking utilities
 - `pytest-cov` - For coverage reporting
@@ -399,11 +427,13 @@ def sample_audio_data():
 ## Performance Considerations
 
 **Test Execution Time**:
+
 - Unit tests should run in <30 seconds
 - Integration tests should run in <2 minutes
 - Use parallel test execution with `pytest-xdist`
 
 **Memory Usage**:
+
 - Mock external services to avoid memory overhead
 - Clean up test fixtures after each test
 - Use `pytest --memray` to identify memory leaks
@@ -411,17 +441,20 @@ def sample_audio_data():
 ## Security Considerations
 
 **Test Data**:
+
 - Never commit real API keys to test files
 - Use environment variables or test-specific keys
 - Sanitize any logged data in tests
 
 **Error Messages**:
+
 - Ensure error messages don't expose sensitive configuration
 - Validate that stack traces don't leak credentials
 
 ## Rollout Strategy
 
 **Incremental Rollout**:
+
 1. Implement and merge test infrastructure (no production impact)
 2. Refactor error handlers with comprehensive tests (low risk)
 3. Add type hints and validate with mypy (no runtime impact)
@@ -429,6 +462,7 @@ def sample_audio_data():
 5. Deploy all changes together after full test suite passes
 
 **Rollback Plan**:
+
 - All changes are backward compatible
 - Can revert individual commits if issues arise
 - Test suite provides confidence in changes
@@ -436,17 +470,20 @@ def sample_audio_data():
 ## Success Metrics
 
 **Code Quality Metrics**:
+
 - Test coverage: >70% overall, >80% for core modules
 - Type coverage: 100% of public functions
 - Code duplication: <5% (measured by tools like `radon`)
 - Mypy errors: 0
 
 **Developer Experience Metrics**:
+
 - Time to understand new code: Reduced by 30% (subjective survey)
 - Time to add new features: Reduced by 20% (measured by story points)
 - Bug fix time: Reduced by 25% (measured by issue resolution time)
 
 **Operational Metrics**:
+
 - No increase in error rates after deployment
 - No performance degradation (response times within 5% of baseline)
 - Successful deployment with zero rollbacks

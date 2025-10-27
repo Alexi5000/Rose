@@ -1,0 +1,398 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  pr-validation:
+    name: Validate Pull Request
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Validate PR title follows conventional commits format
+      - name: Validate PR title format
+        id: validate-title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Validating PR title: $PR_TITLE"
+          
+          # Conventional commit pattern: type(scope): description
+          # Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert
+          PATTERN="^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?: .+"
+          
+          if echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "✅ PR title follows conventional commits format"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ PR title does not follow conventional commits format"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "Expected format: type(scope): description"
+            echo "Examples:"
+            echo "  - feat: add user authentication"
+            echo "  - fix(api): resolve memory leak in session handler"
+            echo "  - docs: update deployment guide"
+            echo "  - refactor(memory): simplify vector store interface"
+            exit 1
+          fi
+      
+      # Check required files exist
+      - name: Check required files
+        id: check-files
+        run: |
+          echo "Checking for required files..."
+          MISSING_FILES=()
+          
+          if [ ! -f "README.md" ]; then
+            MISSING_FILES+=("README.md")
+          fi
+          
+          if [ ! -f "pyproject.toml" ]; then
+            MISSING_FILES+=("pyproject.toml")
+          fi
+          
+          if [ ! -f ".env.example" ]; then
+            MISSING_FILES+=(".env.example")
+          fi
+          
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All required files present"
+            echo "missing=" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Missing required files: ${MISSING_FILES[*]}"
+            echo "missing=${MISSING_FILES[*]}" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      # Detect large files (>1MB)
+      - name: Detect large files
+        id: large-files
+        run: |
+          echo "Scanning for large files (>1MB)..."
+          
+          # Find files larger than 1MB in the PR
+          LARGE_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | \
+            xargs -I {} sh -c 'if [ -f "{}" ]; then stat -f%z "{}" 2>/dev/null || stat -c%s "{}"; fi' | \
+            awk '{if ($1 > 1048576) print $0}' || true)
+          
+          if [ -z "$LARGE_FILES" ]; then
+            echo "✅ No large files detected"
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Large files detected (>1MB):"
+            git diff --name-only origin/${{ github.base_ref }}...HEAD | while read file; do
+              if [ -f "$file" ]; then
+                SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file")
+                if [ "$SIZE" -gt 1048576 ]; then
+                  SIZE_MB=$(echo "scale=2; $SIZE / 1048576" | bc)
+                  echo "  - $file (${SIZE_MB}MB)"
+                fi
+              fi
+            done
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo ""
+            echo "⚠️  Warning: Large files should be reviewed. Consider:"
+            echo "  - Using Git LFS for binary files"
+            echo "  - Compressing images/assets"
+            echo "  - Storing large files externally"
+          fi
+        continue-on-error: true
+      
+      # Secret scanning check
+      - name: Scan for secrets
+        id: secret-scan
+        run: |
+          echo "Scanning for potential secrets..."
+          
+          # Common secret patterns
+          PATTERNS=(
+            "api[_-]?key"
+            "api[_-]?secret"
+            "access[_-]?token"
+            "auth[_-]?token"
+            "password"
+            "passwd"
+            "pwd"
+            "secret"
+            "private[_-]?key"
+            "aws[_-]?access"
+            "aws[_-]?secret"
+            "bearer"
+            "token"
+            "credentials"
+          )
+          
+          FOUND_SECRETS=false
+          
+          # Check changed files for potential secrets
+          for pattern in "${PATTERNS[@]}"; do
+            MATCHES=$(git diff origin/${{ github.base_ref }}...HEAD | grep -iE "^\+.*$pattern.*=.*['\"]?[a-zA-Z0-9_-]{20,}" || true)
+            if [ ! -z "$MATCHES" ]; then
+              echo "⚠️  Potential secret found matching pattern: $pattern"
+              FOUND_SECRETS=true
+            fi
+          done
+          
+          # Check for common secret formats
+          SECRET_FORMATS=$(git diff origin/${{ github.base_ref }}...HEAD | grep -E "^\+.*(sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36})" || true)
+          if [ ! -z "$SECRET_FORMATS" ]; then
+            echo "⚠️  Potential API key or token detected"
+            FOUND_SECRETS=true
+          fi
+          
+          if [ "$FOUND_SECRETS" = true ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo ""
+            echo "⚠️  Warning: Potential secrets detected in PR"
+            echo "Please verify that no actual secrets are committed."
+            echo "Use environment variables or GitHub Secrets instead."
+          else
+            echo "✅ No obvious secrets detected"
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+      
+      # Check for merge conflicts
+      - name: Check for merge conflicts
+        id: merge-conflicts
+        run: |
+          echo "Checking for merge conflict markers..."
+          
+          CONFLICTS=$(git diff origin/${{ github.base_ref }}...HEAD | grep -E "^(\+.*<<<<<<<|^.*=======|^.*>>>>>>>)" || true)
+          
+          if [ ! -z "$CONFLICTS" ]; then
+            echo "❌ Merge conflict markers detected"
+            echo "found=true" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ No merge conflicts detected"
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+      
+      # Validate branch naming convention
+      - name: Validate branch name
+        id: validate-branch
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Validating branch name: $BRANCH_NAME"
+          
+          # Expected patterns: feature/*, fix/*, hotfix/*, chore/*, docs/*, refactor/*
+          PATTERN="^(feature|fix|hotfix|chore|docs|refactor|test|ci)/.+"
+          
+          if echo "$BRANCH_NAME" | grep -qE "$PATTERN"; then
+            echo "✅ Branch name follows convention"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Branch name does not follow convention"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "Recommended format: type/description"
+            echo "Examples:"
+            echo "  - feature/user-authentication"
+            echo "  - fix/memory-leak"
+            echo "  - hotfix/critical-bug"
+            echo "  - docs/api-documentation"
+          fi
+        continue-on-error: true
+      
+      # Generate workflow summary
+      - name: Generate workflow summary
+        if: always()
+        run: |
+          echo "# PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull Request:** #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # PR Title
+          if [ "${{ steps.validate-title.outputs.valid }}" = "true" ]; then
+            echo "✅ **PR Title Format:** Valid conventional commit format" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **PR Title Format:** Invalid - must follow conventional commits" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Required Files
+          if [ -z "${{ steps.check-files.outputs.missing }}" ]; then
+            echo "✅ **Required Files:** All present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Required Files:** Missing - ${{ steps.check-files.outputs.missing }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Large Files
+          if [ "${{ steps.large-files.outputs.found }}" = "true" ]; then
+            echo "⚠️  **Large Files:** Detected (>1MB) - please review" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Large Files:** None detected" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Secrets
+          if [ "${{ steps.secret-scan.outputs.found }}" = "true" ]; then
+            echo "⚠️  **Secret Scan:** Potential secrets detected - please verify" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Secret Scan:** No obvious secrets detected" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Merge Conflicts
+          if [ "${{ steps.merge-conflicts.outputs.found }}" = "true" ]; then
+            echo "❌ **Merge Conflicts:** Conflict markers detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Merge Conflicts:** None detected" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Branch Name
+          if [ "${{ steps.validate-branch.outputs.valid }}" = "true" ]; then
+            echo "✅ **Branch Name:** Follows convention" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  **Branch Name:** Does not follow convention (recommended)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Guidelines" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Conventional Commits" >> $GITHUB_STEP_SUMMARY
+          echo "PR titles should follow the format: \`type(scope): description\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Types:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`feat\`: New feature" >> $GITHUB_STEP_SUMMARY
+          echo "- \`fix\`: Bug fix" >> $GITHUB_STEP_SUMMARY
+          echo "- \`docs\`: Documentation changes" >> $GITHUB_STEP_SUMMARY
+          echo "- \`style\`: Code style changes (formatting, etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`refactor\`: Code refactoring" >> $GITHUB_STEP_SUMMARY
+          echo "- \`perf\`: Performance improvements" >> $GITHUB_STEP_SUMMARY
+          echo "- \`test\`: Test changes" >> $GITHUB_STEP_SUMMARY
+          echo "- \`chore\`: Maintenance tasks" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ci\`: CI/CD changes" >> $GITHUB_STEP_SUMMARY
+          echo "- \`build\`: Build system changes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Branch Naming" >> $GITHUB_STEP_SUMMARY
+          echo "Branches should follow: \`type/description\`" >> $GITHUB_STEP_SUMMARY
+          echo "Examples: \`feature/user-auth\`, \`fix/memory-leak\`, \`docs/api-guide\`" >> $GITHUB_STEP_SUMMARY
+      
+      # Comment on PR with validation results
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const titleValid = '${{ steps.validate-title.outputs.valid }}' === 'true';
+            const missingFiles = '${{ steps.check-files.outputs.missing }}';
+            const largeFiles = '${{ steps.large-files.outputs.found }}' === 'true';
+            const secretsFound = '${{ steps.secret-scan.outputs.found }}' === 'true';
+            const mergeConflicts = '${{ steps.merge-conflicts.outputs.found }}' === 'true';
+            const branchValid = '${{ steps.validate-branch.outputs.valid }}' === 'true';
+            
+            let body = '## 🤖 PR Validation Results\n\n';
+            
+            // Critical issues
+            const criticalIssues = [];
+            if (!titleValid) criticalIssues.push('❌ PR title must follow conventional commits format');
+            if (missingFiles) criticalIssues.push(`❌ Missing required files: ${missingFiles}`);
+            if (mergeConflicts) criticalIssues.push('❌ Merge conflict markers detected');
+            
+            if (criticalIssues.length > 0) {
+              body += '### ❌ Critical Issues\n\n';
+              criticalIssues.forEach(issue => body += `${issue}\n`);
+              body += '\n';
+            }
+            
+            // Warnings
+            const warnings = [];
+            if (largeFiles) warnings.push('⚠️  Large files detected (>1MB)');
+            if (secretsFound) warnings.push('⚠️  Potential secrets detected - please verify');
+            if (!branchValid) warnings.push('⚠️  Branch name does not follow convention');
+            
+            if (warnings.length > 0) {
+              body += '### ⚠️  Warnings\n\n';
+              warnings.forEach(warning => body += `${warning}\n`);
+              body += '\n';
+            }
+            
+            // Success items
+            const successes = [];
+            if (titleValid) successes.push('✅ PR title format');
+            if (!missingFiles) successes.push('✅ Required files');
+            if (!largeFiles) successes.push('✅ No large files');
+            if (!secretsFound) successes.push('✅ No secrets detected');
+            if (!mergeConflicts) successes.push('✅ No merge conflicts');
+            if (branchValid) successes.push('✅ Branch naming');
+            
+            if (successes.length > 0) {
+              body += '### ✅ Passed Checks\n\n';
+              successes.forEach(success => body += `${success}\n`);
+              body += '\n';
+            }
+            
+            // Guidelines
+            if (!titleValid || !branchValid) {
+              body += '### 📖 Guidelines\n\n';
+              
+              if (!titleValid) {
+                body += '**Conventional Commits Format:**\n';
+                body += '```\n';
+                body += 'type(scope): description\n';
+                body += '```\n';
+                body += 'Examples:\n';
+                body += '- `feat: add user authentication`\n';
+                body += '- `fix(api): resolve memory leak`\n';
+                body += '- `docs: update deployment guide`\n\n';
+              }
+              
+              if (!branchValid) {
+                body += '**Branch Naming Convention:**\n';
+                body += '```\n';
+                body += 'type/description\n';
+                body += '```\n';
+                body += 'Examples:\n';
+                body += '- `feature/user-authentication`\n';
+                body += '- `fix/memory-leak`\n';
+                body += '- `docs/api-documentation`\n\n';
+              }
+            }
+            
+            body += '---\n';
+            body += '*This comment is automatically generated by the PR validation workflow.*';
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('PR Validation Results')
+            );
+            
+            // Update or create comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

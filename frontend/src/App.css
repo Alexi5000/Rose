@@ -1,3 +1,5 @@
+/* Keyboard Navigation Accessibility Styles */
+
 /* Skip link for keyboard navigation accessibility */
 .skip-link {
   position: absolute;
@@ -14,6 +16,35 @@
 
 .skip-link:focus {
   top: 0;
+}
+
+/* Enhanced focus indicators for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid rgba(77, 159, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Ensure buttons have visible focus states */
+button:focus-visible {
+  outline: 2px solid rgba(77, 159, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Range inputs focus state */
+input[type="range"]:focus-visible {
+  outline: 2px solid rgba(77, 159, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Checkbox focus state */
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(77, 159, 255, 0.7);
+  outline-offset: 2px;
 }
 
 .app {

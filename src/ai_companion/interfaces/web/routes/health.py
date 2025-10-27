@@ -85,6 +85,7 @@ async def health_check(request: Request) -> HealthCheckResponse:
     Raises:
         HTTPException 429: Rate limit exceeded (60 requests/minute)
     """
+    logger.info("🏥 Health check requested")
     services = {}
 
     # Check Groq API connectivity
@@ -94,8 +95,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
         client = Groq(api_key=settings.GROQ_API_KEY)
         # Simple check - if we can create client, API key is valid
         services["groq"] = "connected"
+        logger.debug("✅ Groq API connected")
     except Exception as e:
-        logger.error("groq_health_check_failed", error=str(e))
+        logger.error("❌ Groq health check failed", error=str(e))
         services["groq"] = "disconnected"
 
     # Check Qdrant connectivity
@@ -110,8 +112,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
         # Try to list collections as a connectivity test
         client.get_collections()
         services["qdrant"] = "connected"
+        logger.debug("✅ Qdrant connected")
     except Exception as e:
-        logger.error("qdrant_health_check_failed", error=str(e))
+        logger.error("❌ Qdrant health check failed", error=str(e))
         services["qdrant"] = "disconnected"
 
     # Check ElevenLabs connectivity
@@ -120,8 +123,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
 
         client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
         services["elevenlabs"] = "connected"
+        logger.debug("✅ ElevenLabs connected")
     except Exception as e:
-        logger.error("elevenlabs_health_check_failed", error=str(e))
+        logger.error("❌ ElevenLabs health check failed", error=str(e))
         services["elevenlabs"] = "disconnected"
 
     # Check SQLite database connectivity
@@ -139,13 +143,17 @@ async def health_check(request: Request) -> HealthCheckResponse:
         conn.close()
 
         services["sqlite"] = "connected"
+        logger.debug("✅ SQLite connected")
     except Exception as e:
-        logger.error("sqlite_health_check_failed", error=str(e))
+        logger.error("❌ SQLite health check failed", error=str(e))
         services["sqlite"] = "disconnected"
 
     # Overall status
     status = "healthy" if all(s == "connected" for s in services.values()) else "degraded"
 
-    logger.info("health_check_complete", status=status, services=services)
+    if status == "healthy":
+        logger.info("✅ Health check complete - all services healthy", status=status, services=services)
+    else:
+        logger.warning("⚠️ Health check complete - degraded status", status=status, services=services)
 
     return HealthCheckResponse(status=status, version="1.0.0", services=services)
