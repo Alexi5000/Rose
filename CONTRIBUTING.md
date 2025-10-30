@@ -40,9 +40,18 @@ Thank you for your interest in contributing to Rose! This document provides guid
    ```bash
    cp .env.example .env
    # Edit .env with your API keys
+   
+   # Also configure frontend environment
+   cp frontend/.env.example frontend/.env
    ```
 
-4. **Run tests to verify setup**
+4. **Start development servers**
+   ```bash
+   # Start both frontend and backend with hot reload
+   python scripts/run_dev_server.py
+   ```
+
+5. **Run tests to verify setup**
    ```bash
    uv run pytest
    ```

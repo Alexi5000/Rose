@@ -65,8 +65,9 @@ COPY --from=python-builder /app/.venv /app/.venv
 COPY --from=python-builder /app/src /app/src
 COPY --from=python-builder /app/pyproject.toml /app/README.md /app/
 
-# Copy frontend build from frontend-builder stage
-COPY --from=frontend-builder /frontend/dist /app/frontend/build
+# Copy frontend build from frontend-builder stage to correct location
+# Vite outputs to /frontend/dist, we copy to the path expected by FastAPI
+COPY --from=frontend-builder /frontend/dist /app/src/ai_companion/interfaces/web/static
 
 # Create data directories for memory databases and backups
 RUN mkdir -p /app/data /app/data/backups

@@ -2,7 +2,7 @@
 
 First thing first, clone the repository.
 
-```
+```bash
 git clone https://github.com/neural-maze/ava-whatsapp-agent-course.git
 cd ava-whatsapp-agent-course
 ```
@@ -11,27 +11,29 @@ cd ava-whatsapp-agent-course
 
 Instead of `pip` or `poetry`, we are using `uv` as the Python package manager. 
 
-To install uv, simply follow this [instructions](https://docs.astral.sh/uv/getting-started/installation/). 
+To install uv, simply follow these [instructions](https://docs.astral.sh/uv/getting-started/installation/). 
 
 # 3. Install the project dependencies
 
-Once uv is intalled, you can install the project dependencies. First of all, let's create a virtual environment.
+Once uv is installed, you can install the project dependencies:
 
 ```bash
-uv venv .venv
-# macOS / Linux
-. .venv/bin/activate # or source .venv/bin/activate
-# Windows
-. .\.venv\Scripts\Activate.ps1 # or .\.venv\Scripts\activate
-uv pip install -e .
+# Install Python dependencies
+uv sync
+
+# Install frontend dependencies
+cd frontend
+npm install
+cd ..
 ```
+
 Just to make sure that everything is working, simply run the following command:
 
 ```bash
- uv run python --version
+uv run python --version
 ```
 
-The Python version should be `Python 3.12.8`.
+The Python version should be `Python 3.12.8` or higher.
 
 
 # 4. Environment Variables
@@ -107,27 +109,67 @@ Copy both values and paste them into your own `.env` file.
 
 # 5. First run
 
-Once you have everything set up, it's time to run the project locally. This is the best way to check that everything is working before starting the course.
+Once you have everything set up, it's time to run the project locally. This is the best way to check that everything is working.
 
-To run the project locally, we have created a [Makefile](../Makefile). Use the command `ava-run` to start the project.
+## Running Rose (Voice-First Web Interface)
+
+Rose now uses a modern voice-first web interface instead of Chainlit. To start the application:
+
+### Development Mode (Recommended)
+
+Start both frontend and backend with hot reload:
+
+```bash
+python scripts/run_dev_server.py
+```
+
+This starts:
+- 🎨 **Frontend**: http://localhost:3000 (Vite dev server with hot reload)
+- 🔌 **Backend**: http://localhost:8000 (FastAPI with auto-reload)
+- 📚 **API Docs**: http://localhost:8000/api/v1/docs (Swagger UI)
+
+Open http://localhost:3000 in your browser to interact with Rose through the voice interface.
+
+### Production Mode
+
+Build and serve the production version:
+
+```bash
+python scripts/build_and_serve.py
+```
+
+This builds the frontend and serves it at http://localhost:8000
+
+## Using the Voice Interface
+
+1. Click and hold the voice button to start recording
+2. Speak your message while holding the button
+3. Release to send your message to Rose
+4. Rose will respond with both text and audio
+
+## Alternative: Docker Compose (Legacy)
+
+If you prefer to use Docker Compose with the Chainlit interface (legacy):
 
 ```bash
 make ava-run
 ```
 
-This command will start a Docker Compose application with three services:
-
+This starts:
 * A Qdrant Database (http://localhost:6333/dashboard)
 * A Chainlit interface (http://localhost:8000)
-* A FastAPI application (http://localhost:8080/docs)
+* A FastAPI application (http://localhost:8000/api/v1/docs)
 
-The FastAPI application is necessary for the WhatsApp integration, but that's something we will cover in Lesson 6. So, for now,
-you can ignore it. Simply click the link to the Chainlit interface to start interacting with Ava.
+> **Note**: The Docker Compose setup uses the older Chainlit interface. For the modern voice-first experience, use the development server method above.
 
-You should see something like this:
+To clean up the Docker Compose application:
 
-![Ava Chainlit](img/ava_chainlit.png)
+```bash
+make ava-delete
+```
 
-Now that we have verified that everything is working, it's time to move on to the [Course Syllabus](../README.md) and start the first lesson!
+For more information, check the [Makefile](../Makefile).
 
-> If you want to clean up the docker compose application and all the related local folders, you can run `make ava-delete`. For more info, check the [Makefile](../Makefile).
+## Troubleshooting
+
+If you encounter issues, see [DEVELOPMENT.md](../DEVELOPMENT.md) for detailed troubleshooting steps.

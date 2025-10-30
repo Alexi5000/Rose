@@ -51,6 +51,46 @@ REM Run voice tests
 scripts\run_tests.bat voice
 ```
 
+## Development Scripts
+
+### run_dev_server.py
+Starts both the frontend Vite dev server and backend FastAPI server for local development with hot reload.
+
+**Usage:**
+```bash
+python scripts/run_dev_server.py
+```
+
+**What it does:**
+- 🔌 Starts FastAPI backend on http://localhost:8000 with auto-reload
+- 🎨 Starts Vite frontend dev server on http://localhost:3000 with hot reload
+- 📚 Provides API documentation at http://localhost:8000/api/v1/docs
+- Handles graceful shutdown with Ctrl+C
+
+**Requirements:**
+- Python dependencies installed (`uv sync`)
+- Frontend dependencies installed (`cd frontend && npm install`)
+- Environment variables configured (`.env` and `frontend/.env`)
+
+### build_and_serve.py
+Builds the frontend for production and starts the FastAPI server to serve both static files and API.
+
+**Usage:**
+```bash
+python scripts/build_and_serve.py
+```
+
+**What it does:**
+- 🎨 Builds frontend with production optimizations (minification, tree-shaking)
+- 📦 Outputs to `src/ai_companion/interfaces/web/static/`
+- 🚀 Starts FastAPI server on http://localhost:8000
+- Serves both the compiled frontend and API endpoints
+
+**Use Cases:**
+- Testing production build locally before deployment
+- Verifying build output and static file serving
+- Performance testing with optimized assets
+
 ## Utility Scripts
 
 ### fix-secret.sh

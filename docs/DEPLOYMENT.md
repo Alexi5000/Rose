@@ -206,10 +206,10 @@ Fly.io offers global deployment with edge computing capabilities.
      dockerfile = "Dockerfile"
 
    [env]
-     PORT = "8080"
+     PORT = "8000"
 
    [[services]]
-     internal_port = 8080
+     internal_port = 8000
      protocol = "tcp"
 
      [[services.ports]]
@@ -259,6 +259,71 @@ Fly.io offers global deployment with edge computing capabilities.
 
 ---
 
+## Production Build Process
+
+### Understanding the Build
+
+The application uses a multi-stage build process:
+
+1. **Frontend Build** (Vite)
+   - Compiles React/TypeScript to optimized JavaScript
+   - Outputs to `src/ai_companion/interfaces/web/static/`
+   - Includes all CSS, 3D assets, and audio files
+   - Build command: `npm run build` (in frontend directory)
+
+2. **Backend Setup** (FastAPI)
+   - Serves the compiled frontend as static files
+   - Provides REST API endpoints at `/api/v1/`
+   - Handles voice processing and session management
+
+### Build Configuration
+
+The frontend build path is configured in `frontend/vite.config.ts`:
+
+```typescript
+build: {
+  outDir: '../src/ai_companion/interfaces/web/static',
+  emptyOutDir: true,
+}
+```
+
+This ensures the frontend builds directly into the location where FastAPI expects to find it.
+
+### Local Production Testing
+
+Before deploying, test the production build locally:
+
+```bash
+# Build and serve production version
+python scripts/build_and_serve.py
+```
+
+This will:
+1. 🎨 Build the frontend with production optimizations
+2. 🚀 Start FastAPI server serving both static files and API
+3. Serve the application at http://localhost:8000
+
+### Troubleshooting Build Issues
+
+**Frontend Build Fails**:
+- Ensure Node.js 18+ is installed
+- Run `npm install` in frontend directory
+- Check for TypeScript errors: `npm run type-check`
+- Verify all environment variables are set in `frontend/.env`
+
+**Static Files Not Loading**:
+- Verify build output exists at `src/ai_companion/interfaces/web/static/`
+- Check that `index.html` and `assets/` directory are present
+- Ensure FastAPI is configured to serve from correct path
+- Check browser console for 404 errors
+
+**API Connection Issues**:
+- Verify `VITE_API_BASE_URL` is set correctly in frontend `.env`
+- For production, this should be `/api/v1` (relative path)
+- For development, this should be `http://localhost:8000/api/v1`
+
+---
+
 ## Environment Variables
 
 ### Required Variables
@@ -279,9 +344,23 @@ These variables **must** be set for the application to function:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ROSE_VOICE_ID` | Override voice ID specifically for Rose | Uses `ELEVENLABS_VOICE_ID` |
-| `PORT` | Server port (auto-set by platforms) | `8080` |
+| `PORT` | Server port (auto-set by platforms) | `8000` |
 | `HOST` | Server host | `0.0.0.0` |
 | `SHORT_TERM_MEMORY_DB_PATH` | Path to SQLite memory database | `/app/data/memory.db` |
+
+### Frontend Environment Variables
+
+The frontend requires configuration during the build process. These are set in `frontend/.env`:
+
+| Variable | Description | Development | Production |
+|----------|-------------|-------------|------------|
+| `VITE_API_BASE_URL` | API endpoint base URL | `http://localhost:8000/api/v1` | `/api/v1` |
+
+**Important Notes**:
+- Frontend environment variables are **baked into the build** at compile time
+- For production deployments, use relative paths (e.g., `/api/v1`) to avoid CORS issues
+- Changes to frontend `.env` require rebuilding the frontend
+- Most deployment platforms handle this automatically during the build process
 
 ### Frozen Features (Not Required)
 
@@ -378,7 +457,7 @@ npm run build
 
 ```bash
 # Test health endpoint locally
-curl http://localhost:8080/api/health
+curl http://localhost:8000/api/v1/health
 ```
 
 #### Memory Database Errors
@@ -436,15 +515,51 @@ railway logs
 fly logs
 ```
 
+### Frontend-Backend Integration Issues
+
+#### "Cannot connect to Rose" Error
+
+**Symptom**: Frontend displays connection error on startup
+
+**Solutions**:
+1. Verify backend is running and accessible
+2. Check `VITE_API_BASE_URL` environment variable
+3. Ensure CORS is configured correctly for your domain
+4. Test health endpoint: `curl https://your-app.com/api/v1/health`
+5. Check browser console for specific error messages
+
+#### Static Assets Not Loading (404 Errors)
+
+**Symptom**: Blank page or missing styles/3D models
+
+**Solutions**:
+1. Verify frontend was built before deployment
+2. Check build output exists at `src/ai_companion/interfaces/web/static/`
+3. Ensure Dockerfile copies frontend build to correct location
+4. Verify FastAPI static file mount path matches build output
+5. Check platform build logs for frontend build errors
+
+#### Voice Processing Fails
+
+**Symptom**: Voice button doesn't work or returns errors
+
+**Solutions**:
+1. Verify Groq API key is set and valid
+2. Check ElevenLabs API key and voice ID
+3. Ensure microphone permissions are granted in browser
+4. Test with different audio formats (browser compatibility)
+5. Check backend logs for specific API errors
+
 ### Getting Help
 
 If you encounter issues not covered here:
 
 1. **Check Application Logs**: Most platforms provide log viewing
-2. **Test Locally**: Run with Docker to reproduce issues
+2. **Test Locally**: Run `python scripts/build_and_serve.py` to reproduce issues
 3. **Verify Environment**: Double-check all environment variables
 4. **API Status**: Check status pages for Groq, ElevenLabs, Qdrant
-5. **Community**: Open an issue on GitHub with logs and error details
+5. **Development Guide**: See [DEVELOPMENT.md](../DEVELOPMENT.md) for detailed troubleshooting
+6. **Community**: Open an issue on GitHub with logs and error details
 
 ---
 

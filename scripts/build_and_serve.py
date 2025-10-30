@@ -3,10 +3,29 @@
 📦 Production Build and Serve
 
 Builds the frontend and starts the FastAPI server in production mode.
+
+This script:
+- Verifies required dependencies (uv, npm) are installed
+- Builds the frontend for production (optimized bundle)
+- Verifies build output exists
+- Starts FastAPI server in production mode (no auto-reload)
+
+Usage:
+    python scripts/build_and_serve.py
+    OR
+    uv run python scripts/build_and_serve.py
+
+Requirements:
+    - uv (Python package manager)
+    - npm (Node.js package manager)
+    - Backend dependencies installed (uv sync)
+    - Frontend dependencies installed (cd frontend && npm install)
+
+Environment:
+    Reads configuration from src/ai_companion/config/server_config.py
 """
 import io
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -15,6 +34,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # Add project root to Python path for imports
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.utils import run_command_sync  # noqa: E402
 from src.ai_companion.config.server_config import (  # noqa: E402
     FRONTEND_BUILD_DIR,
     LOG_EMOJI_ERROR,
@@ -35,11 +55,14 @@ def check_dependencies() -> None:
     """Verify required commands are available before starting."""
     missing_deps = []
 
-    if not shutil.which("npm"):
+    # Check for npm - on Windows it might be npm.cmd or npm.ps1
+    npm_found = shutil.which("npm") or shutil.which("npm.cmd")
+    if not npm_found:
         missing_deps.append("npm (install Node.js from https://nodejs.org)")
 
-    if not shutil.which("uvicorn"):
-        missing_deps.append("uvicorn (run 'uv sync' to install)")
+    # Check for uv (required to run uvicorn)
+    if not shutil.which("uv"):
+        missing_deps.append("uv (install from https://docs.astral.sh/uv/)")
 
     if missing_deps:
         logger.error(f"{LOG_EMOJI_ERROR} missing_dependencies", dependencies=missing_deps)
@@ -55,6 +78,9 @@ def build_frontend() -> None:
     🎨 Build frontend for production
 
     Runs npm build in the frontend directory and verifies success.
+
+    Raises:
+        SystemExit: If build fails or output is not found
     """
     logger.info(f"{LOG_EMOJI_FRONTEND} building_frontend")
     print("🎨 Building frontend...")
@@ -67,7 +93,7 @@ def build_frontend() -> None:
         sys.exit(1)
 
     try:
-        build_result = subprocess.run(
+        build_result = run_command_sync(
             ["npm", "run", "build"],
             cwd=frontend_dir,
             capture_output=True,
@@ -98,6 +124,23 @@ def build_frontend() -> None:
         logger.info(f"{LOG_EMOJI_SUCCESS} frontend_build_complete", output_dir=str(FRONTEND_BUILD_DIR))
         print("✅ Frontend build complete!")
 
+    except FileNotFoundError as e:
+        logger.error(
+            f"{LOG_EMOJI_ERROR} npm_command_not_found",
+            command="npm",
+            error=str(e),
+            hint="Install Node.js from https://nodejs.org",
+        )
+        print("❌ npm command not found. Install Node.js from https://nodejs.org")
+        sys.exit(1)
+    except PermissionError as e:
+        logger.error(
+            f"{LOG_EMOJI_ERROR} build_permission_denied",
+            error=str(e),
+            hint="Check file permissions or run with appropriate privileges",
+        )
+        print(f"❌ Permission denied: {e}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"{LOG_EMOJI_ERROR} frontend_build_exception", error=str(e))
         print(f"❌ Build error: {e}")
@@ -109,6 +152,9 @@ def start_production_server() -> None:
     🚀 Start production server
 
     Starts uvicorn without reload flag, binding to all interfaces.
+
+    Raises:
+        SystemExit: If server fails to start
     """
     logger.info(
         f"{LOG_EMOJI_STARTUP} starting_production_server",
@@ -118,8 +164,11 @@ def start_production_server() -> None:
     print(f"🚀 Starting production server on http://{WEB_SERVER_HOST}:{WEB_SERVER_PORT}...")
 
     try:
-        subprocess.run(
+        # Use uv run to ensure proper environment
+        run_command_sync(
             [
+                "uv",
+                "run",
                 "uvicorn",
                 "src.ai_companion.interfaces.web.app:app",
                 "--host",
@@ -133,6 +182,23 @@ def start_production_server() -> None:
         logger.info(f"{LOG_EMOJI_SUCCESS} server_stopped_by_user")
         print("\n✅ Server stopped")
         sys.exit(0)
+    except FileNotFoundError as e:
+        logger.error(
+            f"{LOG_EMOJI_ERROR} uv_command_not_found",
+            command="uv",
+            error=str(e),
+            hint="Install uv from https://docs.astral.sh/uv/",
+        )
+        print("❌ uv command not found. Install from https://docs.astral.sh/uv/")
+        sys.exit(1)
+    except PermissionError as e:
+        logger.error(
+            f"{LOG_EMOJI_ERROR} server_permission_denied",
+            error=str(e),
+            hint="Check file permissions or run with appropriate privileges",
+        )
+        print(f"❌ Permission denied: {e}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"{LOG_EMOJI_ERROR} server_start_failed", error=str(e))
         print(f"❌ Server error: {e}")

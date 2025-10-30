@@ -17,7 +17,12 @@ Use for local development:
 ```bash
 cp config/dev.env .env
 # Edit .env with your API keys
-uv run uvicorn ai_companion.interfaces.web.app:app --reload
+
+# Start development servers (recommended)
+python scripts/run_dev_server.py
+
+# Or start backend only
+uv run uvicorn ai_companion.interfaces.web.app:app --reload --port 8000
 ```
 
 ### Staging (`staging.env`)

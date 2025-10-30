@@ -200,11 +200,14 @@ uv run python scripts/init_postgres_schema.py
 
 1. **Start the application**:
 ```bash
-# Chainlit interface
+# Voice-first web interface (recommended)
+python scripts/run_dev_server.py
+
+# Or Chainlit interface (legacy)
 uv run chainlit run src/ai_companion/interfaces/chainlit/app.py
 
-# Or voice API
-uv run fastapi dev src/ai_companion/interfaces/web/app.py
+# Or backend API only
+uv run uvicorn ai_companion.interfaces.web.app:app --reload --port 8000
 ```
 
 2. **Create a test session**:

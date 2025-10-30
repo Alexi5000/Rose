@@ -4,7 +4,7 @@ Quick reference guide for Rose the Healer Shaman API.
 
 ## Base URL
 
-- **Development**: `http://localhost:8080`
+- **Development**: `http://localhost:8000`
 - **Production**: `https://your-domain.com`
 
 ## API Version
@@ -149,22 +149,22 @@ All errors follow this format:
 
 ```bash
 # Start a session
-SESSION_ID=$(curl -X POST http://localhost:8080/api/v1/session/start | jq -r '.session_id')
+SESSION_ID=$(curl -X POST http://localhost:8000/api/v1/session/start | jq -r '.session_id')
 
 # Process voice input
-curl -X POST http://localhost:8080/api/v1/voice/process \
+curl -X POST http://localhost:8000/api/v1/voice/process \
   -F "audio=@recording.mp3" \
   -F "session_id=$SESSION_ID"
 
 # Check health
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8000/api/v1/health
 ```
 
 ### JavaScript (Fetch)
 
 ```javascript
 // Start a session
-const sessionResponse = await fetch('http://localhost:8080/api/v1/session/start', {
+const sessionResponse = await fetch('http://localhost:8000/api/v1/session/start', {
   method: 'POST'
 });
 const { session_id } = await sessionResponse.json();
@@ -174,7 +174,7 @@ const formData = new FormData();
 formData.append('audio', audioBlob, 'recording.webm');
 formData.append('session_id', session_id);
 
-const voiceResponse = await fetch('http://localhost:8080/api/v1/voice/process', {
+const voiceResponse = await fetch('http://localhost:8000/api/v1/voice/process', {
   method: 'POST',
   body: formData
 });
@@ -191,7 +191,7 @@ audio.play();
 import requests
 
 # Start a session
-response = requests.post('http://localhost:8080/api/v1/session/start')
+response = requests.post('http://localhost:8000/api/v1/session/start')
 session_id = response.json()['session_id']
 
 # Process voice input
@@ -199,7 +199,7 @@ with open('recording.mp3', 'rb') as audio_file:
     files = {'audio': audio_file}
     data = {'session_id': session_id}
     response = requests.post(
-        'http://localhost:8080/api/v1/voice/process',
+        'http://localhost:8000/api/v1/voice/process',
         files=files,
         data=data
     )

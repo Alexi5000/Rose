@@ -246,7 +246,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1
 COPY --from=python-builder /app/.venv /app/.venv
 COPY --from=python-builder /app/src /app/src
-COPY --from=frontend-builder /frontend/dist /app/frontend/build
+COPY --from=frontend-builder /frontend/dist /app/src/ai_companion/interfaces/web/static
 RUN mkdir -p /app/data /app/data/backups
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
