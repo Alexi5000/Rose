@@ -5,6 +5,8 @@
 Shared utilities for development and production scripts.
 Provides platform-aware subprocess execution and server health checking.
 """
+import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -12,7 +14,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from src.ai_companion.config.server_config import LOG_EMOJI_ERROR, LOG_EMOJI_SUCCESS
+from src.ai_companion.config.server_config import LOG_EMOJI_ERROR, LOG_EMOJI_SUCCESS, LOG_EMOJI_WARNING
 from src.ai_companion.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -214,4 +216,169 @@ def terminate_process_gracefully(
             process.wait()  # Wait for kill to complete
             logger.info(f"{LOG_EMOJI_SUCCESS} process_force_killed", name=name)
 
+        return False
+
+
+def check_command_exists(command: str) -> bool:
+    """
+    Check if a command exists in PATH.
+
+    Args:
+        command: Command name to check (e.g., 'npm', 'docker', 'uv')
+
+    Returns:
+        bool: True if command is found, False otherwise
+
+    Example:
+        >>> if check_command_exists("npm"):
+        ...     print("npm is installed")
+        ... else:
+        ...     print("npm not found")
+    """
+    # On Windows, check for .cmd and .ps1 variants
+    if sys.platform == "win32":
+        found = shutil.which(command) or shutil.which(f"{command}.cmd") or shutil.which(f"{command}.ps1")
+    else:
+        found = shutil.which(command)
+
+    if found:
+        logger.info(f"{LOG_EMOJI_SUCCESS} command_found", command=command, path=found)
+        return True
+
+    logger.warning(f"{LOG_EMOJI_WARNING} command_not_found", command=command)
+    return False
+
+
+def check_port_available(port: int, host: str = "localhost") -> bool:
+    """
+    Check if a port is available for binding.
+
+    Args:
+        port: Port number to check
+        host: Host address to check (default: localhost)
+
+    Returns:
+        bool: True if port is available, False if in use
+
+    Example:
+        >>> if check_port_available(8000):
+        ...     print("Port 8000 is available")
+        ... else:
+        ...     print("Port 8000 is in use")
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            result = sock.connect_ex((host, port))
+            if result == 0:
+                # Port is in use
+                logger.warning(f"{LOG_EMOJI_WARNING} port_in_use", port=port, host=host)
+                return False
+            # Port is available
+            logger.info(f"{LOG_EMOJI_SUCCESS} port_available", port=port, host=host)
+            return True
+    except socket.error as e:
+        logger.error(f"{LOG_EMOJI_ERROR} port_check_failed", port=port, host=host, error=str(e))
+        return False
+
+
+def check_url_accessible(url: str, timeout: int = 5) -> bool:
+    """
+    Check if a URL is accessible.
+
+    Args:
+        url: URL to check (e.g., http://localhost:6333)
+        timeout: Request timeout in seconds
+
+    Returns:
+        bool: True if URL is accessible, False otherwise
+
+    Example:
+        >>> if check_url_accessible("http://localhost:6333"):
+        ...     print("Qdrant is running")
+        ... else:
+        ...     print("Qdrant is not accessible")
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            if response.status == 200:
+                logger.info(f"{LOG_EMOJI_SUCCESS} url_accessible", url=url)
+                return True
+            logger.warning(f"{LOG_EMOJI_WARNING} url_returned_non_200", url=url, status=response.status)
+            return False
+    except Exception as e:
+        logger.warning(f"{LOG_EMOJI_WARNING} url_not_accessible", url=url, error=str(e))
+        return False
+
+
+def check_command_exists(command: str) -> bool:
+    """
+    Check if a command exists in PATH.
+
+    Args:
+        command: Command name to check (e.g., 'npm', 'docker', 'uv')
+
+    Returns:
+        bool: True if command is available, False otherwise
+
+    Example:
+        >>> if check_command_exists('npm'):
+        ...     print("npm is installed")
+    """
+    # shutil.which handles cross-platform PATH lookup
+    # On Windows, it also checks .cmd, .bat, .exe extensions
+    import shutil
+    return shutil.which(command) is not None
+
+
+def check_port_available(port: int, host: str = "127.0.0.1") -> bool:
+    """
+    Check if a port is available (not in use).
+
+    Args:
+        port: Port number to check
+        host: Host address to check (default: localhost)
+
+    Returns:
+        bool: True if port is available, False if in use
+
+    Example:
+        >>> if check_port_available(8000):
+        ...     print("Port 8000 is free")
+        ... else:
+        ...     print("Port 8000 is in use")
+    """
+    import socket
+    try:
+        # Try to bind to the port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            # If bind succeeds, port is available
+            sock.bind((host, port))
+            return True
+    except (socket.error, OSError):
+        # Port is in use or other error
+        return False
+
+
+def check_url_accessible(url: str, timeout: int = 5) -> bool:
+    """
+    Check if a URL is accessible and returns 200 OK.
+
+    Args:
+        url: URL to check (e.g., 'http://localhost:6333/health')
+        timeout: Request timeout in seconds
+
+    Returns:
+        bool: True if URL is accessible, False otherwise
+
+    Example:
+        >>> if check_url_accessible('http://localhost:6333'):
+        ...     print("Qdrant is running")
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return response.status == 200
+    except Exception:
+        # Any error means URL is not accessible
         return False

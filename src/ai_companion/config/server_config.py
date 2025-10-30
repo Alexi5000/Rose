@@ -17,6 +17,7 @@ WEB_SERVER_HOST = "0.0.0.0"  # Listen on all interfaces for production
 WEB_SERVER_PORT = 8000  # Main web interface port (FastAPI)
 DEV_FRONTEND_PORT = 3000  # Vite dev server port for development
 DEV_BACKEND_PORT = 8000  # Backend API port for development (same as WEB_SERVER_PORT)
+QDRANT_DEFAULT_PORT = 6333  # Default Qdrant vector database port
 
 # 📁 Path Configuration
 # =====================

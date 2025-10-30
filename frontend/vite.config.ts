@@ -65,6 +65,7 @@ export default defineConfig({
         target: API_PROXY_TARGET,
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path, // Don't rewrite the path, keep /api/v1/...
       },
     },
   },
