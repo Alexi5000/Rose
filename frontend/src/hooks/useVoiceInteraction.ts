@@ -294,7 +294,10 @@ export const useVoiceInteraction = (options: UseVoiceInteractionOptions) => {
         // Create new audio element with optimal settings
         const audio = new Audio();
         audio.preload = 'auto';
-        audio.crossOrigin = 'anonymous';
+        // Only set crossOrigin for cross-origin URLs to avoid CORS issues with same-origin
+        if (audioUrl.startsWith('http') && !audioUrl.includes(window.location.hostname)) {
+          audio.crossOrigin = 'anonymous';
+        }
         audioElementRef.current = audio;
 
         let readinessTimeout: NodeJS.Timeout | null = null;
