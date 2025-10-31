@@ -335,3 +335,6 @@ short_term_memory/
 .qodo/
 .chainlit/
 .snapshots/
+
+# Claude Code local settings (session-specific)
+.claude/settings.local.json
