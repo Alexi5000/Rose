@@ -77,10 +77,24 @@ def get_audio_dir() -> Path:
     return audio_dir
 
 
-@lru_cache()
 def get_checkpointer() -> SqliteSaver:
-    """Get or create checkpointer instance."""
-    return SqliteSaver.from_conn_string(settings.SHORT_TERM_MEMORY_DB_PATH)
+    """Get or create checkpointer instance.
+
+    Creates a SQLite checkpointer for conversation memory persistence.
+    Uses direct connection to avoid context manager issues.
+
+    Returns:
+        SqliteSaver: Initialized checkpointer instance
+    """
+    import sqlite3
+
+    # Create data directory if it doesn't exist
+    db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create connection and return SqliteSaver directly
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    return SqliteSaver(conn)
 
 
 # Helper functions and context managers
