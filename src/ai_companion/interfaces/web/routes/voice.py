@@ -77,25 +77,26 @@ def get_audio_dir() -> Path:
     return audio_dir
 
 
-def get_checkpointer() -> AsyncSqliteSaver:
+async def get_checkpointer():
     """Get or create async checkpointer instance.
 
     Creates an async SQLite checkpointer for conversation memory persistence.
     Uses AsyncSqliteSaver for compatibility with async LangGraph workflows.
 
-    Returns:
-        AsyncSqliteSaver: Initialized async checkpointer context manager
+    Yields:
+        AsyncSqliteSaver: Initialized async checkpointer instance
 
     Note:
-        This returns a context manager from from_conn_string().
-        FastAPI dependency injection will handle the lifecycle.
+        This is an async generator dependency that properly enters the context manager.
+        FastAPI will call __aenter__ before injecting and __aexit__ after completion.
     """
     # Create data directory if it doesn't exist
     db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Return the context manager - LangGraph will handle entering/exiting it
-    return AsyncSqliteSaver.from_conn_string(str(db_path))
+    # Enter the async context manager and yield the actual checkpointer instance
+    async with AsyncSqliteSaver.from_conn_string(str(db_path)) as checkpointer:
+        yield checkpointer
 
 
 # Helper functions and context managers
