@@ -14,7 +14,7 @@ from typing import Generator, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -77,24 +77,25 @@ def get_audio_dir() -> Path:
     return audio_dir
 
 
-def get_checkpointer() -> SqliteSaver:
-    """Get or create checkpointer instance.
+def get_checkpointer() -> AsyncSqliteSaver:
+    """Get or create async checkpointer instance.
 
-    Creates a SQLite checkpointer for conversation memory persistence.
-    Uses direct connection to avoid context manager issues.
+    Creates an async SQLite checkpointer for conversation memory persistence.
+    Uses AsyncSqliteSaver for compatibility with async LangGraph workflows.
 
     Returns:
-        SqliteSaver: Initialized checkpointer instance
-    """
-    import sqlite3
+        AsyncSqliteSaver: Initialized async checkpointer context manager
 
+    Note:
+        This returns a context manager from from_conn_string().
+        FastAPI dependency injection will handle the lifecycle.
+    """
     # Create data directory if it doesn't exist
     db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create connection and return SqliteSaver directly
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    return SqliteSaver(conn)
+    # Return the context manager - LangGraph will handle entering/exiting it
+    return AsyncSqliteSaver.from_conn_string(str(db_path))
 
 
 # Helper functions and context managers
@@ -218,14 +219,14 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
 
 
 async def _process_workflow(
-    transcribed_text: str, session_id: str, checkpointer: SqliteSaver
+    transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver
 ) -> str:
     """Process through LangGraph workflow with timeout and error handling.
-    
+
     Args:
         transcribed_text: Text to process
         session_id: Session identifier
-        checkpointer: SqliteSaver instance for session persistence
+        checkpointer: AsyncSqliteSaver instance for session persistence
         
     Returns:
         str: Response text from workflow
@@ -425,7 +426,7 @@ async def process_voice(
     stt: SpeechToText = Depends(get_stt),
     tts: TextToSpeech = Depends(get_tts),
     audio_dir: Path = Depends(get_audio_dir),
-    checkpointer: SqliteSaver = Depends(get_checkpointer),
+    checkpointer: AsyncSqliteSaver = Depends(get_checkpointer),
 ) -> VoiceProcessResponse:
     """Process voice input and generate audio response.
 
@@ -455,7 +456,7 @@ async def process_voice(
         stt: SpeechToText instance (injected)
         tts: TextToSpeech instance (injected)
         audio_dir: Audio directory path (injected)
-        checkpointer: SqliteSaver instance (injected)
+        checkpointer: AsyncSqliteSaver instance (injected)
 
     Returns:
         VoiceProcessResponse: Contains response text, audio URL, and session ID
