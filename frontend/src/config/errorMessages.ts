@@ -37,9 +37,12 @@ export const VOICE_PROCESSING_ERRORS = {
 // 🔊 Audio Playback Errors
 export const PLAYBACK_ERRORS = {
   PLAYBACK_FAILED: '🔊 Failed to play audio response. Please check your speakers.',
-  AUDIO_LOAD_FAILED: '🔊 Failed to load audio. Please try again.',
-  AUDIO_DECODE_FAILED: '🔊 Failed to decode audio. The audio format may not be supported.',
-  AUDIO_NOT_SUPPORTED: '🔊 Your browser doesn\'t support this audio format.',
+  AUDIO_LOAD_FAILED: '🔊 Network error loading audio. Please check your connection and try again.',
+  AUDIO_DECODE_FAILED: '🔊 Unable to decode audio. The audio file may be corrupted.',
+  AUDIO_NOT_SUPPORTED: '🔊 Your browser doesn\'t support this audio format. Please try a different browser.',
+  AUDIO_LOAD_TIMEOUT: '⏱️ Audio took too long to load. Please check your connection and try again.',
+  PLAYBACK_BLOCKED: '🔊 Tap here to enable audio playback. Your browser blocked autoplay.',
+  AUDIO_STALLED: '🔊 Audio playback stalled. Retrying...',
 } as const
 
 // ⏱️ Session and Authentication Errors
