@@ -37,6 +37,14 @@ body {
   min-height: 100vh;
 }
 
+/* Fix React Three Fiber passive event listener warnings */
+canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* Screen reader only utility */
 .sr-only {
   position: absolute;
