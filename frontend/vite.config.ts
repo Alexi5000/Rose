@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// 🎯 Build output path - matches backend static directory
-const OUTPUT_DIR = '../src/ai_companion/interfaces/web/static'
+// 🎯 Build output path
+// - Docker build: outputs to 'dist' (Dockerfile handles final location)
+// - Local build: outputs to backend static directory for direct serving
+const OUTPUT_DIR = process.env.DOCKER_BUILD
+  ? 'dist'
+  : '../src/ai_companion/interfaces/web/static'
 
 // 🌐 API proxy configuration for development
 const API_PROXY_TARGET = 'http://localhost:8000'

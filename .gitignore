@@ -323,9 +323,15 @@ pyrightconfig.json
 # Others
 scratchpad/
 generated_images/
-.files   
+.files
 chainlit.md
 src/ai_companion/modules/memory/short_term/*.db
 long_term_memory/
 short_term_memory/
 .langgraph_api/
+
+# Tool-specific directories (dev tools)
+.kiro/
+.qodo/
+.chainlit/
+.snapshots/

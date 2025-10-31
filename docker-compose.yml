@@ -16,6 +16,7 @@ services:
       - .env
     environment:
       - DOCKER_ENV=true
+      - PORT=8000
       - QDRANT_PORT=6333
       - QDRANT_API_KEY=None
       - QDRANT_HOST=localhost

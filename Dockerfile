@@ -14,6 +14,7 @@ RUN npm ci
 COPY frontend/ ./
 
 # Build frontend
+ENV DOCKER_BUILD=true
 RUN npm run build
 
 # Stage 2: Build Python dependencies

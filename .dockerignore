@@ -1,0 +1,85 @@
+# 🐳 Docker Build Exclusions
+# Following Uncle Bob's Clean Code principles - only include what's necessary
+
+# Version Control
+.git/
+.github/
+.gitignore
+
+# IDE and Editor
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# Python Cache and Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pytype/
+
+# Testing
+htmlcov/
+.coverage
+.coverage.*
+coverage.json
+.tox/
+.nox/
+.hypothesis/
+.snapshots/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build Artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Documentation
+docs/
+notebooks/
+*.md
+!README.md
+
+# Tool-Specific Directories
+.files/
+.kiro/
+.qodo/
+.chainlit/
+.langgraph_api/
+scratchpad/
+generated_images/
+
+# Local Data (managed by Docker volumes)
+long_term_memory/
+short_term_memory/
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend Build (built inside Docker)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment Files (use docker-compose env_file)
+.env
+.env.*
+!.env.example

@@ -1,6 +1,7 @@
 // Environment variables and configuration constants
-
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+// In production (Docker): Frontend served from same origin, so use relative path
+// In development (Vite): Proxy handles forwarding to backend on port 8000
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 export const ASSET_CDN_URL = import.meta.env.VITE_ASSET_CDN_URL || '/assets';
 export const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === 'true';
 export const ENABLE_DEBUG = import.meta.env.VITE_ENABLE_DEBUG === 'true';

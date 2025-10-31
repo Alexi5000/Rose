@@ -126,6 +126,31 @@ Memory persists across sessions, allowing Rose to provide personalized, continuo
 
 ### 📁 Project Structure
 
+Following Uncle Bob's Clean Code principles, the project maintains a clear, organized structure:
+
+#### 🗂️ Root Directory
+```
+Rose/
+├── 📂 src/              # Python source code (AI companion logic)
+├── 📂 frontend/         # React TypeScript UI
+├── 📂 tests/            # Test suite (>70% coverage)
+├── 📂 scripts/          # Development and deployment scripts
+├── 📂 docs/             # Documentation and archived notes
+├── 📂 config/           # Configuration templates
+├── 📂 docker/           # Docker-related files
+├── 📂 notebooks/        # Jupyter notebooks for exploration
+├── 📂 img/              # Project images and assets
+├── 📄 pyproject.toml    # Python project config
+├── 📄 uv.lock           # Locked Python dependencies
+├── 📄 Dockerfile        # Production Docker build
+├── 📄 docker-compose.yml # Container orchestration
+├── 📄 Makefile          # Common development tasks
+└── 📄 README.md         # You are here!
+```
+
+> **🧹 Clean Code**: Cache directories (.pytest_cache, .mypy_cache, .ruff_cache), temporary data (long_term_memory/, short_term_memory/), and debug markdown files are gitignored and excluded from Docker builds via .dockerignore
+
+#### 🧠 Source Code Structure
 ```
 src/ai_companion/
 ├── config/            # 🎯 Configuration constants (ports, paths, timeouts)
@@ -134,14 +159,21 @@ src/ai_companion/
 ├── interfaces/        # Web API and future interfaces
 ├── modules/           # Memory, speech, image (frozen)
 └── settings.py        # Configuration management
+```
 
+#### 🎨 Frontend Structure
+```
 frontend/
 ├── src/
 │   ├── components/    # React components (VoiceButton, etc.)
 │   ├── hooks/         # Custom hooks (audio recording, playback)
 │   ├── services/      # API client
 │   └── config/        # Frontend configuration constants
+└── package.json       # Node.js dependencies
+```
 
+#### 🚀 Scripts
+```
 scripts/
 ├── run_dev_server.py      # 🚀 Start development servers
 └── build_and_serve.py     # 📦 Build and serve production
