@@ -47,7 +47,7 @@ export const refinedVoiceRecordingConfig = {
     preferred: 'audio/webm',
     fallbacks: ['audio/mp4', 'audio/ogg'],
   },
-  
+
   // Audio constraints for getUserMedia
   audioConstraints: {
     echoCancellation: true,
@@ -57,12 +57,15 @@ export const refinedVoiceRecordingConfig = {
     channelCount: 1,            // Mono for voice
     latency: 0.01,              // Low latency for responsive feel
   },
-  
+
   // Recording settings
   timeslice: 100,               // Collect data every 100ms for smoother processing
   maxRecordingDuration: 60000,  // 60 seconds max
   minRecordingDuration: 500,    // 0.5 seconds min to avoid accidental taps
-  
+
+  // Validation
+  minAudioSizeBytes: 1000,      // Minimum 1KB to prevent invalid/corrupted files from reaching backend
+
   // Error handling
   retryAttempts: 2,
   retryDelay: 1000,

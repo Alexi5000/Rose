@@ -76,12 +76,26 @@ export const useVoiceInteraction = (options: UseVoiceInteractionOptions) => {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        
+
         // Clean up stream
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
+
+        // Validate audio size before processing (prevent invalid files from reaching backend)
+        if (audioBlob.size < refinedVoiceRecordingConfig.minAudioSizeBytes) {
+          console.warn(
+            `⚠️ Audio too short: ${audioBlob.size} bytes (minimum ${refinedVoiceRecordingConfig.minAudioSizeBytes} bytes)`
+          );
+          const errorMessage = '🎤 Recording too short. Please hold the button longer and speak clearly.';
+          setError(errorMessage);
+          setVoiceState('idle');
+          if (onError) onError(errorMessage);
+          return;
+        }
+
+        console.log(`✅ Audio recorded: ${audioBlob.size} bytes`);
 
         // Process the recorded audio
         await processVoiceInput(audioBlob);
