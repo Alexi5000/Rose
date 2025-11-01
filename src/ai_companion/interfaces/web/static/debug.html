@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Voice Interface Debug Tool - Senior QA</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 { margin-top: 0; text-align: center; }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .primary {
+            background: #4CAF50;
+            color: white;
+        }
+        .primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        .primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .danger {
+            background: #f44336;
+            color: white;
+        }
+        #log {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #4CAF50;
+            padding-left: 10px;
+        }
+        .log-error {
+            border-left-color: #f44336;
+            color: #ffcccc;
+        }
+        .log-warning {
+            border-left-color: #ff9800;
+            color: #ffe0b2;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.idle {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .status.recording {
+            background: #f44336;
+            animation: pulse 1s infinite;
+        }
+        .status.processing {
+            background: #ff9800;
+            animation: pulse 1s infinite;
+        }
+        .status.playing {
+            background: #4CAF50;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Voice Interface Debug Tool</h1>
+        <p style="text-align: center;">Senior QA Approved - Direct API Testing</p>
+        
+        <div id="status" class="status idle">🟢 IDLE</div>
+        
+        <button id="permissionBtn" class="primary">1️⃣ Request Microphone Permission</button>
+        <button id="recordBtn" class="primary" disabled>2️⃣ Start Recording</button>
+        <button id="stopBtn" class="danger" disabled>3️⃣ Stop & Process</button>
+        <button id="clearBtn" class="primary">🗑️ Clear Log</button>
+        
+        <div id="log"></div>
+    </div>
+
+    <script>
+        // 🎯 Configuration - No Magic Numbers
+        const API_BASE_URL = '/api/v1';
+        const MAX_RECORDING_MS = 60000; // 60 seconds
+        const MIN_RECORDING_MS = 1000; // 1 second
+        
+        // State
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let stream = null;
+        let sessionId = null;
+        let recordingStartTime = 0;
+        
+        // DOM Elements
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        const permissionBtn = document.getElementById('permissionBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        // 📝 Logging Functions
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type === 'error' ? 'log-error' : type === 'warning' ? 'log-warning' : ''}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function setStatus(text, className) {
+            statusDiv.textContent = text;
+            statusDiv.className = `status ${className}`;
+        }
+        
+        // Step 1: Request Microphone Permission
+        permissionBtn.addEventListener('click', async () => {
+            try {
+                log('🎤 Requesting microphone permission...');
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('✅ Microphone permission granted!');
+                log(`📊 Audio tracks: ${stream.getAudioTracks().length}`);
+                
+                const track = stream.getAudioTracks()[0];
+                log(`   Label: ${track.label}`);
+                log(`   State: ${track.readyState}`);
+                
+                permissionBtn.disabled = true;
+                recordBtn.disabled = false;
+                
+                // Create session
+                await createSession();
+                
+            } catch (err) {
+                log(`❌ Microphone permission denied: ${err.message}`, 'error');
+                if (err.name === 'NotAllowedError') {
+                    log('⚠️ User denied microphone access', 'warning');
+                } else if (err.name === 'NotFoundError') {
+                    log('⚠️ No microphone found', 'warning');
+                }
+            }
+        });
+        
+        // Create Session
+        async function createSession() {
+            try {
+                log('🎫 Creating session...');
+                const response = await fetch(`${API_BASE_URL}/session/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                sessionId = data.session_id;
+                log(`✅ Session created: ${sessionId}`);
+                
+            } catch (err) {
+                log(`❌ Session creation failed: ${err.message}`, 'error');
+                throw err;
+            }
+        }
+        
+        // Step 2: Start Recording
+        recordBtn.addEventListener('click', () => {
+            try {
+                log('🎙️ Starting recording...');
+                audioChunks = [];
+                recordingStartTime = Date.now();
+                
+                // Try different MIME types
+                const mimeTypes = [
+                    'audio/webm;codecs=opus',
+                    'audio/webm',
+                    'audio/ogg;codecs=opus',
+                    'audio/mp4'
+                ];
+                
+                let selectedMimeType = null;
+                for (const type of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        selectedMimeType = type;
+                        log(`✅ Selected MIME type: ${type}`);
+                        break;
+                    }
+                }
+                
+                if (!selectedMimeType) {
+                    log('⚠️ Using default MIME type', 'warning');
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: selectedMimeType,
+                    bitsPerSecond: 96000
+                });
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        log(`📦 Chunk received: ${event.data.size} bytes`);
+                    }
+                };
+                
+                mediaRecorder.onstop = processRecording;
+                
+                mediaRecorder.start();
+                setStatus('🔴 RECORDING...', 'recording');
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+            } catch (err) {
+                log(`❌ Recording failed: ${err.message}`, 'error');
+            }
+        });
+        
+        // Step 3: Stop Recording and Process
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                const duration = Date.now() - recordingStartTime;
+                log(`🛑 Stopping recording (duration: ${duration}ms)...`);
+                mediaRecorder.stop();
+                stopBtn.disabled = true;
+            }
+        });
+        
+        // Process Recording
+        async function processRecording() {
+            const duration = Date.now() - recordingStartTime;
+            log(`⏱️ Recording duration: ${duration}ms`);
+            
+            if (duration < MIN_RECORDING_MS) {
+                log(`⚠️ Recording too short (minimum ${MIN_RECORDING_MS}ms)`, 'warning');
+                resetUI();
+                return;
+            }
+            
+            const mimeType = mediaRecorder.mimeType || 'audio/webm';
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
+            log(`🎵 Audio blob created: ${audioBlob.size} bytes, type: ${mimeType}`);
+            
+            if (audioBlob.size === 0) {
+                log('❌ Audio blob is empty!', 'error');
+                resetUI();
+                return;
+            }
+            
+            await sendToBackend(audioBlob);
+        }
+        
+        // Send to Backend
+        async function sendToBackend(audioBlob) {
+            try {
+                setStatus('⚙️ PROCESSING...', 'processing');
+                log('📤 Sending to backend...');
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('session_id', sessionId);
+                
+                log(`   Session ID: ${sessionId}`);
+                log(`   Audio size: ${audioBlob.size} bytes`);
+                
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE_URL}/voice/process`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const processingTime = Date.now() - startTime;
+                log(`⏱️ Processing time: ${processingTime}ms`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ HTTP ${response.status}: ${response.statusText}`, 'error');
+                    log(`   Error details: ${errorText}`, 'error');
+                    resetUI();
+                    return;
+                }
+                
+                const result = await response.json();
+                log('✅ Voice processing successful!');
+                log(`   Response: ${result.text.substring(0, 100)}...`);
+                log(`   Audio URL: ${result.audio_url}`);
+                
+                await playAudio(result.audio_url);
+                
+            } catch (err) {
+                log(`❌ Backend error: ${err.message}`, 'error');
+                resetUI();
+            }
+        }
+        
+        // Play Audio Response
+        async function playAudio(audioUrl) {
+            try {
+                setStatus('🔊 PLAYING...', 'playing');
+                log('🔊 Playing audio response...');
+                
+                const audio = new Audio(`http://localhost:8000${audioUrl}`);
+                
+                audio.onended = () => {
+                    log('✅ Audio playback completed');
+                    resetUI();
+                };
+                
+                audio.onerror = (err) => {
+                    log(`❌ Audio playback error: ${err}`, 'error');
+                    resetUI();
+                };
+                
+                await audio.play();
+                log('✅ Audio started playing');
+                
+            } catch (err) {
+                log(`❌ Playback error: ${err.message}`, 'error');
+                resetUI();
+            }
+        }
+        
+        // Reset UI
+        function resetUI() {
+            setStatus('🟢 IDLE', 'idle');
+            recordBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+        
+        // Clear Log
+        clearBtn.addEventListener('click', () => {
+            logDiv.innerHTML = '';
+            log('🗑️ Log cleared');
+        });
+        
+        // Initial log
+        log('🧪 Voice Interface Debug Tool initialized');
+        log('📍 API Base URL: ' + API_BASE_URL);
+        log('👉 Click "Request Microphone Permission" to start');
+        
+    </script>
+</body>
+</html>

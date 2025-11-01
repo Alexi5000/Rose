@@ -338,3 +338,16 @@ short_term_memory/
 
 # Claude Code local settings (session-specific)
 .claude/settings.local.json
+
+# Root directory cleanup - prevent temporary test artifacts
+# (Following YAGNI and Uncle Bob's Clean Code principles)
+/test_results/
+/nul
+/*_test_*.py
+/*_REPORT*.md
+/*_GUIDE.md
+/*_ANALYSIS*.md
+/debug_*.html
+/server.log
+/stress_test*.log
+/*_output*.log

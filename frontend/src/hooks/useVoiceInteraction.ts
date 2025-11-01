@@ -37,8 +37,8 @@ interface UseVoiceInteractionOptions {
 
 // Audio configuration constants
 const AUDIO_CONFIG = {
-  READINESS_TIMEOUT_MS: 8000, // Wait 8s for canplaythrough
-  STALL_RETRY_LIMIT: 1,
+  READINESS_TIMEOUT_MS: 15000, // Wait 15s for canplaythrough (increased for slow connections)
+  STALL_RETRY_LIMIT: 2, // Increased retry limit
   CODEC_PREFERENCES: [
     'audio/webm;codecs=opus',
     'audio/ogg;codecs=opus',
@@ -143,10 +143,22 @@ export const useVoiceInteraction = (options: UseVoiceInteractionOptions) => {
         // Clear recorder ref
         mediaRecorderRef.current = null;
 
+        // Validate minimum duration (must be at least 500ms to avoid circuit breaker trips)
+        if (duration < refinedVoiceRecordingConfig.minRecordingDuration) {
+          console.warn(
+            `⚠️ Recording too short: ${duration}ms (minimum ${refinedVoiceRecordingConfig.minRecordingDuration}ms)`
+          );
+          const errorMessage = '🎤 Recording too short. Please hold the button longer and speak clearly.';
+          setError(errorMessage);
+          setVoiceState('idle');
+          if (onError) onError(errorMessage);
+          return;
+        }
+
         // Validate minimum size
         if (audioBlob.size < refinedVoiceRecordingConfig.minAudioSizeBytes) {
           console.warn(
-            `⚠️ Audio too short: ${audioBlob.size} bytes (minimum ${refinedVoiceRecordingConfig.minAudioSizeBytes} bytes)`
+            `⚠️ Audio too small: ${audioBlob.size} bytes (minimum ${refinedVoiceRecordingConfig.minAudioSizeBytes} bytes)`
           );
           const errorMessage = '🎤 Recording too short. Please hold the button longer and speak clearly.';
           setError(errorMessage);
@@ -222,9 +234,20 @@ export const useVoiceInteraction = (options: UseVoiceInteractionOptions) => {
       setError(null);
 
       try {
-        console.log('🎤 Processing voice input...');
+        console.log('🎤 Processing voice input...', {
+          sessionId,
+          audioBlobSize: audioBlob.size,
+          audioBlobType: audioBlob.type,
+        });
+        
         const response = await apiClient.processVoice(audioBlob, sessionId);
-        console.log('✅ Voice processing successful');
+        
+        console.log('✅ Voice processing successful', {
+          responseTextLength: response.text.length,
+          audioUrl: response.audio_url,
+          sessionId: response.session_id,
+        });
+        
         setResponseText(response.text);
         if (onResponseText) onResponseText(response.text);
 
@@ -232,6 +255,11 @@ export const useVoiceInteraction = (options: UseVoiceInteractionOptions) => {
         await playAudioResponse(response.audio_url);
       } catch (err) {
         console.error('❌ Voice processing error:', err);
+        console.error('❌ Error details:', {
+          errorType: err instanceof Error ? err.constructor.name : typeof err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined,
+        });
 
         const errorMessage =
           err instanceof Error ? err.message : VOICE_PROCESSING_ERRORS.TRANSCRIPTION_FAILED;

@@ -68,9 +68,12 @@ from ai_companion.graph.utils.helpers import (
     get_text_to_image_module,
     get_text_to_speech_module,
 )
+from ai_companion.core.logging_config import get_logger
 from ai_companion.modules.memory.long_term.memory_manager import get_memory_manager
 from ai_companion.modules.schedules.context_generation import ScheduleContextGenerator
 from ai_companion.settings import settings
+
+logger = get_logger(__name__)
 
 
 async def router_node(state: AICompanionState) -> dict[str, str]:
@@ -274,8 +277,13 @@ async def memory_extraction_node(state: AICompanionState) -> dict[str, Any]:
     if not state["messages"]:
         return {}
 
-    memory_manager = get_memory_manager()
-    await memory_manager.extract_and_store_memories(state["messages"][-1])
+    # 🔧 YAGNI FIX: Make long-term memory optional
+    # Skip memory extraction if Qdrant is not available (graceful degradation)
+    try:
+        memory_manager = get_memory_manager()
+        await memory_manager.extract_and_store_memories(state["messages"][-1])
+    except (ValueError, ConnectionError, Exception) as e:
+        logger.warning(f"⚠️ Long-term memory unavailable, skipping extraction: {e}")
     return {}
 
 
@@ -291,13 +299,19 @@ def memory_injection_node(state: AICompanionState) -> dict[str, str]:
     Returns:
         Dictionary with memory context: {"memory_context": str}
     """
-    memory_manager = get_memory_manager()
+    # 🔧 YAGNI FIX: Make long-term memory optional
+    # Skip memory injection if Qdrant is not available (graceful degradation)
+    try:
+        memory_manager = get_memory_manager()
 
-    # Get relevant memories based on recent conversation
-    recent_context = " ".join([m.content for m in state["messages"][-3:]])
-    memories = memory_manager.get_relevant_memories(recent_context)
+        # Get relevant memories based on recent conversation
+        recent_context = " ".join([m.content for m in state["messages"][-3:]])
+        memories = memory_manager.get_relevant_memories(recent_context)
 
-    # Format memories for the character card
-    memory_context = memory_manager.format_memories_for_prompt(memories)
+        # Format memories for the character card
+        memory_context = memory_manager.format_memories_for_prompt(memories)
+    except (ValueError, ConnectionError, Exception) as e:
+        logger.warning(f"⚠️ Long-term memory unavailable, skipping injection: {e}")
+        memory_context = ""
 
     return {"memory_context": memory_context}

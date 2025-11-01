@@ -7,6 +7,14 @@ import {
   GENERIC_ERRORS,
 } from '../config/errorMessages'
 
+// 🎯 API Configuration Constants - No Magic Numbers (Uncle Bob approved)
+const API_TIMEOUT_MS = 60000; // 60 seconds for voice processing
+const HTTP_STATUS_UNAUTHORIZED = 401;
+const HTTP_STATUS_FORBIDDEN = 403;
+const HTTP_STATUS_PAYLOAD_TOO_LARGE = 413;
+const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+const HTTP_STATUS_INTERNAL_ERROR = 500;
+
 interface SessionResponse {
   session_id: string
   message: string
@@ -29,7 +37,7 @@ class ApiClient {
     
     this.client = axios.create({
       baseURL,
-      timeout: 60000, // 60 seconds for voice processing
+      timeout: API_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -62,13 +70,21 @@ class ApiClient {
         return response
       },
       (error) => {
-        // Log error with full context
-        console.error('❌ API Error:', {
+        // 🔍 ENHANCED ERROR LOGGING - Uncle Bob approved
+        const errorContext = {
           url: error.config?.url,
           method: error.config?.method?.toUpperCase(),
           status: error.response?.status,
+          statusText: error.response?.statusText,
           message: error.message,
-        })
+          responseData: error.response?.data,
+          requestData: error.config?.data instanceof FormData ? '[FormData]' : error.config?.data,
+        }
+        
+        console.error('❌ API Error Details:', errorContext)
+        
+        // Log full error object for debugging
+        console.error('❌ Full Error Object:', error)
 
         // Map errors to user-friendly messages
         if (error.message === CONNECTION_ERRORS.NO_INTERNET) {
@@ -84,20 +100,23 @@ class ApiClient {
           const status = error.response.status
           const data = error.response.data
           
+          console.error(`❌ Server Error ${status}:`, data)
+          
           // Map specific status codes to helpful messages
-          if (status === 401 || status === 403) {
+          if (status === HTTP_STATUS_UNAUTHORIZED || status === HTTP_STATUS_FORBIDDEN) {
             throw new Error(SESSION_ERRORS.SESSION_EXPIRED)
           }
           
-          if (status === 413) {
+          if (status === HTTP_STATUS_PAYLOAD_TOO_LARGE) {
             throw new Error(VOICE_PROCESSING_ERRORS.AUDIO_TOO_LARGE)
           }
           
-          if (status === 429) {
+          if (status === HTTP_STATUS_TOO_MANY_REQUESTS) {
             throw new Error(RATE_LIMIT_ERRORS.TOO_MANY_REQUESTS)
           }
           
-          if (status >= 500) {
+          if (status >= HTTP_STATUS_INTERNAL_ERROR) {
+            console.error(`❌ 500+ Error - Server Detail: ${data?.detail || 'No detail provided'}`)
             throw new Error(CONNECTION_ERRORS.SERVER_ERROR)
           }
           
@@ -106,9 +125,11 @@ class ApiClient {
           throw new Error(message)
         } else if (error.request) {
           // Request made but no response - likely server is down
+          console.error('❌ No response received from server')
           throw new Error(CONNECTION_ERRORS.BACKEND_UNREACHABLE)
         } else {
           // Something else happened
+          console.error('❌ Unknown error type')
           throw new Error(GENERIC_ERRORS.UNKNOWN_ERROR)
         }
       }
@@ -121,15 +142,28 @@ class ApiClient {
   }
 
   async processVoice(audioBlob: Blob, sessionId: string): Promise<VoiceResponse> {
+    console.log('🎙️ API: Preparing voice processing request', {
+      audioBlobSize: audioBlob.size,
+      audioBlobType: audioBlob.type,
+      sessionId,
+    });
+    
     const formData = new FormData()
     formData.append('audio', audioBlob, 'recording.webm')
     formData.append('session_id', sessionId)
+    
+    console.log('📤 API: Sending voice processing request to /voice/process');
 
     const response = await this.client.post<VoiceResponse>('/voice/process', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
+    
+    console.log('✅ API: Voice processing response received', {
+      textLength: response.data.text.length,
+      audioUrl: response.data.audio_url,
+    });
 
     return response.data
   }

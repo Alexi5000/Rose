@@ -51,8 +51,8 @@ router = APIRouter()
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Constants
-AUDIO_SERVE_PATH = "/api/voice/audio"
+# Constants - No Magic Numbers (Uncle Bob approved)
+AUDIO_SERVE_PATH = "/api/v1/voice/audio"  # 🔧 FIX: Added /v1 for API versioning consistency
 MAX_FILE_SAVE_RETRIES = 3
 
 
