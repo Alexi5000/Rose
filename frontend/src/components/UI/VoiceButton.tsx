@@ -17,10 +17,10 @@ export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
 
 interface VoiceButtonProps {
   voiceState: VoiceState;
-  onStartRecording: () => void;
-  onStopRecording: () => void;
+  onToggle: () => void | Promise<void>;
   disabled?: boolean;
   audioAmplitude?: number; // For audio-reactive pulsing during speaking
+  isActive: boolean;
 }
 
 // Animation variants for different voice states
@@ -80,81 +80,27 @@ const tapVariant = {
 
 export const VoiceButton = ({
   voiceState,
-  onStartRecording,
-  onStopRecording,
+  onToggle,
   disabled = false,
   audioAmplitude = 0,
+  isActive,
 }: VoiceButtonProps) => {
-  // Handle mouse events
-  const handleMouseDown = () => {
-    if (!disabled && voiceState === 'idle') {
-      onStartRecording();
+  const handleActivate = () => {
+    if (disabled) {
+      return;
     }
-  };
-
-  const handleMouseUp = () => {
-    if (voiceState === 'listening') {
-      onStopRecording();
-    }
-  };
-
-  // Handle touch events with haptic feedback
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (!disabled && voiceState === 'idle') {
-      triggerHapticFeedback(10); // Short vibration for tactile feedback
-      onStartRecording();
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (voiceState === 'listening') {
-      triggerHapticFeedback(10); // Haptic feedback on release
-      onStopRecording();
-    }
-  };
-  
-  // Handle touch cancel (when user drags finger away)
-  const handleTouchCancel = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (voiceState === 'listening') {
-      onStopRecording();
-    }
-  };
-
-  // Handle keyboard events for accessibility
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      if (!disabled && voiceState === 'idle') {
-        onStartRecording();
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      if (voiceState === 'listening') {
-        onStopRecording();
-      }
-    }
-  };
-
-  const handleKeyUp = (e: React.KeyboardEvent) => {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      if (voiceState === 'listening') {
-        onStopRecording();
-      }
-    }
+    triggerHapticFeedback(15);
+    void onToggle();
   };
 
   // Render appropriate icon based on state
   const renderIcon = () => {
     switch (voiceState) {
-      case 'listening':
-        return <Mic className="w-8 h-8 text-white" />;
       case 'processing':
         return <Loader2 className="w-8 h-8 text-white animate-spin" />;
       case 'speaking':
+        return <Mic className="w-8 h-8 text-white" />;
+      case 'listening':
         return <Mic className="w-8 h-8 text-white" />;
       case 'idle':
       default:
@@ -166,14 +112,14 @@ export const VoiceButton = ({
   const getAriaLabel = () => {
     switch (voiceState) {
       case 'listening':
-        return 'Recording your voice. Release to send.';
+        return 'Listening for your voice. Tap to mute.';
       case 'processing':
         return 'Processing your message...';
       case 'speaking':
         return 'Rose is responding...';
       case 'idle':
       default:
-        return 'Press and hold to speak with Rose';
+        return 'Tap to activate Rose and start talking';
     }
   };
 
@@ -221,19 +167,12 @@ export const VoiceButton = ({
           WebkitTapHighlightColor: 'transparent', // Remove tap highlight on iOS
           WebkitTouchCallout: 'none', // Disable callout on iOS
         }}
-        whileHover={voiceState === 'idle' ? hoverVariant : undefined}
-        whileTap={voiceState === 'idle' ? tapVariant : undefined}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        disabled={disabled || voiceState === 'processing' || voiceState === 'speaking'}
+        whileHover={!disabled ? hoverVariant : undefined}
+        whileTap={!disabled ? tapVariant : undefined}
+        onClick={handleActivate}
+        disabled={disabled}
         aria-label={getAriaLabel()}
-        aria-pressed={voiceState === 'listening'}
+        aria-pressed={isActive}
         role="button"
         tabIndex={0}
       >

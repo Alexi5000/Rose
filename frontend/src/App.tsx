@@ -7,7 +7,7 @@ import { SettingsPanel } from './components/UI/SettingsPanel'
 import { KeyboardHelp } from './components/UI/KeyboardHelp'
 import { WebGLFallback } from './components/UI/WebGLFallback'
 import { SmoothScrollWrapper } from './components/Layout/SmoothScrollWrapper'
-import { useVoiceInteraction } from './hooks/useVoiceInteraction'
+import { useVoiceSessionController } from './hooks/useVoiceSessionController'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer'
 // import { useAmbientAudio } from './hooks/useAmbientAudio' // DISABLED - no audio file
 import { useAssetLoader } from './hooks/useAssetLoader'
@@ -145,13 +145,14 @@ function App() {
   // Voice interaction hook
   const {
     voiceState,
-    startRecording,
-    stopRecording,
-    audioElement,
     error: voiceError,
-  } = useVoiceInteraction({
+    isSessionActive,
+    toggleSession,
+    muteSession,
+    audioElement,
+  } = useVoiceSessionController({
     sessionId,
-    onError: (errorMsg) => setError(errorMsg),
+    onError: (message) => setError(message),
   })
 
   // Audio analyzer for visual effects
@@ -210,59 +211,31 @@ function App() {
   // Requirements: 5.5 - Keyboard accessibility
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle if not in an input field or range slider
       if (
-        e.target instanceof HTMLInputElement || 
+        e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         e.target instanceof HTMLButtonElement
       ) {
         return
       }
 
-      switch (e.key) {
-        case ' ':
-        case 'Enter':
-          // Space or Enter to activate voice button
-          e.preventDefault()
-          if (voiceState === 'idle' && !error) {
-            startRecording()
-          }
-          break
-        case 'Escape':
-          // Escape to cancel recording
-          e.preventDefault()
-          if (voiceState === 'listening') {
-            stopRecording()
-          }
-          break
-      }
-    }
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // Only handle if not in an input field
-      if (
-        e.target instanceof HTMLInputElement || 
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLButtonElement
-      ) {
-        return
-      }
-
-      // Release Space/Enter to stop recording (push-to-talk behavior)
-      if ((e.key === ' ' || e.key === 'Enter') && voiceState === 'listening') {
+      if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
         e.preventDefault()
-        stopRecording()
+        void toggleSession()
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        void muteSession()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [voiceState, startRecording, stopRecording, error])
+  }, [muteSession, toggleSession])
 
   // Show WebGL fallback if not supported
   // Requirements: 6.5 - Provide graceful fallback for unsupported browsers
@@ -349,17 +322,25 @@ function App() {
             {/* Voice Button - positioned over water surface area (bottom center) */}
             <VoiceButton
               voiceState={voiceState}
-              onStartRecording={startRecording}
-              onStopRecording={stopRecording}
+              onToggle={toggleSession}
+              isActive={isSessionActive}
               audioAmplitude={amplitude}
               disabled={!sessionId || !!error}
             />
 
             {/* 💡 Instruction hint for voice button - positioned below button */}
-            {voiceState === 'idle' && (
+            {voiceState === 'idle' && !isSessionActive && (
               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-center animate-pulse">
                 <p className="text-white/70 text-sm font-medium tracking-wide">
-                  Press & Hold to Speak
+                  Tap once to start voice session
+                </p>
+              </div>
+            )}
+
+            {isSessionActive && voiceState === 'listening' && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-center">
+                <p className="text-white/80 text-sm font-medium tracking-wide">
+                  Rose is listening for your voice...
                 </p>
               </div>
             )}
