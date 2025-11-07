@@ -1,4 +1,5 @@
-// Custom water surface shader with ripples, reflection, and refraction
+// 💧 Custom water surface shader with ripples, reflection, and refraction
+// Colors match design system - bright cyan/teal water matching reference image
 import * as THREE from 'three';
 
 export const waterShader = {
@@ -6,10 +7,10 @@ export const waterShader = {
     time: { value: 0 },
     rippleCenter: { value: new THREE.Vector2(0.5, 0.5) }, // Rose's position in UV space
     rippleStrength: { value: 0.5 },
-    skyColorTop: { value: new THREE.Color('#0a1e3d') },
-    skyColorHorizon: { value: new THREE.Color('#ff8c42') },
-    waterColorDeep: { value: new THREE.Color('#0a1e3d') },
-    waterColorShallow: { value: new THREE.Color('#4d9fff') },
+    skyColorTop: { value: new THREE.Color('#0a1e3d') }, // COLORS.BACKGROUND_TOP
+    skyColorHorizon: { value: new THREE.Color('#7db9ff') }, // COLORS.HORIZON_SKY (brighter for reflection)
+    waterColorDeep: { value: new THREE.Color('#2a6fbb') }, // COLORS.WATER_DEEP
+    waterColorShallow: { value: new THREE.Color('#4d9fff') }, // COLORS.WATER_SURFACE - bright cyan
   },
 
   vertexShader: `

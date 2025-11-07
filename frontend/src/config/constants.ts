@@ -99,12 +99,12 @@ export const breakpoints = {
   ultrawide: 1920,
 } as const;
 
-// Camera settings per viewport
+// 📸 Camera settings per viewport (matches design system for optimal composition)
 export const cameraSettings = {
-  mobile: { position: [0, 2, 12] as [number, number, number], fov: 60 },
-  tablet: { position: [0, 2, 10] as [number, number, number], fov: 55 },
-  desktop: { position: [0, 2, 8] as [number, number, number], fov: 50 },
-  ultrawide: { position: [0, 2, 8] as [number, number, number], fov: 45 },
+  mobile: { position: [0, 2, 14] as [number, number, number], fov: 60 },
+  tablet: { position: [0, 2, 12] as [number, number, number], fov: 55 },
+  desktop: { position: [0, 2, 12] as [number, number, number], fov: 50 }, // Adjusted to match reference image
+  ultrawide: { position: [0, 2, 12] as [number, number, number], fov: 50 }, // Wider view for ultrawide
 } as const;
 
 // Quality settings per device type

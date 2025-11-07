@@ -131,85 +131,89 @@ class MemoryManager:
         prompt = MEMORY_ANALYSIS_PROMPT.format(message=message)
         return await self.llm.ainvoke(prompt)
 
-    async def extract_and_store_memories(self, message: BaseMessage) -> None:
+    async def extract_and_store_memories(self, message: BaseMessage, session_id: Optional[str] = None) -> None:
         """Extract important information from a message and store in vector store.
 
         This method processes human messages to identify and store important information.
         It performs the following steps:
         1. Analyzes the message using an LLM to determine importance
-        2. Checks for duplicate or similar existing memories
-        3. Stores new memories with metadata (ID, timestamp)
+        2. Checks for duplicate or similar existing memories within the session
+        3. Stores new memories with metadata (ID, timestamp, session_id)
 
         Only human messages are processed; AI messages are ignored to avoid storing
         the companion's own responses.
 
         Args:
             message: The message to analyze (only HumanMessage types are processed)
+            session_id: Optional session/user identifier for multi-user isolation
 
         Returns:
             None: Memories are stored as a side effect
 
-        Raises:
-            No exceptions are raised; errors are logged internally
-
         Example:
             >>> message = HumanMessage(content="I'm allergic to peanuts")
-            >>> await manager.extract_and_store_memories(message)
-            # Logs: "Storing new memory: 'User has peanut allergy'"
+            >>> await manager.extract_and_store_memories(message, session_id="user_123")
+            # Logs: "💾 Storing new memory: 'User has peanut allergy'"
         """
         if message.type != "human":
             return
 
-        # Analyze the message for importance and formatting
+        # 🧠 Analyze the message for importance and formatting
         # The LLM determines if the message contains information worth remembering
         # and formats it in a concise, searchable form (e.g., "User prefers tea")
         analysis = await self._analyze_memory(message.content)
         if analysis.is_important and analysis.formatted_memory:
-            # Check if similar memory exists (similarity threshold: 0.9)
+            # ♻️ Check if similar memory exists (within the same session)
             # This prevents duplicate storage of the same information
-            # Example: "User likes coffee" and "User prefers coffee" would be considered similar
-            similar = self.vector_store.find_similar_memory(analysis.formatted_memory)
+            similar = self.vector_store.find_similar_memory(
+                analysis.formatted_memory,
+                session_id=session_id
+            )
             if similar:
                 # Skip storage if we already have a similar memory
-                # This keeps the memory store clean and avoids redundant information
-                self.logger.info(f"Similar memory already exists: '{analysis.formatted_memory}'")
+                self.logger.info(f"♻️ Similar memory exists, skipping: '{analysis.formatted_memory}'")
                 return
 
-            # Store new memory with unique ID and timestamp
-            # The timestamp allows for temporal reasoning (e.g., "user mentioned this recently")
-            # The ID enables updates and deletions if needed in the future
-            self.logger.info(f"Storing new memory: '{analysis.formatted_memory}'")
+            # 💾 Store new memory with unique ID, timestamp, and session_id
+            self.logger.info(f"💾 Storing new memory: '{analysis.formatted_memory}'")
             self.vector_store.store_memory(
                 text=analysis.formatted_memory,
                 metadata={
                     "id": str(uuid.uuid4()),
                     "timestamp": datetime.now().isoformat(),
                 },
+                session_id=session_id,
             )
 
-    def get_relevant_memories(self, context: str) -> List[str]:
+    def get_relevant_memories(self, context: str, session_id: Optional[str] = None) -> List[str]:
         """Retrieve relevant memories based on the current context.
 
         Performs semantic search in the vector store to find memories that are
         relevant to the given context. Returns the top-K most similar memories
         (K is configured via settings.MEMORY_TOP_K).
 
+        If session_id is provided and ENABLE_SESSION_ISOLATION is True, only
+        memories from that session are retrieved (prevents cross-user data leakage).
+
         Args:
             context: The current conversation context to search against
+            session_id: Optional session/user identifier for filtering
 
         Returns:
             List[str]: List of relevant memory texts, ordered by relevance
 
         Example:
             >>> context = "What outdoor activities do I enjoy?"
-            >>> memories = manager.get_relevant_memories(context)
+            >>> memories = manager.get_relevant_memories(context, session_id="user_123")
             >>> print(memories)
             ['User enjoys hiking in mountainous terrain', 'User likes camping']
         """
-        memories = self.vector_store.search_memories(context, k=settings.MEMORY_TOP_K)
-        if memories:
-            for memory in memories:
-                self.logger.debug(f"Memory: '{memory.text}' (score: {memory.score:.2f})")
+        memories = self.vector_store.search_memories(
+            context,
+            k=settings.MEMORY_TOP_K,
+            session_id=session_id
+        )
+        # Detailed logging is now handled in vector_store.search_memories()
         return [memory.text for memory in memories]
 
     def format_memories_for_prompt(self, memories: List[str]) -> str:

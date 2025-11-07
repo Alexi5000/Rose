@@ -1,19 +1,20 @@
 import * as THREE from 'three';
 
 /**
- * Custom ice shader with subsurface scattering, Fresnel effect, and refraction
+ * 🧊 Custom ice shader with subsurface scattering, Fresnel effect, and refraction
  * Creates realistic ice appearance with translucency and edge glow
+ * Colors match design system - bright glowing blue icicles
  */
 export const icicleShader = {
   uniforms: {
     time: { value: 0 },
     lightPosition: { value: new THREE.Vector3(0, 10, 5) },
-    baseColor: { value: new THREE.Color('#4d9fff') },
-    emissiveColor: { value: new THREE.Color('#0a1e3d') },
+    baseColor: { value: new THREE.Color('#4d9fff') }, // COLORS.ICICLE_BRIGHT from design system
+    emissiveColor: { value: new THREE.Color('#5dadff') }, // COLORS.ICICLE_HIGHLIGHT
     translucency: { value: 0.9 },
-    subsurfaceStrength: { value: 0.5 },
-    fresnelPower: { value: 3.0 },
-    glowIntensity: { value: 0.3 },
+    subsurfaceStrength: { value: 0.6 }, // Increased for more glow
+    fresnelPower: { value: 2.5 }, // Reduced for more visible glow
+    glowIntensity: { value: 0.5 }, // Increased glow intensity
     refractionStrength: { value: 0.1 },
   },
 

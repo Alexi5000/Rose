@@ -1,4 +1,5 @@
-// Custom aurora borealis shader with flowing noise patterns
+// 🌌 Custom aurora borealis shader with flowing noise patterns
+// Colors match design system - blue/purple/cyan gradient matching reference image
 import * as THREE from 'three';
 
 // Simplex noise function for GLSL
@@ -73,9 +74,9 @@ export const auroraShader = {
   uniforms: {
     time: { value: 0 },
     intensity: { value: 0.6 },
-    color1: { value: new THREE.Color('#4d9fff') }, // Blue
-    color2: { value: new THREE.Color('#9d4dff') }, // Purple
-    color3: { value: new THREE.Color('#4dffaa') }, // Green
+    color1: { value: new THREE.Color('#4d9fff') }, // COLORS.AURORA_BLUE
+    color2: { value: new THREE.Color('#9d4dff') }, // COLORS.AURORA_PURPLE
+    color3: { value: new THREE.Color('#4dffaa') }, // COLORS.AURORA_CYAN
   },
 
   vertexShader: `

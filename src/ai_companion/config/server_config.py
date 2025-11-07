@@ -58,7 +58,7 @@ RATE_LIMIT_ENABLED = True  # Enable/disable rate limiting globally
 # Cache control settings for static assets and API responses
 
 STATIC_ASSET_CACHE_SECONDS = 31536000  # 1 year cache for immutable assets (JS, CSS, images)
-HTML_CACHE_SECONDS = 300  # 5 minutes cache for HTML files (allows quick updates)
+HTML_CACHE_SECONDS = 0  # ⚡ No cache for HTML - always get latest (prevents browser cache issues)
 API_CACHE_SECONDS = 0  # No cache for API responses (always fresh data)
 
 # 🧹 Cleanup Configuration

@@ -9,12 +9,14 @@ import { WebGLFallback } from './components/UI/WebGLFallback'
 import { SmoothScrollWrapper } from './components/Layout/SmoothScrollWrapper'
 import { useVoiceInteraction } from './hooks/useVoiceInteraction'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer'
-import { useAmbientAudio } from './hooks/useAmbientAudio'
+// import { useAmbientAudio } from './hooks/useAmbientAudio' // DISABLED - no audio file
 import { useAssetLoader } from './hooks/useAssetLoader'
 import { useWebGLDetection } from './hooks/useWebGLDetection'
 import { useHealthCheck } from './hooks/useHealthCheck'
 import { apiClient } from './services/apiClient'
 import { getAutoDismissTimeout, shouldAutoDismiss } from './config/errorMessages'
+import { logDesignSystemInit } from './config/designSystem'
+// import { audioFeatureFlags } from './config/refinedAudio' // DISABLED - not needed
 import './App.css'
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking'
@@ -155,15 +157,22 @@ function App() {
   // Audio analyzer for visual effects
   const { amplitude } = useAudioAnalyzer(audioElement)
 
-  // Ambient audio system
-  const {
-    volume: ambientVolume,
-    setVolume: setAmbientVolume,
-    duck,
-    unduck,
-  } = useAmbientAudio({
-    enabled: true,
-  })
+  // Ambient audio system - DISABLED (no audio file available, YAGNI)
+  // Using dummy implementation to avoid loading missing audio file
+  const ambientVolume = 0;
+  const setAmbientVolume = () => {};
+  const duck = () => {};
+  const unduck = () => {};
+
+  // Original implementation (commented out):
+  // const {
+  //   volume: ambientVolume,
+  //   setVolume: setAmbientVolume,
+  //   duck,
+  //   unduck,
+  // } = useAmbientAudio({
+  //   enabled: audioFeatureFlags.enableAmbientAudio,
+  // })
 
   // Handle ambient audio ducking during voice interaction
   useEffect(() => {
@@ -174,8 +183,11 @@ function App() {
     }
   }, [voiceState, duck, unduck])
 
-  // Detect prefers-reduced-motion
+  // Initialize design system and detect prefers-reduced-motion
   useEffect(() => {
+    // 🎨 Log design system initialization
+    logDesignSystemInit()
+
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     setReducedMotion(mediaQuery.matches)
 
@@ -260,7 +272,7 @@ function App() {
 
   return (
     <SmoothScrollWrapper enabled={false}>
-      <div className="relative w-full h-screen overflow-hidden bg-gradient-to-b from-[#0a1e3d] to-[#1e4d8b]">
+      <div className="app-container relative w-full h-screen overflow-hidden">
         {/* Skip link for keyboard navigation */}
         <a
           href="#main-content"
@@ -285,6 +297,7 @@ function App() {
               
               {/* Dismiss button */}
               <button
+                type="button"
                 onClick={() => {
                   setError(null)
                   console.log('🗑️ Error manually dismissed')
@@ -341,6 +354,15 @@ function App() {
               audioAmplitude={amplitude}
               disabled={!sessionId || !!error}
             />
+
+            {/* 💡 Instruction hint for voice button - positioned below button */}
+            {voiceState === 'idle' && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-center animate-pulse">
+                <p className="text-white/70 text-sm font-medium tracking-wide">
+                  Press & Hold to Speak
+                </p>
+              </div>
+            )}
 
             {/* Settings Panel - positioned at top right */}
             <SettingsPanel

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { DirectionalLight } from 'three';
 import { useFrame } from '@react-three/fiber';
-import { refinedLightingConfig } from '../../config/refinedColors';
+import { LIGHTING } from '../../config/designSystem';
 import { useResponsiveScene } from '../../hooks/useResponsiveScene';
 
 interface LightingRigProps {
@@ -24,12 +24,12 @@ export const LightingRig = ({ voiceState = 'idle', audioAmplitude = 0 }: Lightin
   const { quality } = useResponsiveScene();
   const shadowsEnabled = quality.shadows;
 
-  // Use refined lighting intensities for enhanced atmosphere
+  // 💡 Use design system lighting intensities (Uncle Bob approved - no magic numbers!)
   const baseIntensities = {
-    ambient: refinedLightingConfig.ambient.intensity,
-    key: refinedLightingConfig.key.intensity,
-    rim: refinedLightingConfig.rim.intensity,
-    fill: refinedLightingConfig.fill.intensity,
+    ambient: LIGHTING.AMBIENT_INTENSITY,
+    key: LIGHTING.KEY_LIGHT_INTENSITY,
+    rim: LIGHTING.AURORA_LIGHT_INTENSITY,
+    fill: LIGHTING.FILL_LIGHT_INTENSITY,
   };
 
   // Dynamic lighting adjustments based on voice state
@@ -76,47 +76,47 @@ export const LightingRig = ({ voiceState = 'idle', audioAmplitude = 0 }: Lightin
 
   return (
     <>
-      {/* Ambient light - soft blue for overall illumination (refined intensity) */}
-      <ambientLight 
-        color={refinedLightingConfig.ambient.color} 
-        intensity={baseIntensities.ambient} 
+      {/* 🌙 Ambient light - soft blue for overall illumination */}
+      <ambientLight
+        color={LIGHTING.AMBIENT_COLOR}
+        intensity={baseIntensities.ambient}
       />
 
-      {/* Key light - warm light from horizon (main light source, refined position and intensity) */}
+      {/* ☀️ Key light - moonlight/horizon light (main light source) */}
       <directionalLight
         ref={keyLightRef}
-        position={refinedLightingConfig.key.position}
-        color={refinedLightingConfig.key.color}
+        position={[5, 10, 5]}
+        color={LIGHTING.KEY_LIGHT_COLOR}
         intensity={baseIntensities.key}
-        castShadow={shadowsEnabled && refinedLightingConfig.key.castShadow}
-        shadow-mapSize-width={refinedLightingConfig.key.shadowConfig.mapSize}
-        shadow-mapSize-height={refinedLightingConfig.key.shadowConfig.mapSize}
+        castShadow={shadowsEnabled}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-far={50}
         shadow-camera-left={-10}
         shadow-camera-right={10}
         shadow-camera-top={10}
         shadow-camera-bottom={-10}
-        shadow-bias={refinedLightingConfig.key.shadowConfig.bias}
-        shadow-normalBias={refinedLightingConfig.key.shadowConfig.normalBias}
-        shadow-radius={refinedLightingConfig.key.shadowConfig.radius}
+        shadow-bias={-0.0001}
+        shadow-normalBias={0.02}
+        shadow-radius={4}
       />
 
-      {/* Rim light - cool blue from above (creates depth and separation, enhanced color) */}
+      {/* 🌌 Rim light - aurora light from above (creates depth and separation) */}
       <directionalLight
         ref={rimLightRef}
-        position={refinedLightingConfig.rim.position}
-        color={refinedLightingConfig.rim.color}
+        position={[0, 15, -10]}
+        color={LIGHTING.AURORA_LIGHT_COLOR}
         intensity={baseIntensities.rim}
       />
 
-      {/* Fill light - soft from left (reduces harsh shadows, enhanced coverage) */}
+      {/* 💡 Fill light - soft cyan from left (reduces harsh shadows) */}
       <pointLight
         ref={fillLightRef}
-        position={refinedLightingConfig.fill.position}
-        color={refinedLightingConfig.fill.color}
+        position={[-8, 5, 3]}
+        color={LIGHTING.FILL_LIGHT_COLOR}
         intensity={baseIntensities.fill}
-        distance={refinedLightingConfig.fill.distance}
-        decay={refinedLightingConfig.fill.decay}
+        distance={30}
+        decay={2}
       />
     </>
   );

@@ -61,7 +61,7 @@ export const refinedVoiceRecordingConfig = {
   // Recording settings
   timeslice: 100,               // Collect data every 100ms for smoother processing
   maxRecordingDuration: 60000,  // 60 seconds max
-  minRecordingDuration: 500,    // 0.5 seconds min to avoid accidental taps
+  minRecordingDuration: 300,    // ⚡ 0.3 seconds min (reduced for better UX - Uncle Bob approved!)
 
   // Validation
   minAudioSizeBytes: 1000,      // Minimum 1KB to prevent invalid/corrupted files from reaching backend
@@ -278,7 +278,7 @@ export const audioErrorMessages = {
  * Enable/disable specific audio features
  */
 export const audioFeatureFlags = {
-  enableAmbientAudio: true,
+  enableAmbientAudio: false,      // Disabled: audio file not included (YAGNI)
   enableAudioDucking: true,
   enableAudioAnalysis: true,
   enableAudioVisualization: true,

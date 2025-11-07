@@ -1,3 +1,14 @@
+/* 🎨 Main App Background - Design System Gradient */
+.app-container {
+  /* Gradient from design system - matches reference image */
+  background: linear-gradient(
+    to bottom,
+    #0a1e3d 0%,    /* BACKGROUND_TOP - Deep navy */
+    #1e4d8b 50%,   /* BACKGROUND_MID - Ocean blue */
+    #4d9fff 100%   /* BACKGROUND_BOTTOM - Bright cyan */
+  );
+}
+
 /* Keyboard Navigation Accessibility Styles */
 
 /* Skip link for keyboard navigation accessibility */
