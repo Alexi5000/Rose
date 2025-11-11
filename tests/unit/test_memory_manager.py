@@ -136,8 +136,10 @@ class TestMemoryStorage:
             message = HumanMessage(content="My name is Sarah and I live in Portland")
             await manager.extract_and_store_memories(message)
 
-            # Verify duplicate check was performed
-            mock_vs.return_value.find_similar_memory.assert_called_once_with("Name is Sarah, lives in Portland")
+            # Verify duplicate check was performed (with session_id for multi-user safety)
+            mock_vs.return_value.find_similar_memory.assert_called_once_with(
+                "Name is Sarah, lives in Portland", session_id=None
+            )
             # Verify memory was stored
             mock_vs.return_value.store_memory.assert_called_once()
 
