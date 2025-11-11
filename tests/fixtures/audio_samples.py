@@ -47,10 +47,14 @@ def sample_mp3_audio() -> bytes:
     """
     # Minimal MP3 frame header (MPEG-1 Layer 3, 128kbps, 44.1kHz, mono)
     # This is a simplified MP3 header for format detection testing
-    mp3_header = bytes([
-        0xFF, 0xFB,  # Sync word and MPEG version
-        0x90, 0x00,  # Bitrate and sample rate
-    ])
+    mp3_header = bytes(
+        [
+            0xFF,
+            0xFB,  # Sync word and MPEG version
+            0x90,
+            0x00,  # Bitrate and sample rate
+        ]
+    )
 
     # Add some padding to make it look like a real MP3
     mp3_data = mp3_header + (b"\x00" * 1024)

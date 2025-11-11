@@ -58,6 +58,7 @@ from uuid import uuid4
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 
+from ai_companion.core.logging_config import get_logger
 from ai_companion.graph.state import AICompanionState
 from ai_companion.graph.utils.chains import (
     get_character_response_chain,
@@ -68,7 +69,6 @@ from ai_companion.graph.utils.helpers import (
     get_text_to_image_module,
     get_text_to_speech_module,
 )
-from ai_companion.core.logging_config import get_logger
 from ai_companion.modules.memory.long_term.memory_manager import get_memory_manager
 from ai_companion.modules.schedules.context_generation import ScheduleContextGenerator
 from ai_companion.settings import settings

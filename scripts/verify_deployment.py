@@ -18,6 +18,7 @@ Usage:
     OR
     uv run python scripts/verify_deployment.py
 """
+
 import io
 import sys
 from pathlib import Path
@@ -86,7 +87,12 @@ class DeploymentVerifier:
         if result.passed:
             logger.info(f"{LOG_EMOJI_SUCCESS} verification_passed", check=result.name, message=result.message)
         else:
-            logger.error(f"{LOG_EMOJI_ERROR} verification_failed", check=result.name, message=result.message, details=result.details)
+            logger.error(
+                f"{LOG_EMOJI_ERROR} verification_failed",
+                check=result.name,
+                message=result.message,
+                details=result.details,
+            )
 
     def verify_environment_file(self) -> VerificationResult:
         """Verify .env file exists and has required keys."""
@@ -94,10 +100,7 @@ class DeploymentVerifier:
 
         if not env_file.exists():
             return VerificationResult(
-                "Environment File",
-                False,
-                ".env file not found",
-                "Copy .env.example to .env and fill in your API keys"
+                "Environment File", False, ".env file not found", "Copy .env.example to .env and fill in your API keys"
             )
 
         # Check for required keys
@@ -120,14 +123,10 @@ class DeploymentVerifier:
                 "Environment File",
                 False,
                 "Missing required environment variables",
-                f"Missing: {', '.join(missing_keys)}"
+                f"Missing: {', '.join(missing_keys)}",
             )
 
-        return VerificationResult(
-            "Environment File",
-            True,
-            ".env file exists with required keys"
-        )
+        return VerificationResult("Environment File", True, ".env file exists with required keys")
 
     def verify_python_version(self) -> VerificationResult:
         """Verify Python version meets requirements."""
@@ -138,31 +137,20 @@ class DeploymentVerifier:
                 "Python Version",
                 False,
                 f"Python {REQUIRED_PYTHON_VERSION[0]}.{REQUIRED_PYTHON_VERSION[1]}+ required",
-                f"Current version: {current_version[0]}.{current_version[1]}"
+                f"Current version: {current_version[0]}.{current_version[1]}",
             )
 
         return VerificationResult(
-            "Python Version",
-            True,
-            f"Python {current_version[0]}.{current_version[1]} meets requirements"
+            "Python Version", True, f"Python {current_version[0]}.{current_version[1]} meets requirements"
         )
 
     def verify_command_available(self, command: str, install_url: str = "") -> VerificationResult:
         """Verify a command is available in PATH."""
         if check_command_exists(command):
-            return VerificationResult(
-                f"{command.upper()} Command",
-                True,
-                f"{command} is installed and available"
-            )
+            return VerificationResult(f"{command.upper()} Command", True, f"{command} is installed and available")
 
         details = f"Install from: {install_url}" if install_url else ""
-        return VerificationResult(
-            f"{command.upper()} Command",
-            False,
-            f"{command} not found in PATH",
-            details
-        )
+        return VerificationResult(f"{command.upper()} Command", False, f"{command} not found in PATH", details)
 
     def verify_frontend_build(self) -> VerificationResult:
         """Verify frontend build exists and is complete."""
@@ -171,7 +159,7 @@ class DeploymentVerifier:
                 "Frontend Build",
                 False,
                 "Frontend build directory not found",
-                f"Run 'npm run build' in frontend directory. Expected: {FRONTEND_BUILD_DIR}"
+                f"Run 'npm run build' in frontend directory. Expected: {FRONTEND_BUILD_DIR}",
             )
 
         index_file = FRONTEND_BUILD_DIR / "index.html"
@@ -180,7 +168,7 @@ class DeploymentVerifier:
                 "Frontend Build",
                 False,
                 "index.html not found in build directory",
-                "Frontend build may be incomplete. Run 'npm run build' again."
+                "Frontend build may be incomplete. Run 'npm run build' again.",
             )
 
         assets_dir = FRONTEND_BUILD_DIR / "assets"
@@ -189,45 +177,35 @@ class DeploymentVerifier:
                 "Frontend Build",
                 False,
                 "Assets directory not found in build",
-                "Frontend build may be incomplete. Run 'npm run build' again."
+                "Frontend build may be incomplete. Run 'npm run build' again.",
             )
 
-        return VerificationResult(
-            "Frontend Build",
-            True,
-            f"Frontend build complete at {FRONTEND_BUILD_DIR}"
-        )
+        return VerificationResult("Frontend Build", True, f"Frontend build complete at {FRONTEND_BUILD_DIR}")
 
     def verify_qdrant_running(self) -> VerificationResult:
         """Verify Qdrant is running and accessible."""
         if check_url_accessible(QDRANT_HEALTH_URL, timeout=5):
-            return VerificationResult(
-                "Qdrant Service",
-                True,
-                f"Qdrant is running on port {QDRANT_DEFAULT_PORT}"
-            )
+            return VerificationResult("Qdrant Service", True, f"Qdrant is running on port {QDRANT_DEFAULT_PORT}")
 
         return VerificationResult(
             "Qdrant Service",
             False,
             "Qdrant is not accessible",
-            f"Start Qdrant with 'docker compose up qdrant -d' or check {QDRANT_HEALTH_URL}"
+            f"Start Qdrant with 'docker compose up qdrant -d' or check {QDRANT_HEALTH_URL}",
         )
 
     def verify_port_available(self, port: int, service_name: str) -> VerificationResult:
         """Verify a port is available for use."""
         if check_port_available(port):
             return VerificationResult(
-                f"Port {port} ({service_name})",
-                True,
-                f"Port {port} is available for {service_name}"
+                f"Port {port} ({service_name})", True, f"Port {port} is available for {service_name}"
             )
 
         return VerificationResult(
             f"Port {port} ({service_name})",
             False,
             f"Port {port} is already in use",
-            f"Stop the service using port {port} or choose a different port"
+            f"Stop the service using port {port} or choose a different port",
         )
 
     def verify_memory_directories(self) -> VerificationResult:
@@ -240,7 +218,7 @@ class DeploymentVerifier:
                 "Memory Directories",
                 False,
                 "Long-term memory directory not found",
-                "Directory will be created on first run, but Qdrant should be running first"
+                "Directory will be created on first run, but Qdrant should be running first",
             )
 
         if not short_term_dir.exists():
@@ -248,14 +226,10 @@ class DeploymentVerifier:
                 "Memory Directories",
                 False,
                 "Short-term memory directory not found",
-                "Directory will be created on first run"
+                "Directory will be created on first run",
             )
 
-        return VerificationResult(
-            "Memory Directories",
-            True,
-            "Memory directories exist"
-        )
+        return VerificationResult("Memory Directories", True, "Memory directories exist")
 
     def run_all_checks(self) -> bool:
         """Run all verification checks."""
@@ -336,10 +310,18 @@ def main() -> None:
     success = verifier.run_all_checks()
 
     if success:
-        logger.info(f"{LOG_EMOJI_SUCCESS} deployment_verification_complete", passed=verifier.passed_count, failed=verifier.failed_count)
+        logger.info(
+            f"{LOG_EMOJI_SUCCESS} deployment_verification_complete",
+            passed=verifier.passed_count,
+            failed=verifier.failed_count,
+        )
         sys.exit(EXIT_SUCCESS)
     else:
-        logger.error(f"{LOG_EMOJI_ERROR} deployment_verification_failed", passed=verifier.passed_count, failed=verifier.failed_count)
+        logger.error(
+            f"{LOG_EMOJI_ERROR} deployment_verification_failed",
+            passed=verifier.passed_count,
+            failed=verifier.failed_count,
+        )
         sys.exit(EXIT_FAILURE)
 
 

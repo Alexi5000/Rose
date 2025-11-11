@@ -37,21 +37,12 @@ class MetricsResponse(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "counters": {
-                        "sessions_started": 42,
-                        "voice_requests_total": 156,
-                        "errors_total": 3
-                    },
+                    "counters": {"sessions_started": 42, "voice_requests_total": 156, "errors_total": 3},
                     "gauges": {},
                     "histograms": {
-                        "voice_audio_size_bytes": {
-                            "count": 156,
-                            "min": 12345,
-                            "max": 987654,
-                            "avg": 456789
-                        }
+                        "voice_audio_size_bytes": {"count": 156, "min": 12345, "max": 987654, "avg": 456789}
                     },
-                    "timestamp": "2025-10-21T12:34:56.789Z"
+                    "timestamp": "2025-10-21T12:34:56.789Z",
                 }
             ]
         }
@@ -97,5 +88,5 @@ async def get_metrics(request: Request) -> MetricsResponse:
         counters=summary["counters"],
         gauges=summary["gauges"],
         histograms=summary["histograms"],
-        timestamp=summary["timestamp"]
+        timestamp=summary["timestamp"],
     )

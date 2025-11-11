@@ -263,7 +263,6 @@ async def send_response(
             "text": {"body": response_text},
         }
 
-
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages",

@@ -54,7 +54,9 @@ describe('useAudioAnalyzer', () => {
     };
 
     // Mock AudioContext constructor
-    global.AudioContext = vi.fn(() => mockAudioContext) as any;
+    global.AudioContext = vi.fn(function(this: any) {
+      return mockAudioContext;
+    }) as any;
   });
 
   afterEach(() => {
@@ -144,7 +146,9 @@ describe('useAudioAnalyzer', () => {
       result.current.stopAnalysis();
     });
 
-    expect(result.current.isAnalyzing).toBe(false);
+    await waitFor(() => {
+      expect(result.current.isAnalyzing).toBe(false);
+    });
   });
 
   it('should restart analysis when startAnalysis is called', async () => {
@@ -158,13 +162,17 @@ describe('useAudioAnalyzer', () => {
       result.current.stopAnalysis();
     });
 
-    expect(result.current.isAnalyzing).toBe(false);
+    await waitFor(() => {
+      expect(result.current.isAnalyzing).toBe(false);
+    });
 
     act(() => {
       result.current.startAnalysis();
     });
 
-    expect(result.current.isAnalyzing).toBe(true);
+    await waitFor(() => {
+      expect(result.current.isAnalyzing).toBe(true);
+    });
   });
 
   it('should cleanup audio context on unmount', async () => {
@@ -202,7 +210,9 @@ describe('useAudioAnalyzer', () => {
       }),
     };
 
-    global.AudioContext = vi.fn(() => errorAudioContext) as any;
+    global.AudioContext = vi.fn(function(this: any) {
+      return errorAudioContext;
+    }) as any;
 
     const { result } = renderHook(() => useAudioAnalyzer(mockAudioElement));
 
@@ -233,11 +243,20 @@ describe('useAudioAnalyzer', () => {
   });
 
   it('should connect audio nodes correctly', async () => {
+    // Track the source that will be created
+    let createdSource: any = null;
+    const originalCreateSource = mockAudioContext.createMediaElementSource;
+    mockAudioContext.createMediaElementSource = vi.fn((element) => {
+      createdSource = originalCreateSource(element);
+      return createdSource;
+    });
+
     renderHook(() => useAudioAnalyzer(mockAudioElement));
 
     await waitFor(() => {
-      const source = mockAudioContext.createMediaElementSource();
-      expect(source.connect).toHaveBeenCalledWith(mockAnalyser);
+      expect(mockAudioContext.createMediaElementSource).toHaveBeenCalledWith(mockAudioElement);
+      expect(createdSource).not.toBeNull();
+      expect(createdSource.connect).toHaveBeenCalledWith(mockAnalyser);
       expect(mockAnalyser.connect).toHaveBeenCalledWith(mockAudioContext.destination);
     });
   });

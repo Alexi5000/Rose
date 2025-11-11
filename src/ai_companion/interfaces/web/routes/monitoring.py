@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 
 class MetricsResponse(BaseModel):
     """Response model for metrics endpoint."""
+
     counters: Dict[str, int]
     gauges: Dict[str, float]
     histograms: Dict[str, Dict[str, float]]
@@ -28,6 +29,7 @@ class MetricsResponse(BaseModel):
 
 class MonitoringStatusResponse(BaseModel):
     """Response model for monitoring status endpoint."""
+
     sentry_enabled: bool
     alert_thresholds_count: int
     active_alerts_count: int
@@ -37,6 +39,7 @@ class MonitoringStatusResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     """Response model for individual alert."""
+
     name: str
     severity: str
     message: str
@@ -60,10 +63,7 @@ async def get_metrics(request: Request) -> MetricsResponse:
     try:
         metrics_summary = metrics.get_metrics_summary()
 
-        logger.info(
-            "metrics_retrieved",
-            request_id=getattr(request.state, "request_id", None)
-        )
+        logger.info("metrics_retrieved", request_id=getattr(request.state, "request_id", None))
 
         return MetricsResponse(**metrics_summary)
 
@@ -90,7 +90,7 @@ async def get_monitoring_status(request: Request) -> MonitoringStatusResponse:
         logger.info(
             "monitoring_status_retrieved",
             request_id=getattr(request.state, "request_id", None),
-            active_alerts=status["active_alerts_count"]
+            active_alerts=status["active_alerts_count"],
         )
 
         return MonitoringStatusResponse(**status)
@@ -117,10 +117,7 @@ async def get_alerts(request: Request, hours: int = 24) -> list[AlertResponse]:
     """
     try:
         if hours < 1 or hours > 168:  # Max 1 week
-            raise HTTPException(
-                status_code=400,
-                detail="Hours must be between 1 and 168"
-            )
+            raise HTTPException(status_code=400, detail="Hours must be between 1 and 168")
 
         alert_history = monitoring.get_alert_history(hours=hours)
 
@@ -131,16 +128,13 @@ async def get_alerts(request: Request, hours: int = 24) -> list[AlertResponse]:
                 message=alert.message,
                 metric_value=alert.metric_value,
                 threshold=alert.threshold,
-                timestamp=alert.timestamp.isoformat()
+                timestamp=alert.timestamp.isoformat(),
             )
             for alert in alert_history
         ]
 
         logger.info(
-            "alerts_retrieved",
-            request_id=getattr(request.state, "request_id", None),
-            count=len(alerts),
-            hours=hours
+            "alerts_retrieved", request_id=getattr(request.state, "request_id", None), count=len(alerts), hours=hours
         )
 
         return alerts
@@ -173,20 +167,15 @@ async def evaluate_thresholds(request: Request) -> Dict[str, Any]:
         logger.info(
             "thresholds_evaluated",
             request_id=getattr(request.state, "request_id", None),
-            triggered_count=len(triggered_alerts)
+            triggered_count=len(triggered_alerts),
         )
 
         return {
             "evaluated": True,
             "triggered_alerts_count": len(triggered_alerts),
             "triggered_alerts": [
-                {
-                    "name": alert.name,
-                    "severity": alert.severity,
-                    "message": alert.message
-                }
-                for alert in triggered_alerts
-            ]
+                {"name": alert.name, "severity": alert.severity, "message": alert.message} for alert in triggered_alerts
+            ],
         }
 
     except Exception as e:

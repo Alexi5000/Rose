@@ -72,13 +72,13 @@ class PerformanceProfiler:
             "iterations": self.iterations,
             "total_time_ms": elapsed_time * 1000,
             "avg_time_ms": avg_time,
-            "profile_stats": stats_stream.getvalue()
+            "profile_stats": stats_stream.getvalue(),
         }
 
         self.results[name] = result
 
         print(f"  Average time: {avg_time:.3f}ms")
-        print(f"  Total time: {elapsed_time*1000:.1f}ms")
+        print(f"  Total time: {elapsed_time * 1000:.1f}ms")
 
         return result
 
@@ -108,30 +108,26 @@ class PerformanceProfiler:
         self.results[name] = result
 
         print(f"  Average time: {avg_time:.3f}ms")
-        print(f"  Total time: {elapsed_time*1000:.1f}ms")
+        print(f"  Total time: {elapsed_time * 1000:.1f}ms")
 
         return result
 
     def print_summary(self):
         """Print summary of all profiling results."""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("PERFORMANCE PROFILING SUMMARY")
-        print("="*70)
+        print("=" * 70)
 
         # Sort by average time
-        sorted_results = sorted(
-            self.results.values(),
-            key=lambda x: x["avg_time_ms"],
-            reverse=True
-        )
+        sorted_results = sorted(self.results.values(), key=lambda x: x["avg_time_ms"], reverse=True)
 
         print(f"\n{'Operation':<40} {'Avg Time (ms)':<15} {'Total (ms)':<15}")
-        print("-"*70)
+        print("-" * 70)
 
         for result in sorted_results:
             print(f"{result['name']:<40} {result['avg_time_ms']:>12.3f}   {result['total_time_ms']:>12.1f}")
 
-        print("="*70)
+        print("=" * 70)
 
 
 async def profile_memory_extraction(profiler: PerformanceProfiler):
@@ -140,10 +136,7 @@ async def profile_memory_extraction(profiler: PerformanceProfiler):
 
     from ai_companion.modules.memory.long_term.memory_manager import MemoryAnalysis, MemoryManager
 
-    mock_analysis = MemoryAnalysis(
-        is_important=True,
-        formatted_memory="Experiencing anxiety following mother's death"
-    )
+    mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Experiencing anxiety following mother's death")
 
     with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
         mock_vs.return_value.find_similar_memory.return_value = None
@@ -155,11 +148,7 @@ async def profile_memory_extraction(profiler: PerformanceProfiler):
 
         message = HumanMessage(content="I've been feeling really anxious since my mom passed away")
 
-        await profiler.profile_async(
-            "Memory Extraction",
-            manager.extract_and_store_memories,
-            message
-        )
+        await profiler.profile_async("Memory Extraction", manager.extract_and_store_memories, message)
 
 
 def profile_memory_retrieval(profiler: PerformanceProfiler):
@@ -168,11 +157,7 @@ def profile_memory_retrieval(profiler: PerformanceProfiler):
     from ai_companion.modules.memory.long_term.vector_store import Memory
 
     mock_memories = [
-        Memory(
-            text=f"Memory {i}: Important information",
-            metadata={"id": f"mem{i}"},
-            score=0.9 - i*0.05
-        )
+        Memory(text=f"Memory {i}: Important information", metadata={"id": f"mem{i}"}, score=0.9 - i * 0.05)
         for i in range(3)
     ]
 
@@ -181,11 +166,7 @@ def profile_memory_retrieval(profiler: PerformanceProfiler):
 
         manager = MemoryManager()
 
-        profiler.profile_sync(
-            "Memory Retrieval",
-            manager.get_relevant_memories,
-            "I'm having a hard day"
-        )
+        profiler.profile_sync("Memory Retrieval", manager.get_relevant_memories, "I'm having a hard day")
 
 
 def profile_memory_formatting(profiler: PerformanceProfiler):
@@ -195,16 +176,9 @@ def profile_memory_formatting(profiler: PerformanceProfiler):
     with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store"):
         manager = MemoryManager()
 
-        memories = [
-            f"Memory {i}: Important therapeutic information about the user"
-            for i in range(5)
-        ]
+        memories = [f"Memory {i}: Important therapeutic information about the user" for i in range(5)]
 
-        profiler.profile_sync(
-            "Memory Formatting",
-            manager.format_memories_for_prompt,
-            memories
-        )
+        profiler.profile_sync("Memory Formatting", manager.format_memories_for_prompt, memories)
 
 
 async def profile_speech_to_text(profiler: PerformanceProfiler):
@@ -220,21 +194,20 @@ async def profile_speech_to_text(profiler: PerformanceProfiler):
     with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
         with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
             mock_breaker = MagicMock()
+
             async def async_call(func):
                 result = func()
                 if hasattr(result, "__await__"):
                     return await result
                 return result
+
             mock_breaker.call_async = async_call
             mock_cb.return_value = mock_breaker
 
             stt = SpeechToText()
 
             await profiler.profile_async(
-                "Speech-to-Text Transcription",
-                stt.transcribe,
-                sample_audio,
-                audio_format="wav"
+                "Speech-to-Text Transcription", stt.transcribe, sample_audio, audio_format="wav"
             )
 
 
@@ -248,20 +221,20 @@ async def profile_text_to_speech(profiler: PerformanceProfiler):
     with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
         with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
             mock_breaker = MagicMock()
+
             async def async_call(func):
                 result = func()
                 if hasattr(result, "__await__"):
                     return await result
                 return result
+
             mock_breaker.call_async = async_call
             mock_cb.return_value = mock_breaker
 
             tts = TextToSpeech()
 
             await profiler.profile_async(
-                "Text-to-Speech Synthesis",
-                tts.synthesize,
-                "Hello, I'm Rose. How are you feeling today?"
+                "Text-to-Speech Synthesis", tts.synthesize, "Hello, I'm Rose. How are you feeling today?"
             )
 
 
@@ -272,17 +245,9 @@ def profile_circuit_breaker(profiler: PerformanceProfiler):
     def fast_operation():
         return "success"
 
-    breaker = CircuitBreaker(
-        failure_threshold=5,
-        recovery_timeout=60,
-        expected_exception=Exception
-    )
+    breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60, expected_exception=Exception)
 
-    profiler.profile_sync(
-        "Circuit Breaker (sync)",
-        breaker.call,
-        fast_operation
-    )
+    profiler.profile_sync("Circuit Breaker (sync)", breaker.call, fast_operation)
 
 
 async def profile_async_circuit_breaker(profiler: PerformanceProfiler):
@@ -292,17 +257,9 @@ async def profile_async_circuit_breaker(profiler: PerformanceProfiler):
     async def fast_async_operation():
         return "success"
 
-    breaker = CircuitBreaker(
-        failure_threshold=5,
-        recovery_timeout=60,
-        expected_exception=Exception
-    )
+    breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60, expected_exception=Exception)
 
-    await profiler.profile_async(
-        "Circuit Breaker (async)",
-        breaker.call_async,
-        fast_async_operation
-    )
+    await profiler.profile_async("Circuit Breaker (async)", breaker.call_async, fast_async_operation)
 
 
 async def main():
@@ -310,24 +267,26 @@ async def main():
     parser = argparse.ArgumentParser(description="Profile AI Companion performance")
     parser.add_argument(
         "--operation",
-        choices=["memory_extraction", "memory_retrieval", "memory_formatting",
-                 "speech_to_text", "text_to_speech", "circuit_breaker", "all"],
+        choices=[
+            "memory_extraction",
+            "memory_retrieval",
+            "memory_formatting",
+            "speech_to_text",
+            "text_to_speech",
+            "circuit_breaker",
+            "all",
+        ],
         default="all",
-        help="Operation to profile"
+        help="Operation to profile",
     )
-    parser.add_argument(
-        "--iterations",
-        type=int,
-        default=100,
-        help="Number of iterations for profiling"
-    )
+    parser.add_argument("--iterations", type=int, default=100, help="Number of iterations for profiling")
 
     args = parser.parse_args()
 
     profiler = PerformanceProfiler(iterations=args.iterations)
 
     print(f"Performance Profiling - {args.iterations} iterations per operation")
-    print("="*70)
+    print("=" * 70)
 
     operations = {
         "memory_extraction": profile_memory_extraction,

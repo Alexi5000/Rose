@@ -88,11 +88,14 @@ class SessionCleanupManager:
 
                 # First, find thread_ids that have at least one recent checkpoint
                 # (these are active sessions we want to keep)
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT DISTINCT thread_id
                     FROM checkpoints
                     WHERE checkpoint_id > ?
-                """, (cutoff_date.timestamp(),))
+                """,
+                    (cutoff_date.timestamp(),),
+                )
 
                 active_thread_ids = {row[0] for row in cursor.fetchall()}
 

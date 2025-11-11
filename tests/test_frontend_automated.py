@@ -1,6 +1,5 @@
 """Automated tests for frontend functionality (to be run with Playwright or Selenium)."""
 
-
 import pytest
 
 # Note: These tests require Playwright or Selenium to be installed

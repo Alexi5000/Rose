@@ -38,9 +38,7 @@ class TestConversationWorkflow:
         """
         # Arrange: Create initial state with user message
         initial_state = {
-            "messages": [
-                HumanMessage(content="I'm feeling overwhelmed with grief today.")
-            ],
+            "messages": [HumanMessage(content="I'm feeling overwhelmed with grief today.")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -54,17 +52,20 @@ class TestConversationWorkflow:
         mock_router_response = MagicMock()
         mock_router_response.response_type = "conversation"
 
-        mock_conversation_response = "I hear you, dear one. Grief can feel overwhelming. Would you like to talk about what you're experiencing?"
+        mock_conversation_response = (
+            "I hear you, dear one. Grief can feel overwhelming. Would you like to talk about what you're experiencing?"
+        )
 
         mock_memory_analysis = MagicMock()
         mock_memory_analysis.is_important = True
         mock_memory_analysis.formatted_memory = "User is experiencing overwhelming grief."
 
         # Act: Execute workflow with mocked dependencies
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             # Mock character response chain
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
@@ -121,9 +122,7 @@ class TestConversationWorkflow:
         """
         # Arrange: Create state with existing conversation
         initial_state = {
-            "messages": [
-                HumanMessage(content="Can you remind me what we discussed about my mother?")
-            ],
+            "messages": [HumanMessage(content="Can you remind me what we discussed about my mother?")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -149,10 +148,11 @@ class TestConversationWorkflow:
         mock_memory_analysis.formatted_memory = "User asked to recall previous discussion about their mother."
 
         # Act: Execute workflow
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
@@ -205,9 +205,7 @@ class TestAudioWorkflow:
         """
         # Arrange: Create state with audio workflow
         initial_state = {
-            "messages": [
-                HumanMessage(content="I need help with breathing exercises.")
-            ],
+            "messages": [HumanMessage(content="I need help with breathing exercises.")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -228,11 +226,12 @@ class TestAudioWorkflow:
         mock_memory_analysis.formatted_memory = "User requested help with breathing exercises."
 
         # Act: Execute workflow
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm, \
-             patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
+        ):
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
@@ -289,9 +288,7 @@ class TestMemoryWorkflow:
         """
         # Arrange
         initial_state = {
-            "messages": [
-                HumanMessage(content="My mother passed away last month from cancer.")
-            ],
+            "messages": [HumanMessage(content="My mother passed away last month from cancer.")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -311,10 +308,11 @@ class TestMemoryWorkflow:
         mock_memory_analysis.formatted_memory = "User's mother passed away last month from cancer."
 
         # Act
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
@@ -359,9 +357,7 @@ class TestMemoryWorkflow:
         """
         # Arrange
         initial_state = {
-            "messages": [
-                HumanMessage(content="Tell me more about what we discussed regarding healing.")
-            ],
+            "messages": [HumanMessage(content="Tell me more about what we discussed regarding healing.")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -386,10 +382,11 @@ class TestMemoryWorkflow:
         mock_memory_analysis.formatted_memory = None
 
         # Act
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
@@ -468,11 +465,12 @@ class TestConversationSummarization:
         mock_memory_analysis.formatted_memory = None
 
         # Act
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.graph.nodes.get_chat_model") as mock_get_chat_model, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_chat_model") as mock_get_chat_model,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             # Mock response chain for conversation
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke.return_value = mock_conversation_response
@@ -528,9 +526,7 @@ class TestWorkflowTimeout:
         """
         # Arrange
         initial_state = {
-            "messages": [
-                HumanMessage(content="Test message")
-            ],
+            "messages": [HumanMessage(content="Test message")],
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
@@ -553,10 +549,11 @@ class TestWorkflowTimeout:
         mock_memory_analysis.formatted_memory = None
 
         # Act & Assert: Verify timeout is respected
-        with patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store, \
-             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm:
-
+        with (
+            patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
+            patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
+        ):
             # Mock response chain with slow operation
             mock_response_chain = AsyncMock()
             mock_response_chain.ainvoke = slow_llm_call
@@ -586,5 +583,5 @@ class TestWorkflowTimeout:
                     with pytest.raises(asyncio.TimeoutError):
                         await asyncio.wait_for(
                             graph.ainvoke(initial_state),
-                            timeout=2.0  # 2 second timeout
+                            timeout=2.0,  # 2 second timeout
                         )

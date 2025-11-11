@@ -20,12 +20,12 @@ from typing import Dict, List
 # Add src to path
 sys.path.insert(0, "src")
 
+from langchain_core.messages import HumanMessage
+
 from ai_companion.modules.memory.long_term.constants import ENABLE_SESSION_ISOLATION
 from ai_companion.modules.memory.long_term.memory_manager import get_memory_manager
 from ai_companion.modules.memory.long_term.startup import initialize_memory_system, verify_memory_system
 from ai_companion.modules.memory.long_term.vector_store import get_vector_store
-from langchain_core.messages import HumanMessage
-
 
 # ==============================================================================
 # TEST DATA
@@ -87,6 +87,7 @@ CONVERSATION_TEMPLATES = {
 # CONVERSATION SIMULATOR
 # ==============================================================================
 
+
 class ConversationSimulator:
     """Simulates a realistic 5-minute therapeutic conversation."""
 
@@ -107,9 +108,9 @@ class ConversationSimulator:
         duration_seconds = duration_minutes * 60
         conversation_turns = []
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"🗣️  {self.session_id} ({self.conversation_type})")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         turn = 0
         while (time.time() - self.start_time) < duration_seconds:
@@ -123,22 +124,18 @@ class ConversationSimulator:
 
             try:
                 message = HumanMessage(content=message_text)
-                await self.memory_manager.extract_and_store_memories(
-                    message,
-                    session_id=self.session_id
-                )
+                await self.memory_manager.extract_and_store_memories(message, session_id=self.session_id)
 
-                memories = self.memory_manager.get_relevant_memories(
-                    message_text,
-                    session_id=self.session_id
-                )
+                memories = self.memory_manager.get_relevant_memories(message_text, session_id=self.session_id)
 
-                conversation_turns.append({
-                    "turn": turn,
-                    "message": message_text,
-                    "memories_retrieved": len(memories),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                conversation_turns.append(
+                    {
+                        "turn": turn,
+                        "message": message_text,
+                        "memories_retrieved": len(memories),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
                 self.stored_memories.extend(memories)
 
@@ -173,17 +170,19 @@ class ConversationSimulator:
 # MAIN TEST FUNCTION
 # ==============================================================================
 
+
 async def run_smoke_test():
     """Run the 10x5min conversation smoke test."""
     # Set UTF-8 encoding for Windows
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-    print("\n" + "="*70)
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+
+    print("\n" + "=" * 70)
     print("  SMOKE TEST: 10 x 5-MINUTE CONVERSATIONS")
-    print("="*70)
+    print("=" * 70)
 
     # Initialize
     print("\n🚀 Initializing memory system...")
@@ -193,7 +192,7 @@ async def run_smoke_test():
         return False
 
     status = verify_memory_system()
-    if not status or status['status'] != 'operational':
+    if not status or status["status"] != "operational":
         print("❌ Memory system not operational")
         return False
 
@@ -206,82 +205,83 @@ async def run_smoke_test():
     simulators = []
 
     for i in range(10):
-        session_id = f"user_{i+1}_{uuid.uuid4().hex[:8]}"
+        session_id = f"user_{i + 1}_{uuid.uuid4().hex[:8]}"
         conv_type = conversation_types[i % len(conversation_types)]
         simulators.append(ConversationSimulator(session_id, conv_type))
 
     # Run concurrently
     start_time = time.time()
     results = await asyncio.gather(
-        *[sim.run_conversation(duration_minutes=5) for sim in simulators],
-        return_exceptions=True
+        *[sim.run_conversation(duration_minutes=5) for sim in simulators], return_exceptions=True
     )
     total_duration = time.time() - start_time
 
     # Analyze results
-    print(f"\n{'='*70}")
-    print(f"  ANALYSIS")
-    print(f"{'='*70}")
+    print(f"\n{'=' * 70}")
+    print("  ANALYSIS")
+    print(f"{'=' * 70}")
 
     successful = [r for r in results if not isinstance(r, Exception)]
     failed = [r for r in results if isinstance(r, Exception)]
 
-    print(f"\n📊 Overall Statistics:")
-    print(f"  ⏱️  Total runtime: {total_duration:.1f}s ({total_duration/60:.1f} minutes)")
+    print("\n📊 Overall Statistics:")
+    print(f"  ⏱️  Total runtime: {total_duration:.1f}s ({total_duration / 60:.1f} minutes)")
     print(f"  ✅ Successful: {len(successful)}/10")
     print(f"  ❌ Failed: {len(failed)}/10")
 
     if failed:
-        print(f"\n  Failed conversation errors:")
+        print("\n  Failed conversation errors:")
         for i, exc in enumerate(failed, 1):
             print(f"    {i}. {exc}")
 
     # Stats
-    total_turns = sum(r['turns'] for r in successful)
-    total_memories = sum(r['memories_stored'] for r in successful)
-    total_errors = sum(len(r['errors']) for r in successful)
+    total_turns = sum(r["turns"] for r in successful)
+    total_memories = sum(r["memories_stored"] for r in successful)
+    total_errors = sum(len(r["errors"]) for r in successful)
 
-    print(f"\n📈 Per-Conversation Statistics:")
+    print("\n📈 Per-Conversation Statistics:")
     for i, result in enumerate(successful, 1):
         print(f"  {i}. {result['session_id'][:20]}... ({result['conversation_type']})")
-        print(f"     • Turns: {result['turns']}, Duration: {result['duration_seconds']:.1f}s, Memories: {result['memories_stored']}")
-        if result['errors']:
+        print(
+            f"     • Turns: {result['turns']}, Duration: {result['duration_seconds']:.1f}s, Memories: {result['memories_stored']}"
+        )
+        if result["errors"]:
             print(f"     • Errors: {len(result['errors'])} ⚠️")
 
-    print(f"\n📊 Aggregate:")
+    print("\n📊 Aggregate:")
     print(f"  💬 Total turns: {total_turns}")
     print(f"  💾 Total memories: {total_memories}")
     print(f"  ⚠️  Total errors: {total_errors}")
 
     # Verify session isolation
     if ENABLE_SESSION_ISOLATION and successful:
-        print(f"\n{'='*70}")
-        print(f"  SESSION ISOLATION VERIFICATION")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print("  SESSION ISOLATION VERIFICATION")
+        print(f"{'=' * 70}")
 
         vector_store = get_vector_store()
         isolation_violations = 0
 
         for result in successful[:3]:
-            session_id = result['session_id']
+            session_id = result["session_id"]
             memories = vector_store.search_memories("allergic to", k=10, session_id=session_id)
 
             for memory in memories:
-                if memory.metadata.get('session_id') != session_id:
+                if memory.metadata.get("session_id") != session_id:
                     isolation_violations += 1
-                    print(f"  ⚠️  VIOLATION: Cross-session leak detected!")
+                    print("  ⚠️  VIOLATION: Cross-session leak detected!")
 
         if isolation_violations == 0:
-            print(f"  ✅ Session isolation: PASS")
+            print("  ✅ Session isolation: PASS")
         else:
             print(f"  ❌ Session isolation: FAIL ({isolation_violations} violations)")
 
     # Circuit breaker check
-    print(f"\n{'='*70}")
-    print(f"  CIRCUIT BREAKER VERIFICATION")
-    print(f"{'='*70}")
+    print(f"\n{'=' * 70}")
+    print("  CIRCUIT BREAKER VERIFICATION")
+    print(f"{'=' * 70}")
 
-    from ai_companion.core.resilience import get_qdrant_circuit_breaker, get_groq_circuit_breaker
+    from ai_companion.core.resilience import get_groq_circuit_breaker, get_qdrant_circuit_breaker
 
     qdrant_cb = get_qdrant_circuit_breaker()
     groq_cb = get_groq_circuit_breaker()
@@ -290,9 +290,9 @@ async def run_smoke_test():
     print(f"  ⚡ Groq: {groq_cb.state.name} (failures: {groq_cb.fail_counter}/{groq_cb.failure_threshold})")
 
     # Assertions
-    print(f"\n{'='*70}")
-    print(f"  ASSERTIONS")
-    print(f"{'='*70}")
+    print(f"\n{'=' * 70}")
+    print("  ASSERTIONS")
+    print(f"{'=' * 70}")
 
     all_passed = True
 
@@ -300,25 +300,25 @@ async def run_smoke_test():
         print(f"  ❌ {len(failed)} conversations failed")
         all_passed = False
     else:
-        print(f"  ✅ All conversations completed")
+        print("  ✅ All conversations completed")
 
     if total_memories == 0:
-        print(f"  ❌ No memories stored")
+        print("  ❌ No memories stored")
         all_passed = False
     else:
         print(f"  ✅ Memories stored: {total_memories}")
 
     if qdrant_cb.state.name == "OPEN":
-        print(f"  ❌ Qdrant circuit breaker tripped")
+        print("  ❌ Qdrant circuit breaker tripped")
         all_passed = False
     else:
-        print(f"  ✅ Qdrant circuit breaker healthy")
+        print("  ✅ Qdrant circuit breaker healthy")
 
     if groq_cb.state.name == "OPEN":
-        print(f"  ❌ Groq circuit breaker tripped")
+        print("  ❌ Groq circuit breaker tripped")
         all_passed = False
     else:
-        print(f"  ✅ Groq circuit breaker healthy")
+        print("  ✅ Groq circuit breaker healthy")
 
     error_rate = total_errors / total_turns if total_turns > 0 else 0
     if error_rate >= 0.1:
@@ -328,22 +328,22 @@ async def run_smoke_test():
         print(f"  ✅ Error rate acceptable: {error_rate:.1%}")
 
     # Final result
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     if all_passed:
-        print(f"  🎉 SMOKE TEST PASSED!")
+        print("  🎉 SMOKE TEST PASSED!")
     else:
-        print(f"  ❌ SMOKE TEST FAILED")
-    print(f"{'='*70}")
+        print("  ❌ SMOKE TEST FAILED")
+    print(f"{'=' * 70}")
 
     if all_passed:
-        print(f"\n  System is stable under concurrent load:")
-        print(f"    • 10 concurrent users")
+        print("\n  System is stable under concurrent load:")
+        print("    • 10 concurrent users")
         print(f"    • {total_turns} total turns")
         print(f"    • {total_memories} memories stored")
-        print(f"    • Session isolation working")
-        print(f"    • Circuit breakers healthy")
+        print("    • Session isolation working")
+        print("    • Circuit breakers healthy")
         print(f"    • Error rate: {error_rate:.1%}")
-        print(f"\n  ✅ Memory system is PRODUCTION READY! 🚀\n")
+        print("\n  ✅ Memory system is PRODUCTION READY! 🚀\n")
 
     return all_passed
 

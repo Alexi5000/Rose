@@ -48,6 +48,8 @@ export const useAudioAnalyzer = (
     waveformData: new Uint8Array(0),
   });
 
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -150,6 +152,7 @@ export const useAudioAnalyzer = (
       cancelAnimationFrame(animationFrameRef.current);
     }
     animationFrameRef.current = requestAnimationFrame(analyze);
+    setIsAnalyzing(true);
   }, [analyze]);
 
   /**
@@ -160,6 +163,7 @@ export const useAudioAnalyzer = (
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
+    setIsAnalyzing(false);
   }, []);
 
   /**
@@ -206,12 +210,12 @@ export const useAudioAnalyzer = (
     frequency: audioData.frequency,
     frequencyData: audioData.frequencyData,
     waveformData: audioData.waveformData,
-    
+
     // Controls
     startAnalysis,
     stopAnalysis,
-    
+
     // Status
-    isAnalyzing: animationFrameRef.current !== null,
+    isAnalyzing,
   };
 };

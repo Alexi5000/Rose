@@ -123,6 +123,7 @@ def handle_api_errors(
     def decorator(func: F) -> F:
         # Use introspection to determine if function is async
         if inspect.iscoroutinefunction(func):
+
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 try:
@@ -132,6 +133,7 @@ def handle_api_errors(
 
             return async_wrapper  # type: ignore
         else:
+
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 try:
@@ -199,6 +201,7 @@ def handle_workflow_errors(func: F) -> F:
 
     # Use introspection to determine if function is async
     if inspect.iscoroutinefunction(func):
+
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -208,6 +211,7 @@ def handle_workflow_errors(func: F) -> F:
 
         return async_wrapper  # type: ignore
     else:
+
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -268,6 +272,7 @@ def handle_memory_errors(func: F) -> F:
 
     # Use introspection to determine if function is async
     if inspect.iscoroutinefunction(func):
+
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -279,6 +284,7 @@ def handle_memory_errors(func: F) -> F:
 
         return async_wrapper  # type: ignore
     else:
+
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -333,6 +339,7 @@ def handle_validation_errors(func: F) -> F:
 
     # Use introspection to determine if function is async
     if inspect.iscoroutinefunction(func):
+
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -345,6 +352,7 @@ def handle_validation_errors(func: F) -> F:
 
         return async_wrapper  # type: ignore
     else:
+
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:

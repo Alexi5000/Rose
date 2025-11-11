@@ -45,7 +45,7 @@ class ErrorResponse(BaseModel):
                     "error": "external_service_unavailable",
                     "message": "I'm having trouble connecting to my services right now. Please try again in a moment.",
                     "request_id": "550e8400-e29b-41d4-a716-446655440000",
-                    "details": None
+                    "details": None,
                 }
             ]
         }
@@ -97,7 +97,7 @@ async def ai_companion_error_handler(request: Request, exc: AICompanionError) ->
         error_type=type(exc).__name__,
         error_message=str(exc),
         request_id=request_id,
-        exc_info=True
+        exc_info=True,
     )
 
     # Map exception types to user-friendly messages
@@ -128,11 +128,7 @@ async def ai_companion_error_handler(request: Request, exc: AICompanionError) ->
 
     return JSONResponse(
         status_code=status_code,
-        content=ErrorResponse(
-            error=error_code,
-            message=message,
-            request_id=request_id
-        ).model_dump()
+        content=ErrorResponse(error=error_code, message=message, request_id=request_id).model_dump(),
     )
 
 
@@ -148,19 +144,15 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
     """
     request_id = get_request_id(request)
 
-    logger.warning(
-        "validation_error",
-        error_message=str(exc),
-        request_id=request_id
-    )
+    logger.warning("validation_error", error_message=str(exc), request_id=request_id)
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content=ErrorResponse(
             error="validation_failed",
             message="Invalid request data. Please check your input and try again.",
-            request_id=request_id
-        ).model_dump()
+            request_id=request_id,
+        ).model_dump(),
     )
 
 
@@ -182,7 +174,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         error_type=type(exc).__name__,
         error_message=str(exc),
         request_id=request_id,
-        exc_info=True
+        exc_info=True,
     )
 
     return JSONResponse(
@@ -190,6 +182,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         content=ErrorResponse(
             error="internal_server_error",
             message="An unexpected error occurred. Please try again.",
-            request_id=request_id
-        ).model_dump()
+            request_id=request_id,
+        ).model_dump(),
     )

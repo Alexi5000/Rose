@@ -165,10 +165,7 @@ class MemoryManager:
         if analysis.is_important and analysis.formatted_memory:
             # ♻️ Check if similar memory exists (within the same session)
             # This prevents duplicate storage of the same information
-            similar = self.vector_store.find_similar_memory(
-                analysis.formatted_memory,
-                session_id=session_id
-            )
+            similar = self.vector_store.find_similar_memory(analysis.formatted_memory, session_id=session_id)
             if similar:
                 # Skip storage if we already have a similar memory
                 self.logger.info(f"♻️ Similar memory exists, skipping: '{analysis.formatted_memory}'")
@@ -208,11 +205,7 @@ class MemoryManager:
             >>> print(memories)
             ['User enjoys hiking in mountainous terrain', 'User likes camping']
         """
-        memories = self.vector_store.search_memories(
-            context,
-            k=settings.MEMORY_TOP_K,
-            session_id=session_id
-        )
+        memories = self.vector_store.search_memories(context, k=settings.MEMORY_TOP_K, session_id=session_id)
         # Detailed logging is now handled in vector_store.search_memories()
         return [memory.text for memory in memories]
 

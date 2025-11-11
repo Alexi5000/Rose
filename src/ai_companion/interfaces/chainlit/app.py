@@ -148,9 +148,7 @@ async def generate_voice_response(text_content: str, thread_id: int) -> tuple[st
 
         # Generate TTS with timeout
         try:
-            audio_buffer = await asyncio.wait_for(
-                text_to_speech_module.synthesize(text_content), timeout=10.0
-            )
+            audio_buffer = await asyncio.wait_for(text_to_speech_module.synthesize(text_content), timeout=10.0)
 
             # Check if circuit breaker state changed after successful call
             circuit_state_after = circuit_breaker.state
@@ -276,9 +274,7 @@ async def on_message(message: cl.Message):
                         output_state = await graph.aget_state(config={"configurable": {"thread_id": thread_id}})
                 except asyncio.TimeoutError:
                     cl.logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s")
-                    await cl.Message(
-                        content="I'm taking longer than usual to respond. Please try again."
-                    ).send()
+                    await cl.Message(content="I'm taking longer than usual to respond. Please try again.").send()
                     return
 
     except CircuitBreakerError as e:
@@ -289,9 +285,7 @@ async def on_message(message: cl.Message):
         return
     except Exception as e:
         cl.logger.error(f"Workflow failed: {e}", exc_info=True)
-        await cl.Message(
-            content="I'm having trouble processing that right now. Could you try rephrasing?"
-        ).send()
+        await cl.Message(content="I'm having trouble processing that right now. Could you try rephrasing?").send()
         return
 
     # Generate voice response for all message types (voice-first design)
@@ -356,9 +350,7 @@ async def on_audio_end(elements):
                 )
             except asyncio.TimeoutError:
                 cl.logger.error(f"Workflow timeout after {settings.WORKFLOW_TIMEOUT_SECONDS}s")
-                await cl.Message(
-                    content="I'm taking longer than usual to respond. Please try again."
-                ).send()
+                await cl.Message(content="I'm taking longer than usual to respond. Please try again.").send()
                 return
 
         # Generate voice response using centralized function
@@ -375,6 +367,4 @@ async def on_audio_end(elements):
         ).send()
     except Exception as e:
         cl.logger.error(f"Audio workflow failed: {e}", exc_info=True)
-        await cl.Message(
-            content="I'm having trouble processing that right now. Could you try rephrasing?"
-        ).send()
+        await cl.Message(content="I'm having trouble processing that right now. Could you try rephrasing?").send()

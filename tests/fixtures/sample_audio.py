@@ -23,6 +23,7 @@ def create_sample_wav(duration_seconds: float = 1.0, sample_rate: int = 16000) -
 
     # Create a simple sine wave pattern (440 Hz tone)
     import math
+
     frequency = 440.0
     samples = []
     for i in range(num_samples):
@@ -51,10 +52,14 @@ def create_sample_mp3_header() -> bytes:
     """
     # MP3 frame header (simplified for testing purposes)
     # This creates a minimal valid MP3 frame sync pattern
-    mp3_header = bytes([
-        0xFF, 0xFB,  # Frame sync + MPEG 1 Layer 3
-        0x90, 0x00,  # Bitrate + sample rate
-    ])
+    mp3_header = bytes(
+        [
+            0xFF,
+            0xFB,  # Frame sync + MPEG 1 Layer 3
+            0x90,
+            0x00,  # Bitrate + sample rate
+        ]
+    )
 
     # Add some dummy audio data
     dummy_data = bytes([0x00] * 100)

@@ -93,6 +93,7 @@ def log_section(title: str):
 
 # Fix functions (Uncle Bob: Small, focused functions with single responsibility)
 
+
 def fix_qdrant_url_local():
     """Fix Qdrant URL for local development."""
     env_path = PROJECT_ROOT / ".env"
@@ -136,12 +137,7 @@ def fix_frontend_dependencies():
     if not npm_cmd:
         raise RuntimeError("npm not found in PATH")
 
-    result = subprocess.run(
-        [npm_cmd, "install"],
-        cwd=frontend_dir,
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run([npm_cmd, "install"], cwd=frontend_dir, capture_output=True, text=True)
 
     if result.returncode != 0:
         raise RuntimeError(f"npm install failed: {result.stderr}")
@@ -156,12 +152,7 @@ def fix_python_dependencies():
     if not shutil.which("uv"):
         raise RuntimeError("uv not found in PATH")
 
-    result = subprocess.run(
-        ["uv", "sync"],
-        cwd=PROJECT_ROOT,
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["uv", "sync"], cwd=PROJECT_ROOT, capture_output=True, text=True)
 
     if result.returncode != 0:
         raise RuntimeError(f"uv sync failed: {result.stderr}")
@@ -182,12 +173,7 @@ def fix_frontend_build():
     if not npm_cmd:
         raise RuntimeError("npm not found in PATH")
 
-    result = subprocess.run(
-        [npm_cmd, "run", "build"],
-        cwd=frontend_dir,
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run([npm_cmd, "run", "build"], cwd=frontend_dir, capture_output=True, text=True)
 
     if result.returncode != 0:
         raise RuntimeError(f"npm run build failed: {result.stderr}")
@@ -306,6 +292,7 @@ def fix_add_docker_env_flag():
 
 # Check functions (Uncle Bob: Separate query from command)
 
+
 def check_qdrant_url_correct() -> bool:
     """Check if Qdrant URL is correct for local dev."""
     env_path = PROJECT_ROOT / ".env"
@@ -355,10 +342,7 @@ def check_docker_compose_valid() -> bool:
 
 def check_memory_dirs_exist() -> bool:
     """Check if memory directories exist."""
-    return (
-        (PROJECT_ROOT / "short_term_memory").exists() and
-        (PROJECT_ROOT / "long_term_memory").exists()
-    )
+    return (PROJECT_ROOT / "short_term_memory").exists() and (PROJECT_ROOT / "long_term_memory").exists()
 
 
 def main():
@@ -366,6 +350,7 @@ def main():
     # Fix Windows console encoding for emojis
     if sys.platform == "win32":
         import io
+
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
@@ -376,13 +361,9 @@ def main():
 Examples:
   python scripts/fix_deployment_issues.py              # Apply all fixes
   python scripts/fix_deployment_issues.py --dry-run    # Show what would be fixed
-        """
+        """,
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be fixed without making changes"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be fixed without making changes")
 
     args = parser.parse_args()
 
@@ -397,43 +378,43 @@ Examples:
             "Qdrant URL for Local Development",
             "Update QDRANT_URL in .env to use localhost instead of Docker service name",
             fix_qdrant_url_local,
-            check_qdrant_url_correct
+            check_qdrant_url_correct,
         ),
         Fix(
             "Python Dependencies",
             "Install Python dependencies using uv sync",
             fix_python_dependencies,
-            check_python_deps_installed
+            check_python_deps_installed,
         ),
         Fix(
             "Frontend Dependencies",
             "Install frontend dependencies using npm install",
             fix_frontend_dependencies,
-            check_frontend_deps_installed
+            check_frontend_deps_installed,
         ),
         Fix(
             "Frontend Build",
             "Build frontend for production using npm run build",
             fix_frontend_build,
-            check_frontend_built
+            check_frontend_built,
         ),
         Fix(
             "Docker Compose Configuration",
             "Fix docker-compose.yml issues (Dockerfile references, service names)",
             fix_docker_compose,
-            check_docker_compose_valid
+            check_docker_compose_valid,
         ),
         Fix(
             "Memory Directories",
             "Create short_term_memory and long_term_memory directories",
             fix_create_memory_dirs,
-            check_memory_dirs_exist
+            check_memory_dirs_exist,
         ),
         Fix(
             "Docker Environment Flag",
             "Add DOCKER_ENV=true to docker-compose.yml for environment detection",
             fix_add_docker_env_flag,
-            None  # Always apply this fix
+            None,  # Always apply this fix
         ),
     ]
 
@@ -520,5 +501,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n{RED}{LOG_EMOJI_ERROR} Fix process failed: {e}{RESET}\n")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

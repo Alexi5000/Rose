@@ -45,8 +45,7 @@ class TextToImage:
         """Initialize the TextToImage class and validate environment variables."""
         if Together is None:
             raise ImportError(
-                "The 'together' package is required for image generation. "
-                "Install it with: uv pip install together"
+                "The 'together' package is required for image generation. Install it with: uv pip install together"
             )
         self._validate_env_vars()
         self._together_client: Optional[Together] = None

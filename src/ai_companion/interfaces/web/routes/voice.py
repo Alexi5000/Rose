@@ -108,13 +108,13 @@ def track_api_call(
     error_emoji: str = "❌",
 ) -> Generator[dict, None, None]:
     """Context manager for tracking API calls with metrics and logging.
-    
+
     Args:
         service_name: Name of the service being called (e.g., "groq_stt", "elevenlabs_tts")
         session_id: Session identifier for logging
         success_emoji: Emoji to use for success logs
         error_emoji: Emoji to use for error logs
-        
+
     Yields:
         dict: Context dictionary that can be updated with additional log data
     """
@@ -146,7 +146,7 @@ def track_api_call(
 
 def record_error_metrics(error_type: str, endpoint: str = "voice_process") -> None:
     """Record error metrics and log.
-    
+
     Args:
         error_type: Type of error for metrics
         endpoint: Endpoint name for metrics
@@ -157,13 +157,13 @@ def record_error_metrics(error_type: str, endpoint: str = "voice_process") -> No
 
 async def _validate_and_read_audio(audio: UploadFile) -> bytes:
     """Validate and read audio file.
-    
+
     Args:
         audio: Uploaded audio file
-        
+
     Returns:
         bytes: Audio file content
-        
+
     Raises:
         HTTPException: If audio is invalid or too large
     """
@@ -183,15 +183,15 @@ async def _validate_and_read_audio(audio: UploadFile) -> bytes:
 
 async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToText) -> str:
     """Transcribe audio to text with metrics tracking.
-    
+
     Args:
         audio_data: Audio file bytes
         session_id: Session identifier
         stt: SpeechToText instance
-        
+
     Returns:
         str: Transcribed text
-        
+
     Raises:
         HTTPException: If audio validation fails
         SpeechToTextError: If transcription fails
@@ -213,25 +213,23 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
         logger.error("❌ audio_validation_failed", error=str(e), session_id=session_id)
         raise HTTPException(status_code=400, detail=ERROR_MSG_AUDIO_VALIDATION_FAILED)
 
-    except Exception as e:
+    except Exception:
         # API or processing errors
         record_error_metrics("speech_to_text_failed")
         raise SpeechToTextError(ERROR_MSG_STT_FAILED)
 
 
-async def _process_workflow(
-    transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver
-) -> str:
+async def _process_workflow(transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver) -> str:
     """Process through LangGraph workflow with timeout and error handling.
 
     Args:
         transcribed_text: Text to process
         session_id: Session identifier
         checkpointer: AsyncSqliteSaver instance for session persistence
-        
+
     Returns:
         str: Response text from workflow
-        
+
     Raises:
         HTTPException: If workflow times out or circuit breaker is open
         WorkflowError: If workflow execution fails
@@ -321,15 +319,15 @@ async def _process_workflow(
 
 async def _generate_audio_response(response_text: str, session_id: str, tts: TextToSpeech) -> bytes:
     """Generate audio response using TTS.
-    
+
     Args:
         response_text: Text to synthesize
         session_id: Session identifier
         tts: TextToSpeech instance
-        
+
     Returns:
         bytes: Audio file bytes
-        
+
     Raises:
         TextToSpeechError: If TTS synthesis fails
     """
@@ -339,7 +337,7 @@ async def _generate_audio_response(response_text: str, session_id: str, tts: Tex
             ctx["audio_size_bytes"] = len(audio_bytes)
             return audio_bytes
 
-    except Exception as e:
+    except Exception:
         record_error_metrics("text_to_speech_failed")
         # Include the response text in the error so user can still see what Rose wanted to say
         raise TextToSpeechError(ERROR_MSG_TTS_FAILED.format(response_text=response_text))
@@ -347,15 +345,15 @@ async def _generate_audio_response(response_text: str, session_id: str, tts: Tex
 
 async def _save_audio_file(audio_bytes: bytes, session_id: str, audio_dir: Path) -> str:
     """Save audio file with secure permissions and retry logic.
-    
+
     Args:
         audio_bytes: Audio file bytes
         session_id: Session identifier for logging
         audio_dir: Directory to save audio files
-        
+
     Returns:
         str: Audio URL path
-        
+
     Raises:
         HTTPException: If file save fails after retries
     """

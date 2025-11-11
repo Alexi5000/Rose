@@ -23,8 +23,10 @@ Modes:
 
 Author: Uncle Bob would approve 👍
 """
+
 import argparse
 import io
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -39,12 +41,11 @@ from scripts.utils import (  # noqa: E402
     wait_for_server,
 )
 from src.ai_companion.config.server_config import (  # noqa: E402
-    QDRANT_DEFAULT_PORT,
     LOG_EMOJI_CLEANUP,
     LOG_EMOJI_ERROR,
     LOG_EMOJI_STARTUP,
     LOG_EMOJI_SUCCESS,
-    LOG_EMOJI_WARNING,
+    QDRANT_DEFAULT_PORT,
     WEB_SERVER_PORT,
 )
 from src.ai_companion.core.logging_config import configure_logging, get_logger  # noqa: E402
@@ -71,6 +72,7 @@ EXIT_FAILURE = 1
 
 class DeploymentMode:
     """Deployment mode constants."""
+
     DOCKER = "docker"
     LOCAL = "local"
     PROD = "prod"
@@ -128,12 +130,7 @@ class RoseDeployer:
         try:
             if self.mode == DeploymentMode.DOCKER:
                 # Stop Docker containers
-                result = run_command_sync(
-                    ["docker-compose", "down"],
-                    cwd=PROJECT_ROOT,
-                    capture_output=True,
-                    text=True
-                )
+                result = run_command_sync(["docker-compose", "down"], cwd=PROJECT_ROOT, capture_output=True, text=True)
 
                 if result.returncode != 0:
                     self.log_error("Failed to stop Docker services", stderr=result.stderr)
@@ -156,6 +153,7 @@ class RoseDeployer:
             frontend_dist = FRONTEND_DIR / "dist"
             if frontend_dist.exists():
                 import shutil
+
                 shutil.rmtree(frontend_dist)
                 self.log_step(LOG_EMOJI_SUCCESS, "Frontend build cleaned")
 
@@ -176,12 +174,7 @@ class RoseDeployer:
         self.log_step(LOG_EMOJI_STARTUP, "Building frontend...")
 
         try:
-            result = run_command_sync(
-                ["npm", "run", "build"],
-                cwd=FRONTEND_DIR,
-                capture_output=True,
-                text=True
-            )
+            result = run_command_sync(["npm", "run", "build"], cwd=FRONTEND_DIR, capture_output=True, text=True)
 
             if result.returncode != 0:
                 self.log_error("Frontend build failed", stderr=result.stderr)
@@ -204,7 +197,7 @@ class RoseDeployer:
                 cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
-                timeout=DOCKER_BUILD_TIMEOUT
+                timeout=DOCKER_BUILD_TIMEOUT,
             )
 
             if result.returncode != 0:
@@ -226,12 +219,7 @@ class RoseDeployer:
         self.log_step(LOG_EMOJI_STARTUP, "Starting Docker services...")
 
         try:
-            result = run_command_sync(
-                ["docker-compose", "up", "-d"],
-                cwd=PROJECT_ROOT,
-                capture_output=True,
-                text=True
-            )
+            result = run_command_sync(["docker-compose", "up", "-d"], cwd=PROJECT_ROOT, capture_output=True, text=True)
 
             if result.returncode != 0:
                 self.log_error("Failed to start Docker services", stderr=result.stderr)
@@ -384,14 +372,12 @@ def main() -> None:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
-    parser = argparse.ArgumentParser(
-        description="Deploy Rose the Healer Shaman with comprehensive verification"
-    )
+    parser = argparse.ArgumentParser(description="Deploy Rose the Healer Shaman with comprehensive verification")
     parser.add_argument(
         "--mode",
         choices=[DeploymentMode.DOCKER, DeploymentMode.LOCAL, DeploymentMode.PROD],
         default=DeploymentMode.DOCKER,
-        help="Deployment mode (default: docker)"
+        help="Deployment mode (default: docker)",
     )
 
     args = parser.parse_args()

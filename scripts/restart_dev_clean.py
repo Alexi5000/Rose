@@ -23,23 +23,28 @@ RED = "\033[91m"
 BLUE = "\033[94m"
 RESET = "\033[0m"
 
+
 def print_step(emoji: str, message: str):
     """Print a step message."""
     print(f"\n{emoji} {BLUE}{message}{RESET}")
+
 
 def print_success(message: str):
     """Print a success message."""
     print(f"   {GREEN}✓ {message}{RESET}")
 
+
 def print_error(message: str):
     """Print an error message."""
     print(f"   {RED}✗ {message}{RESET}")
+
 
 def main():
     """Main entry point."""
     # Fix Windows console encoding
     if sys.platform == "win32":
         import io
+
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
@@ -78,10 +83,7 @@ def main():
             raise RuntimeError("npm not found")
 
         result = subprocess.run(
-            [npm_cmd, "run", "build"],
-            cwd=PROJECT_ROOT / "frontend",
-            capture_output=True,
-            text=True
+            [npm_cmd, "run", "build"], cwd=PROJECT_ROOT / "frontend", capture_output=True, text=True
         )
 
         if result.returncode == 0:
@@ -100,10 +102,7 @@ def main():
 
     try:
         # Start dev server (this will block)
-        subprocess.run(
-            ["python", "scripts/run_dev_server.py"],
-            cwd=PROJECT_ROOT
-        )
+        subprocess.run(["python", "scripts/run_dev_server.py"], cwd=PROJECT_ROOT)
     except KeyboardInterrupt:
         print(f"\n\n{YELLOW}🛑 Stopping servers...{RESET}")
         print(f"{GREEN}✓ Servers stopped{RESET}\n")
@@ -111,6 +110,7 @@ def main():
     except Exception as e:
         print_error(f"Failed to start servers: {e}")
         return 1
+
 
 if __name__ == "__main__":
     try:

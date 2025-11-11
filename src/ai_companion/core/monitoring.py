@@ -30,6 +30,7 @@ class AlertThreshold:
         window_seconds: Time window for evaluation
         enabled: Whether the alert is enabled
     """
+
     name: str
     metric_name: str
     threshold: float
@@ -50,6 +51,7 @@ class Alert:
         threshold: Threshold that was exceeded
         timestamp: When the alert was triggered
     """
+
     name: str
     message: str
     severity: str
@@ -99,7 +101,7 @@ class MonitoringSystem:
                         FastApiIntegration(),
                         LoggingIntegration(
                             level=None,  # Capture all logs
-                            event_level=None  # Send errors as events
+                            event_level=None,  # Send errors as events
                         ),
                     ],
                     # Set release version
@@ -113,10 +115,7 @@ class MonitoringSystem:
                 logger.info("sentry_initialized", dsn_configured=True)
 
             except ImportError:
-                logger.warning(
-                    "sentry_not_available",
-                    message="Sentry DSN configured but sentry-sdk not installed"
-                )
+                logger.warning("sentry_not_available", message="Sentry DSN configured but sentry-sdk not installed")
             except Exception as e:
                 logger.error("sentry_init_failed", error=str(e))
         else:
@@ -125,44 +124,52 @@ class MonitoringSystem:
     def _setup_default_thresholds(self) -> None:
         """Set up default alert thresholds."""
         # Error rate threshold: > 5% of requests failing
-        self.add_threshold(AlertThreshold(
-            name="high_error_rate",
-            metric_name="error_rate_percent",
-            threshold=5.0,
-            comparison="gt",
-            window_seconds=300,  # 5 minutes
-            enabled=os.getenv("ALERT_ERROR_RATE_ENABLED", "true").lower() == "true"
-        ))
+        self.add_threshold(
+            AlertThreshold(
+                name="high_error_rate",
+                metric_name="error_rate_percent",
+                threshold=5.0,
+                comparison="gt",
+                window_seconds=300,  # 5 minutes
+                enabled=os.getenv("ALERT_ERROR_RATE_ENABLED", "true").lower() == "true",
+            )
+        )
 
         # Response time threshold: P95 > 2000ms
-        self.add_threshold(AlertThreshold(
-            name="slow_response_time",
-            metric_name="response_time_p95_ms",
-            threshold=2000.0,
-            comparison="gt",
-            window_seconds=300,
-            enabled=os.getenv("ALERT_RESPONSE_TIME_ENABLED", "true").lower() == "true"
-        ))
+        self.add_threshold(
+            AlertThreshold(
+                name="slow_response_time",
+                metric_name="response_time_p95_ms",
+                threshold=2000.0,
+                comparison="gt",
+                window_seconds=300,
+                enabled=os.getenv("ALERT_RESPONSE_TIME_ENABLED", "true").lower() == "true",
+            )
+        )
 
         # Memory usage threshold: > 80% of limit
-        self.add_threshold(AlertThreshold(
-            name="high_memory_usage",
-            metric_name="memory_usage_percent",
-            threshold=80.0,
-            comparison="gt",
-            window_seconds=60,  # 1 minute
-            enabled=os.getenv("ALERT_MEMORY_ENABLED", "true").lower() == "true"
-        ))
+        self.add_threshold(
+            AlertThreshold(
+                name="high_memory_usage",
+                metric_name="memory_usage_percent",
+                threshold=80.0,
+                comparison="gt",
+                window_seconds=60,  # 1 minute
+                enabled=os.getenv("ALERT_MEMORY_ENABLED", "true").lower() == "true",
+            )
+        )
 
         # Circuit breaker open threshold
-        self.add_threshold(AlertThreshold(
-            name="circuit_breaker_open",
-            metric_name="circuit_breaker_open_count",
-            threshold=0.0,
-            comparison="gt",
-            window_seconds=60,
-            enabled=os.getenv("ALERT_CIRCUIT_BREAKER_ENABLED", "true").lower() == "true"
-        ))
+        self.add_threshold(
+            AlertThreshold(
+                name="circuit_breaker_open",
+                metric_name="circuit_breaker_open_count",
+                threshold=0.0,
+                comparison="gt",
+                window_seconds=60,
+                enabled=os.getenv("ALERT_CIRCUIT_BREAKER_ENABLED", "true").lower() == "true",
+            )
+        )
 
         logger.info("alert_thresholds_configured", count=len(self._alert_thresholds))
 
@@ -178,7 +185,7 @@ class MonitoringSystem:
             name=threshold.name,
             metric=threshold.metric_name,
             threshold=threshold.threshold,
-            enabled=threshold.enabled
+            enabled=threshold.enabled,
         )
 
     def evaluate_thresholds(self) -> List[Alert]:
@@ -215,7 +222,7 @@ class MonitoringSystem:
                     severity=self._get_alert_severity(threshold.name),
                     metric_value=metric_value,
                     threshold=threshold.threshold,
-                    timestamp=current_time
+                    timestamp=current_time,
                 )
 
                 triggered_alerts.append(alert)
@@ -238,14 +245,8 @@ class MonitoringSystem:
         histograms = metrics_summary.get("histograms", {})
 
         # Calculate error rate percentage
-        total_requests = sum(
-            v for k, v in counters.items()
-            if k.endswith("_success") or k.endswith("_failure")
-        )
-        total_errors = sum(
-            v for k, v in counters.items()
-            if k.endswith("_failure") or k == "errors_total"
-        )
+        total_requests = sum(v for k, v in counters.items() if k.endswith("_success") or k.endswith("_failure"))
+        total_errors = sum(v for k, v in counters.items() if k.endswith("_failure") or k == "errors_total")
 
         if total_requests > 0:
             derived["error_rate_percent"] = (total_errors / total_requests) * 100
@@ -267,6 +268,7 @@ class MonitoringSystem:
         # Get memory usage (if available from system metrics)
         try:
             import psutil
+
             process = psutil.Process()
             memory_info = process.memory_info()
             memory_percent = process.memory_percent()
@@ -277,10 +279,7 @@ class MonitoringSystem:
             derived["memory_usage_percent"] = 0.0
 
         # Count open circuit breakers
-        circuit_breaker_open = sum(
-            1 for k, v in counters.items()
-            if "circuit_breaker" in k and "open" in k and v > 0
-        )
+        circuit_breaker_open = sum(1 for k, v in counters.items() if "circuit_breaker" in k and "open" in k and v > 0)
         derived["circuit_breaker_open_count"] = circuit_breaker_open
 
         return derived
@@ -318,9 +317,7 @@ class MonitoringSystem:
             Formatted alert message
         """
         return (
-            f"Alert: {threshold.name} - "
-            f"{threshold.metric_name} is {value:.2f} "
-            f"(threshold: {threshold.threshold:.2f})"
+            f"Alert: {threshold.name} - {threshold.metric_name} is {value:.2f} (threshold: {threshold.threshold:.2f})"
         )
 
     def _get_alert_severity(self, alert_name: str) -> str:
@@ -351,13 +348,14 @@ class MonitoringSystem:
             severity=alert.severity,
             metric_value=alert.metric_value,
             threshold=alert.threshold,
-            message=alert.message
+            message=alert.message,
         )
 
         # Send to Sentry if enabled and critical
         if self._sentry_enabled and alert.severity == "critical":
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_message(
                     alert.message,
                     level="error",
@@ -365,8 +363,8 @@ class MonitoringSystem:
                         "alert_name": alert.name,
                         "metric_value": alert.metric_value,
                         "threshold": alert.threshold,
-                        "severity": alert.severity
-                    }
+                        "severity": alert.severity,
+                    },
                 )
             except Exception as e:
                 logger.error("sentry_alert_failed", error=str(e))
@@ -377,10 +375,7 @@ class MonitoringSystem:
 
         # Keep only recent alerts in active list (last hour)
         cutoff_time = datetime.utcnow() - timedelta(hours=1)
-        self._active_alerts = [
-            a for a in self._active_alerts
-            if a.timestamp > cutoff_time
-        ]
+        self._active_alerts = [a for a in self._active_alerts if a.timestamp > cutoff_time]
 
     def get_active_alerts(self) -> List[Alert]:
         """Get currently active alerts.
@@ -400,10 +395,7 @@ class MonitoringSystem:
             List of historical alerts
         """
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-        return [
-            alert for alert in self._alert_history
-            if alert.timestamp > cutoff_time
-        ]
+        return [alert for alert in self._alert_history if alert.timestamp > cutoff_time]
 
     def get_monitoring_status(self) -> Dict[str, Any]:
         """Get overall monitoring system status.
@@ -421,10 +413,10 @@ class MonitoringSystem:
                     "name": alert.name,
                     "severity": alert.severity,
                     "message": alert.message,
-                    "timestamp": alert.timestamp.isoformat()
+                    "timestamp": alert.timestamp.isoformat(),
                 }
                 for alert in self._active_alerts
-            ]
+            ],
         }
 
     def capture_exception(self, exception: Exception, context: Optional[Dict[str, Any]] = None) -> None:
@@ -437,6 +429,7 @@ class MonitoringSystem:
         if self._sentry_enabled:
             try:
                 import sentry_sdk
+
                 with sentry_sdk.push_scope() as scope:
                     if context:
                         for key, value in context.items():
@@ -450,7 +443,7 @@ class MonitoringSystem:
             "exception_captured",
             exception_type=type(exception).__name__,
             exception_message=str(exception),
-            context=context or {}
+            context=context or {},
         )
 
 

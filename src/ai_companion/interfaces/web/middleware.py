@@ -121,11 +121,7 @@ def create_secure_temp_file(directory: str, filename: str) -> str:
 
     # Create file with secure permissions
     # Use os.open with specific flags for secure creation
-    fd = os.open(
-        file_path,
-        os.O_CREAT | os.O_WRONLY | os.O_EXCL,
-        stat.S_IRUSR | stat.S_IWUSR
-    )
+    fd = os.open(file_path, os.O_CREAT | os.O_WRONLY | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
     os.close(fd)
 
     logger.debug(f"Created secure temp file: {file_path}")

@@ -25,11 +25,7 @@ pytestmark = pytest.mark.e2e
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args):
     """Configure browser context with permissions."""
-    return {
-        **browser_context_args,
-        "permissions": ["microphone"],
-        "viewport": {"width": 1280, "height": 720}
-    }
+    return {**browser_context_args, "permissions": ["microphone"], "viewport": {"width": 1280, "height": 720}}
 
 
 class TestVoiceInterfaceE2E:
@@ -50,7 +46,9 @@ class TestVoiceInterfaceE2E:
         page.goto("http://localhost:8080")
 
         # Look for voice button (may have different selectors)
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button")
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        )
 
         # Verify button is visible
         expect(voice_button.first).to_be_visible()
@@ -63,7 +61,9 @@ class TestVoiceInterfaceE2E:
         page.goto("http://localhost:8080")
 
         # Find voice button
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
 
         # Get initial state
         initial_aria_pressed = voice_button.get_attribute("aria-pressed")
@@ -79,8 +79,9 @@ class TestVoiceInterfaceE2E:
 
         # State should have changed (or button should show different visual state)
         # This is a basic check - actual implementation may vary
-        assert initial_aria_pressed != new_aria_pressed or \
-               voice_button.get_attribute("class") != voice_button.get_attribute("class")
+        assert initial_aria_pressed != new_aria_pressed or voice_button.get_attribute(
+            "class"
+        ) != voice_button.get_attribute("class")
 
     def test_error_message_display(self, page: Page):
         """Test that error messages are displayed to users."""
@@ -106,7 +107,9 @@ class TestVoiceInterfaceE2E:
         page.wait_for_timeout(1000)
 
         # Verify page is interactive
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_enabled()
 
 
@@ -123,7 +126,9 @@ class TestResponsiveDesignE2E:
         expect(page.locator("body")).to_be_visible()
 
         # Verify voice button is still accessible
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_visible()
 
     def test_tablet_viewport(self, page: Page):
@@ -136,7 +141,9 @@ class TestResponsiveDesignE2E:
         expect(page.locator("body")).to_be_visible()
 
         # Verify voice button is accessible
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_visible()
 
     def test_desktop_viewport(self, page: Page):
@@ -149,7 +156,9 @@ class TestResponsiveDesignE2E:
         expect(page.locator("body")).to_be_visible()
 
         # Verify voice button is accessible
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_visible()
 
 
@@ -172,7 +181,9 @@ class TestAccessibilityE2E:
         page.goto("http://localhost:8080")
 
         # Find voice button
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
 
         # Verify aria-label exists
         aria_label = voice_button.get_attribute("aria-label")
@@ -204,7 +215,9 @@ class TestErrorHandlingE2E:
         page.route("**/api/**", lambda route: route.abort())
 
         # Try to interact with voice button
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         voice_button.click()
 
         # Wait for error to appear
@@ -261,10 +274,7 @@ class TestPerformanceE2E:
 
         # Should have no critical console errors
         # Filter out known non-critical errors
-        critical_errors = [
-            err for err in console_errors
-            if "favicon" not in err.lower() and "404" not in err
-        ]
+        critical_errors = [err for err in console_errors if "favicon" not in err.lower() and "404" not in err]
 
         assert len(critical_errors) == 0, f"Console errors: {critical_errors}"
 
@@ -290,7 +300,9 @@ class TestSessionManagementE2E:
         # Session should persist (if implemented)
         # This is implementation-specific
         # For now, just verify page still works
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_visible()
 
     def test_multiple_tabs_different_sessions(self, page: Page, context):
@@ -311,8 +323,12 @@ class TestSessionManagementE2E:
         # Sessions should be different (if not using shared storage)
         # This is implementation-specific
         # For now, just verify both pages work
-        voice_button1 = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
-        voice_button2 = page2.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button1 = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
+        voice_button2 = page2.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
 
         expect(voice_button1).to_be_visible()
         expect(voice_button2).to_be_visible()
@@ -338,7 +354,9 @@ class TestVisualRegressionE2E:
         page.wait_for_load_state("networkidle")
 
         # Find and screenshot voice button
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         voice_button.screenshot(path="tests/screenshots/voice-button.png")
 
 
@@ -384,6 +402,8 @@ class TestPostDeploymentSmokeE2E:
         page.wait_for_load_state("networkidle")
 
         # Verify voice button is present
-        voice_button = page.locator("button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button").first
+        voice_button = page.locator(
+            "button[aria-label*='voice' i], button[aria-label*='record' i], button.voice-button"
+        ).first
         expect(voice_button).to_be_visible()
         expect(voice_button).to_be_enabled()

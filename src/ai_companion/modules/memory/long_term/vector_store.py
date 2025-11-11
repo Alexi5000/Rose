@@ -138,17 +138,16 @@ class VectorStore:
             # API key is only required for Qdrant Cloud, not for local Docker deployments
             if settings.QDRANT_API_KEY and settings.QDRANT_API_KEY.lower() not in ["none", "", "null"]:
                 self.logger.info("🔐 Initializing Qdrant client with API key authentication")
-                self.client: QdrantClient = QdrantClient(
-                    url=settings.QDRANT_URL,
-                    api_key=settings.QDRANT_API_KEY
-                )
+                self.client: QdrantClient = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
             else:
                 self.logger.info(f"🌐 Initializing Qdrant client for local deployment: {settings.QDRANT_URL}")
                 self.client: QdrantClient = QdrantClient(url=settings.QDRANT_URL)
 
             self._circuit_breaker: CircuitBreaker = get_qdrant_circuit_breaker()
             VectorStore._initialized = True
-            self.logger.info(f"✅ VectorStore initialized (model: {EMBEDDING_MODEL_NAME}, collection: {QDRANT_COLLECTION_NAME})")
+            self.logger.info(
+                f"✅ VectorStore initialized (model: {EMBEDDING_MODEL_NAME}, collection: {QDRANT_COLLECTION_NAME})"
+            )
 
     def _collection_exists(self) -> bool:
         """Check if the memory collection exists.
@@ -303,15 +302,10 @@ class VectorStore:
 
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.error(
-                    f"⚡ Circuit breaker OPEN: Cannot store memory. Text: {text[:50]}..."
-                )
+                self.logger.error(f"⚡ Circuit breaker OPEN: Cannot store memory. Text: {text[:50]}...")
 
     def search_memories(
-        self,
-        query: str,
-        k: int = DEFAULT_MEMORY_SEARCH_LIMIT,
-        session_id: Optional[str] = None
+        self, query: str, k: int = DEFAULT_MEMORY_SEARCH_LIMIT, session_id: Optional[str] = None
     ) -> MemorySearchResult:
         """Search for similar memories in the vector store using semantic search.
 
@@ -340,7 +334,7 @@ class VectorStore:
         """
         try:
             if not self._collection_exists():
-                self.logger.debug(f"📭 Collection does not exist, cannot search")
+                self.logger.debug("📭 Collection does not exist, cannot search")
                 return []
 
             # 🔒 Ensure session isolation if enabled
@@ -349,17 +343,10 @@ class VectorStore:
             if ENABLE_SESSION_ISOLATION:
                 effective_session_id = session_id or DEFAULT_SESSION_ID
                 if not session_id:
-                    self.logger.warning(
-                        f"⚠️ No session_id provided for search, using default: {DEFAULT_SESSION_ID}"
-                    )
+                    self.logger.warning(f"⚠️ No session_id provided for search, using default: {DEFAULT_SESSION_ID}")
                 # Create Qdrant filter for session-based retrieval
                 query_filter = Filter(
-                    must=[
-                        FieldCondition(
-                            key=SESSION_ID_METADATA_KEY,
-                            match=MatchValue(value=effective_session_id)
-                        )
-                    ]
+                    must=[FieldCondition(key=SESSION_ID_METADATA_KEY, match=MatchValue(value=effective_session_id))]
                 )
 
             self.logger.debug(f"🔍 Searching memories: query='{query[:60]}...', k={k}, session={effective_session_id}")
@@ -428,14 +415,12 @@ class VectorStore:
 
             info = {
                 "name": QDRANT_COLLECTION_NAME,  # Collection name is not in the response
-                "vectors_count": collection_info.vectors_count if hasattr(collection_info, 'vectors_count') else 0,
-                "points_count": collection_info.points_count if hasattr(collection_info, 'points_count') else 0,
-                "status": collection_info.status if hasattr(collection_info, 'status') else "unknown",
+                "vectors_count": collection_info.vectors_count if hasattr(collection_info, "vectors_count") else 0,
+                "points_count": collection_info.points_count if hasattr(collection_info, "points_count") else 0,
+                "status": collection_info.status if hasattr(collection_info, "status") else "unknown",
             }
 
-            self.logger.debug(
-                f"📊 Collection info: {info['points_count']} memories, status={info['status']}"
-            )
+            self.logger.debug(f"📊 Collection info: {info['points_count']} memories, status={info['status']}")
             return info
 
         except CircuitBreakerError:
@@ -474,7 +459,7 @@ class VectorStore:
                     self.logger.info(f"✅ Collection '{QDRANT_COLLECTION_NAME}' created and verified")
                     return True
                 else:
-                    self.logger.error(f"❌ Collection creation verification failed")
+                    self.logger.error("❌ Collection creation verification failed")
                     return False
         except Exception as e:
             self.logger.error(f"❌ Collection initialization failed: {e}")

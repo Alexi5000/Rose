@@ -48,9 +48,7 @@ def test_sample_mp3_audio_fixture(sample_mp3_audio):
 
 @pytest.mark.unit
 def test_mock_responses_fixtures(
-    mock_groq_transcription_response,
-    mock_qdrant_search_response,
-    mock_memory_extraction_result
+    mock_groq_transcription_response, mock_qdrant_search_response, mock_memory_extraction_result
 ):
     """Verify mock response fixtures are available and properly structured."""
     # Test Groq transcription response

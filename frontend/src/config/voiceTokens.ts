@@ -45,3 +45,12 @@ export const AUDIO_ENGINE_TOKENS = Object.freeze({
   bitsPerSample: 16,
   monoChannels: 1,
 } as const);
+
+export const PLAYBACK_TOKENS = Object.freeze({
+  readinessTimeoutMs: 15 * MILLISECONDS_PER_SECOND,
+  stallRetryLimit: 2,
+} as const);
+
+export const PIPELINE_TOKENS = Object.freeze({
+  rateLimitCooldownMs: 10 * MILLISECONDS_PER_SECOND,
+} as const);

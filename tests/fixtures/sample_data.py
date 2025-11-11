@@ -1,6 +1,5 @@
 """Sample data fixtures for testing conversation state and messages."""
 
-
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 

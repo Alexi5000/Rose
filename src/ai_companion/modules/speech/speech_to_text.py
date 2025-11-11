@@ -176,6 +176,7 @@ class SpeechToText:
                                     language="en",
                                     response_format="text",
                                 )
+
                         return await asyncio.to_thread(_sync_transcribe)
 
                     transcription: str = await self._circuit_breaker.call_async(_call_groq_api)

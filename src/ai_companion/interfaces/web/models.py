@@ -27,17 +27,13 @@ class ErrorResponse(BaseModel):
                     "error": "validation_error",
                     "message": "Audio file too large. Maximum size is 10MB",
                     "request_id": "550e8400-e29b-41d4-a716-446655440000",
-                    "details": {
-                        "field": "audio",
-                        "max_size_mb": 10,
-                        "received_size_mb": 15.2
-                    }
+                    "details": {"field": "audio", "max_size_mb": 10, "received_size_mb": 15.2},
                 },
                 {
                     "error": "service_unavailable",
                     "message": "I'm having trouble connecting to my services right now. Please try again in a moment.",
-                    "request_id": "550e8400-e29b-41d4-a716-446655440001"
-                }
+                    "request_id": "550e8400-e29b-41d4-a716-446655440001",
+                },
             ]
         }
     }

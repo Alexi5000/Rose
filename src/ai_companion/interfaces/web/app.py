@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
         args=[AUDIO_CLEANUP_MAX_AGE_HOURS],
         id="audio_cleanup",
         name="Cleanup old audio files",
-        replace_existing=True
+        replace_existing=True,
     )
 
     # Schedule automatic database backups (runs daily at 2 AM)
@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
         args=[DATABASE_BACKUP_RETENTION_DAYS],
         id="database_backup",
         name="Daily database backup",
-        replace_existing=True
+        replace_existing=True,
     )
 
     # Schedule automatic session cleanup (runs daily at 3 AM)
@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI):
         args=[settings.SESSION_RETENTION_DAYS],
         id="session_cleanup",
         name="Daily session cleanup",
-        replace_existing=True
+        replace_existing=True,
     )
 
     # Start the scheduler
@@ -112,7 +112,9 @@ async def lifespan(app: FastAPI):
 
     # Start monitoring scheduler
     await monitoring_scheduler.start()
-    logger.info(f"{LOG_EMOJI_SUCCESS} monitoring_scheduler_started", evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL)
+    logger.info(
+        f"{LOG_EMOJI_SUCCESS} monitoring_scheduler_started", evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL
+    )
 
     yield
 
@@ -163,8 +165,8 @@ def create_app() -> FastAPI:
                     content={
                         "error": "request_too_large",
                         "message": f"Request body too large. Maximum size is {MAX_REQUEST_SIZE_BYTES / 1024 / 1024}MB",
-                        "max_size_bytes": MAX_REQUEST_SIZE_BYTES
-                    }
+                        "max_size_bytes": MAX_REQUEST_SIZE_BYTES,
+                    },
                 )
         return await call_next(request)
 
@@ -175,7 +177,9 @@ def create_app() -> FastAPI:
     else:
         allowed_origins = settings.get_allowed_origins()
 
-    logger.info(f"{LOG_EMOJI_CONNECTION} cors_configured", allowed_origins=allowed_origins, environment=settings.ENVIRONMENT)
+    logger.info(
+        f"{LOG_EMOJI_CONNECTION} cors_configured", allowed_origins=allowed_origins, environment=settings.ENVIRONMENT
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -275,7 +279,9 @@ def create_app() -> FastAPI:
         logger.error(f"{LOG_EMOJI_ERROR} frontend_build_not_found", expected_path=str(FRONTEND_BUILD_DIR))
         logger.warning(f"{LOG_EMOJI_WARNING} frontend_not_served - run 'npm run build' in frontend directory")
 
-    logger.info(f"{LOG_EMOJI_CONNECTION} server_ready", port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists())
+    logger.info(
+        f"{LOG_EMOJI_CONNECTION} server_ready", port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists()
+    )
 
     return app
 

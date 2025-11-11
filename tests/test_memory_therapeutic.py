@@ -168,9 +168,7 @@ class TestTherapeuticMemoryExtraction:
     def test_ignore_non_important_messages(self, mock_chat):
         """Test that casual messages are not stored as memories."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(
-            content='{"is_important": false, "formatted_memory": null}'
-        )
+        mock_llm.invoke.return_value = MagicMock(content='{"is_important": false, "formatted_memory": null}')
         mock_chat.return_value = mock_llm
 
         state = AICompanionState(
@@ -291,9 +289,7 @@ class TestMemorySessionContinuity:
         memory_extraction_node(state1)
 
         # Second session: retrieve memory
-        mock_memory.get_relevant_memories.return_value = [
-            "Name is Emma, grieving loss of partner"
-        ]
+        mock_memory.get_relevant_memories.return_value = ["Name is Emma, grieving loss of partner"]
 
         state2 = AICompanionState(
             messages=[HumanMessage(content="Do you remember me?")],

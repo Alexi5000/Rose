@@ -113,6 +113,7 @@ def check_env_file() -> Tuple[bool, str]:
 def check_required_env_vars() -> Tuple[bool, str]:
     """Check if required environment variables are set."""
     from dotenv import load_dotenv
+
     load_dotenv()
 
     required_vars = [
@@ -135,6 +136,7 @@ def check_required_env_vars() -> Tuple[bool, str]:
 def check_qdrant_url_config() -> Tuple[bool, str]:
     """Check if Qdrant URL is configured correctly for local dev."""
     from dotenv import load_dotenv
+
     load_dotenv()
 
     qdrant_url = os.getenv("QDRANT_URL", "")
@@ -157,6 +159,7 @@ def check_qdrant_url_config() -> Tuple[bool, str]:
 def check_qdrant_connectivity() -> Tuple[bool, str]:
     """Check if Qdrant is accessible."""
     from dotenv import load_dotenv
+
     load_dotenv()
 
     try:
@@ -243,6 +246,7 @@ def main():
     # Fix Windows console encoding for emojis
     if sys.platform == "win32":
         import io
+
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
@@ -253,81 +257,49 @@ def main():
     checks: List[DiagnosticCheck] = [
         # System prerequisites
         DiagnosticCheck(
-            "Python Version (3.12+)",
-            check_python_version,
-            "Install Python 3.12+ from https://www.python.org/"
+            "Python Version (3.12+)", check_python_version, "Install Python 3.12+ from https://www.python.org/"
         ),
         DiagnosticCheck(
             "uv Package Manager",
             check_uv_installed,
-            "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+            "Install uv: https://docs.astral.sh/uv/getting-started/installation/",
         ),
-        DiagnosticCheck(
-            "npm Package Manager",
-            check_npm_installed,
-            "Install Node.js from https://nodejs.org/"
-        ),
-
+        DiagnosticCheck("npm Package Manager", check_npm_installed, "Install Node.js from https://nodejs.org/"),
         # Configuration
+        DiagnosticCheck(".env File Exists", check_env_file, "Copy .env.example to .env and fill in API keys"),
         DiagnosticCheck(
-            ".env File Exists",
-            check_env_file,
-            "Copy .env.example to .env and fill in API keys"
-        ),
-        DiagnosticCheck(
-            "Required Environment Variables",
-            check_required_env_vars,
-            "Set missing variables in .env file"
+            "Required Environment Variables", check_required_env_vars, "Set missing variables in .env file"
         ),
         DiagnosticCheck(
             "Qdrant URL Configuration",
             check_qdrant_url_config,
-            "Update QDRANT_URL in .env: 'http://localhost:6333' for local dev"
+            "Update QDRANT_URL in .env: 'http://localhost:6333' for local dev",
         ),
-
         # Dependencies
+        DiagnosticCheck("Python Dependencies Installed", check_python_dependencies, "Run: uv sync"),
         DiagnosticCheck(
-            "Python Dependencies Installed",
-            check_python_dependencies,
-            "Run: uv sync"
+            "Frontend Dependencies Installed", check_frontend_dependencies, "Run: cd frontend && npm install"
         ),
-        DiagnosticCheck(
-            "Frontend Dependencies Installed",
-            check_frontend_dependencies,
-            "Run: cd frontend && npm install"
-        ),
-
         # Services
         DiagnosticCheck(
             "Qdrant Connectivity",
             check_qdrant_connectivity,
-            "Start Qdrant: docker run -p 6333:6333 qdrant/qdrant:latest"
+            "Start Qdrant: docker run -p 6333:6333 qdrant/qdrant:latest",
         ),
-
         # Build artifacts
-        DiagnosticCheck(
-            "Frontend Build",
-            check_frontend_build,
-            "Build frontend: cd frontend && npm run build"
-        ),
-
+        DiagnosticCheck("Frontend Build", check_frontend_build, "Build frontend: cd frontend && npm run build"),
         # Docker
         DiagnosticCheck(
             "Docker Compose Configuration",
             check_docker_compose,
-            "Fix docker-compose.yml (see DEPLOYMENT_READINESS_ANALYSIS.md)"
+            "Fix docker-compose.yml (see DEPLOYMENT_READINESS_ANALYSIS.md)",
         ),
-
         # Directories
         DiagnosticCheck(
-            "Short-term Memory Directory",
-            check_short_term_memory_dir,
-            "Will be created automatically on first run"
+            "Short-term Memory Directory", check_short_term_memory_dir, "Will be created automatically on first run"
         ),
         DiagnosticCheck(
-            "Long-term Memory Directory",
-            check_long_term_memory_dir,
-            "Will be created by Qdrant on first connection"
+            "Long-term Memory Directory", check_long_term_memory_dir, "Will be created by Qdrant on first connection"
         ),
     ]
 
@@ -398,5 +370,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n{RED}❌ Diagnostic failed with error: {e}{RESET}\n")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

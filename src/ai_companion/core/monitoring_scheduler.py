@@ -34,10 +34,7 @@ class MonitoringScheduler:
 
         self._running = True
         self._task = asyncio.create_task(self._run())
-        logger.info(
-            "monitoring_scheduler_started",
-            evaluation_interval=self.evaluation_interval
-        )
+        logger.info("monitoring_scheduler_started", evaluation_interval=self.evaluation_interval)
 
     async def stop(self) -> None:
         """Stop the monitoring scheduler."""
@@ -63,19 +60,12 @@ class MonitoringScheduler:
                 triggered_alerts = monitoring.evaluate_thresholds()
 
                 if triggered_alerts:
-                    logger.warning(
-                        "monitoring_evaluation_completed",
-                        triggered_alerts=len(triggered_alerts)
-                    )
+                    logger.warning("monitoring_evaluation_completed", triggered_alerts=len(triggered_alerts))
                 else:
                     logger.debug("monitoring_evaluation_completed", triggered_alerts=0)
 
             except Exception as e:
-                logger.error(
-                    "monitoring_evaluation_error",
-                    error=str(e),
-                    error_type=type(e).__name__
-                )
+                logger.error("monitoring_evaluation_error", error=str(e), error_type=type(e).__name__)
 
             # Wait for next evaluation
             try:

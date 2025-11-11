@@ -8,16 +8,14 @@ def test_mock_groq_client(mock_groq_client):
     """Verify mock Groq client fixture works correctly."""
     # Test chat completion
     response = mock_groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": "Hello"}]
+        model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": "Hello"}]
     )
     assert response.choices[0].message.content
     assert "test response" in response.choices[0].message.content.lower()
 
     # Test audio transcription
     transcription = mock_groq_client.audio.transcriptions.create(
-        file=("test.wav", b"fake_audio_data"),
-        model="whisper-large-v3"
+        file=("test.wav", b"fake_audio_data"), model="whisper-large-v3"
     )
     assert transcription.text
     assert "test transcription" in transcription.text.lower()
@@ -45,11 +43,7 @@ def test_mock_qdrant_client(mock_qdrant_client):
     assert exists is True
 
     # Test search
-    results = mock_qdrant_client.search(
-        collection_name="test_collection",
-        query_vector=[0.1] * 384,
-        limit=5
-    )
+    results = mock_qdrant_client.search(collection_name="test_collection", query_vector=[0.1] * 384, limit=5)
     assert len(results) > 0
     assert results[0].score > 0
     assert "payload" in dir(results[0])

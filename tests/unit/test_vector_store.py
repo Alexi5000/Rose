@@ -44,11 +44,7 @@ def mock_vector_store_deps():
 
                 mock_circuit_breaker.call.side_effect = circuit_breaker_call
 
-                yield {
-                    "client": mock_client,
-                    "model": mock_model,
-                    "circuit_breaker": mock_circuit_breaker
-                }
+                yield {"client": mock_client, "model": mock_model, "circuit_breaker": mock_circuit_breaker}
 
 
 @pytest.mark.unit
@@ -60,17 +56,12 @@ class TestMemoryStorage:
         mock_client = mock_vector_store_deps["client"]
 
         # Mock collection exists
-        mock_client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
 
         store = VectorStore()
 
         memory_text = "User is experiencing anxiety about work deadlines"
-        metadata = {
-            "id": "test_id_123",
-            "timestamp": datetime.now().isoformat()
-        }
+        metadata = {"id": "test_id_123", "timestamp": datetime.now().isoformat()}
 
         store.store_memory(memory_text, metadata)
 
@@ -97,9 +88,7 @@ class TestMemoryStorage:
         """Test that memory is stored with proper metadata."""
         mock_client = mock_vector_store_deps["client"]
 
-        mock_client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
 
         store = VectorStore()
 
@@ -108,7 +97,7 @@ class TestMemoryStorage:
             "id": "mem_456",
             "timestamp": "2024-01-15T10:30:00Z",
             "emotion": "calm",
-            "topic": "coping_strategies"
+            "topic": "coping_strategies",
         }
 
         store.store_memory(memory_text, metadata)
@@ -125,9 +114,7 @@ class TestMemoryStorage:
         mock_client = mock_vector_store_deps["client"]
         mock_model = mock_vector_store_deps["model"]
 
-        mock_client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
 
         store = VectorStore()
         memory_text = "Test memory for embedding"
@@ -159,7 +146,7 @@ class TestMemorySearch:
         mock_hit1.payload = {
             "text": "User mentioned feeling anxious about work deadlines",
             "id": "mem1",
-            "timestamp": "2024-01-15T10:30:00Z"
+            "timestamp": "2024-01-15T10:30:00Z",
         }
 
         mock_hit2 = MagicMock()
@@ -167,7 +154,7 @@ class TestMemorySearch:
         mock_hit2.payload = {
             "text": "User finds deep breathing exercises helpful for anxiety",
             "id": "mem2",
-            "timestamp": "2024-01-14T15:20:00Z"
+            "timestamp": "2024-01-14T15:20:00Z",
         }
 
         mock_client.search.return_value = [mock_hit1, mock_hit2]
@@ -234,7 +221,7 @@ class TestMemorySearch:
             "text": "User has been working on mindfulness practices",
             "id": "mem3",
             "timestamp": "2024-01-13T09:15:00Z",
-            "topic": "mindfulness"
+            "topic": "mindfulness",
         }
 
         mock_client.search.return_value = [mock_hit]
@@ -269,7 +256,7 @@ class TestDuplicateDetection:
         mock_hit.payload = {
             "text": "Name is Sarah, lives in Portland",
             "id": "existing_mem",
-            "timestamp": "2024-01-01T00:00:00Z"
+            "timestamp": "2024-01-01T00:00:00Z",
         }
 
         mock_client.search.return_value = [mock_hit]
@@ -286,17 +273,12 @@ class TestDuplicateDetection:
         """Test that memories below similarity threshold are not considered duplicates."""
         mock_client = mock_vector_store_deps["client"]
 
-        mock_client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
 
         # Mock a low similarity match
         mock_hit = MagicMock()
         mock_hit.score = 0.75  # Below threshold (0.9)
-        mock_hit.payload = {
-            "text": "Different memory content",
-            "id": "other_mem"
-        }
+        mock_hit.payload = {"text": "Different memory content", "id": "other_mem"}
 
         mock_client.search.return_value = [mock_hit]
 
@@ -310,9 +292,7 @@ class TestDuplicateDetection:
         """Test that None is returned when no memories exist."""
         mock_client = mock_vector_store_deps["client"]
 
-        mock_client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
         mock_client.search.return_value = []
 
         store = VectorStore()
@@ -350,12 +330,8 @@ class TestMemoryDataClass:
         """Test Memory data class properties."""
         memory = Memory(
             text="User is experiencing grief",
-            metadata={
-                "id": "mem_123",
-                "timestamp": "2024-01-15T10:00:00Z",
-                "emotion": "sadness"
-            },
-            score=0.92
+            metadata={"id": "mem_123", "timestamp": "2024-01-15T10:00:00Z", "emotion": "sadness"},
+            score=0.92,
         )
 
         assert memory.text == "User is experiencing grief"
@@ -365,11 +341,7 @@ class TestMemoryDataClass:
 
     def test_memory_timestamp_property(self):
         """Test Memory timestamp property parsing."""
-        memory = Memory(
-            text="Test memory",
-            metadata={"timestamp": "2024-01-15T10:30:00"},
-            score=0.85
-        )
+        memory = Memory(text="Test memory", metadata={"timestamp": "2024-01-15T10:30:00"}, score=0.85)
 
         timestamp = memory.timestamp
         assert timestamp is not None
@@ -379,21 +351,13 @@ class TestMemoryDataClass:
 
     def test_memory_without_id(self):
         """Test Memory without id in metadata."""
-        memory = Memory(
-            text="Test memory",
-            metadata={},
-            score=0.80
-        )
+        memory = Memory(text="Test memory", metadata={}, score=0.80)
 
         assert memory.id is None
 
     def test_memory_without_timestamp(self):
         """Test Memory without timestamp in metadata."""
-        memory = Memory(
-            text="Test memory",
-            metadata={"id": "test"},
-            score=0.80
-        )
+        memory = Memory(text="Test memory", metadata={"id": "test"}, score=0.80)
 
         assert memory.timestamp is None
 

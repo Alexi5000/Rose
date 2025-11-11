@@ -58,12 +58,10 @@ class TestConfigurationValidation:
         # These directories should be created automatically
         data_dirs = [
             Path(settings.SHORT_TERM_MEMORY_DB_PATH).parent,
-            Path(settings.LONG_TERM_MEMORY_COLLECTION_PATH).parent,
         ]
 
         for dir_path in data_dirs:
-            assert dir_path.exists() or dir_path.parent.exists(), \
-                f"Data directory parent does not exist: {dir_path}"
+            assert dir_path.exists() or dir_path.parent.exists(), f"Data directory parent does not exist: {dir_path}"
 
 
 class TestCoreModuleImports:
@@ -71,48 +69,54 @@ class TestCoreModuleImports:
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_import_settings(self):
         """Test settings module import."""
         from ai_companion import settings
+
         assert settings is not None
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_import_graph(self):
         """Test graph module import."""
         from ai_companion.graph import graph
+
         assert graph is not None
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_import_state(self):
         """Test state module import."""
         from ai_companion.graph.state import AICompanionState
+
         assert AICompanionState is not None
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_import_nodes(self):
         """Test nodes module import."""
         from ai_companion.graph import nodes
+
         assert nodes is not None
 
     def test_import_resilience(self):
         """Test resilience module import."""
         from ai_companion.core import resilience
+
         assert resilience is not None
 
     def test_import_backup(self):
         """Test backup module import."""
         from ai_companion.core import backup
+
         assert backup is not None
 
 
@@ -126,9 +130,9 @@ class TestBasicFunctionality:
         if not all(os.getenv(var) for var in required_vars):
             pytest.skip("Environment variables not set - skipping graph compilation test")
 
-        from ai_companion.graph.graph import create_graph
+        from ai_companion.graph.graph import create_workflow_graph
 
-        graph = create_graph()
+        graph = create_workflow_graph()
         assert graph is not None
 
         # Verify graph has expected nodes
@@ -180,6 +184,7 @@ class TestCircuitBreakers:
     def test_circuit_breaker_module_exists(self):
         """Test that circuit breaker module can be imported."""
         from ai_companion.core import resilience
+
         assert resilience is not None
 
     def test_groq_circuit_breaker_configured(self):
@@ -190,6 +195,7 @@ class TestCircuitBreakers:
             pytest.skip("Environment variables not set - skipping circuit breaker test")
 
         from ai_companion.core.resilience import get_groq_circuit_breaker
+
         breaker = get_groq_circuit_breaker()
         assert breaker is not None
         assert breaker.name == "GroqAPI"
@@ -202,6 +208,7 @@ class TestCircuitBreakers:
             pytest.skip("Environment variables not set - skipping circuit breaker test")
 
         from ai_companion.core.resilience import get_elevenlabs_circuit_breaker
+
         breaker = get_elevenlabs_circuit_breaker()
         assert breaker is not None
         assert breaker.name == "ElevenLabsAPI"
@@ -214,6 +221,7 @@ class TestCircuitBreakers:
             pytest.skip("Environment variables not set - skipping circuit breaker test")
 
         from ai_companion.core.resilience import get_qdrant_circuit_breaker
+
         breaker = get_qdrant_circuit_breaker()
         assert breaker is not None
         assert breaker.name == "QdrantAPI"
@@ -224,7 +232,7 @@ class TestSecurityMiddleware:
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_security_headers_middleware_exists(self):
         """Test that security headers middleware is configured."""
@@ -232,24 +240,24 @@ class TestSecurityMiddleware:
 
         # Check that middleware is registered
         middleware_classes = [m.cls.__name__ for m in app.user_middleware]
-        assert "SecurityHeadersMiddleware" in middleware_classes or \
-               any("security" in m.lower() for m in middleware_classes)
+        assert "SecurityHeadersMiddleware" in middleware_classes or any(
+            "security" in m.lower() for m in middleware_classes
+        )
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_rate_limiting_configured(self):
         """Test that rate limiting is configured."""
         from ai_companion.interfaces.web.app import app
 
         # Check that rate limiter is configured
-        assert hasattr(app.state, "limiter") or \
-               any("limiter" in str(m) for m in app.user_middleware)
+        assert hasattr(app.state, "limiter") or any("limiter" in str(m) for m in app.user_middleware)
 
     @pytest.mark.skipif(
         not all(os.getenv(var) for var in ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "QDRANT_URL"]),
-        reason="Environment variables not set"
+        reason="Environment variables not set",
     )
     def test_cors_middleware_configured(self):
         """Test that CORS middleware is configured."""
@@ -265,17 +273,20 @@ class TestDataPersistence:
     def test_backup_module_exists(self):
         """Test that backup module can be imported."""
         from ai_companion.core import backup
+
         assert backup is not None
 
     def test_backup_manager_configured(self):
         """Test that backup manager is configured."""
         from ai_companion.core.backup import backup_manager
+
         assert backup_manager is not None
         assert hasattr(backup_manager, "backup_database")
 
     def test_cleanup_job_configured(self):
         """Test that cleanup job is configured."""
-        from ai_companion.interfaces.web.app import cleanup_old_audio_files
+        from ai_companion.interfaces.web.routes.voice import cleanup_old_audio_files
+
         assert cleanup_old_audio_files is not None
 
 
@@ -295,7 +306,7 @@ class TestDeploymentReadiness:
             "ai_companion.graph.graph",
             "ai_companion.graph.state",
             "ai_companion.graph.nodes",
-            "ai_companion.modules.memory.long_term_memory",
+            "ai_companion.modules.memory.long_term",
             "ai_companion.modules.speech.speech_to_text",
             "ai_companion.modules.speech.text_to_speech",
             "ai_companion.interfaces.web.app",

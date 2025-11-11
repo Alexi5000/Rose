@@ -36,13 +36,7 @@ class MetricsCollector:
             tags: Optional tags for metric dimensions
         """
         self._counters[name] += value
-        logger.info(
-            "metric_counter",
-            metric_name=name,
-            value=value,
-            total=self._counters[name],
-            tags=tags or {}
-        )
+        logger.info("metric_counter", metric_name=name, value=value, total=self._counters[name], tags=tags or {})
 
     def set_gauge(self, name: str, value: float, tags: Optional[Dict[str, Any]] = None) -> None:
         """Set a gauge metric.
@@ -53,12 +47,7 @@ class MetricsCollector:
             tags: Optional tags for metric dimensions
         """
         self._gauges[name] = value
-        logger.info(
-            "metric_gauge",
-            metric_name=name,
-            value=value,
-            tags=tags or {}
-        )
+        logger.info("metric_gauge", metric_name=name, value=value, tags=tags or {})
 
     def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, Any]] = None) -> None:
         """Record a histogram value.
@@ -69,12 +58,7 @@ class MetricsCollector:
             tags: Optional tags for metric dimensions
         """
         self._histograms[name].append(value)
-        logger.info(
-            "metric_histogram",
-            metric_name=name,
-            value=value,
-            tags=tags or {}
-        )
+        logger.info("metric_histogram", metric_name=name, value=value, tags=tags or {})
 
     def record_session_started(self, session_id: str) -> None:
         """Record a new session start.
@@ -94,11 +78,7 @@ class MetricsCollector:
         """
         self.increment_counter("voice_requests_total")
         self.record_histogram("voice_audio_size_bytes", audio_size_bytes)
-        logger.info(
-            "voice_request",
-            session_id=session_id,
-            audio_size_bytes=audio_size_bytes
-        )
+        logger.info("voice_request", session_id=session_id, audio_size_bytes=audio_size_bytes)
 
     def record_api_call(self, service: str, success: bool, duration_ms: float) -> None:
         """Record an external API call.
@@ -111,12 +91,7 @@ class MetricsCollector:
         status = "success" if success else "failure"
         self.increment_counter(f"api_calls_{service}_{status}")
         self.record_histogram(f"api_duration_ms_{service}", duration_ms)
-        logger.info(
-            "api_call",
-            service=service,
-            success=success,
-            duration_ms=duration_ms
-        )
+        logger.info("api_call", service=service, success=success, duration_ms=duration_ms)
 
     def record_error(self, error_type: str, endpoint: Optional[str] = None) -> None:
         """Record an error occurrence.
@@ -130,11 +105,7 @@ class MetricsCollector:
             tags["endpoint"] = endpoint
 
         self.increment_counter("errors_total", tags=tags)
-        logger.error(
-            "error_recorded",
-            error_type=error_type,
-            endpoint=endpoint
-        )
+        logger.error("error_recorded", error_type=error_type, endpoint=endpoint)
 
     def record_workflow_execution(self, session_id: str, duration_ms: float, success: bool) -> None:
         """Record a workflow execution.
@@ -147,12 +118,7 @@ class MetricsCollector:
         status = "success" if success else "failure"
         self.increment_counter(f"workflow_executions_{status}")
         self.record_histogram("workflow_duration_ms", duration_ms)
-        logger.info(
-            "workflow_execution",
-            session_id=session_id,
-            duration_ms=duration_ms,
-            success=success
-        )
+        logger.info("workflow_execution", session_id=session_id, duration_ms=duration_ms, success=success)
 
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get a summary of all collected metrics.
@@ -168,11 +134,11 @@ class MetricsCollector:
                     "count": len(values),
                     "min": min(values) if values else 0,
                     "max": max(values) if values else 0,
-                    "avg": sum(values) / len(values) if values else 0
+                    "avg": sum(values) / len(values) if values else 0,
                 }
                 for name, values in self._histograms.items()
             },
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
 
@@ -191,6 +157,7 @@ def track_performance(metric_name: Optional[str] = None) -> Callable:
         async def process_voice(...):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         name = metric_name or func.__name__
 
@@ -218,11 +185,7 @@ def track_performance(metric_name: Optional[str] = None) -> Callable:
                 metrics.increment_counter(f"{name}_{status}")
 
                 # Log performance
-                log_data = {
-                    "endpoint": name,
-                    "duration_ms": round(duration_ms, 2),
-                    "success": success
-                }
+                log_data = {"endpoint": name, "duration_ms": round(duration_ms, 2), "success": success}
 
                 if error_type:
                     log_data["error_type"] = error_type
@@ -253,11 +216,7 @@ def track_performance(metric_name: Optional[str] = None) -> Callable:
                 metrics.increment_counter(f"{name}_{status}")
 
                 # Log performance
-                log_data = {
-                    "endpoint": name,
-                    "duration_ms": round(duration_ms, 2),
-                    "success": success
-                }
+                log_data = {"endpoint": name, "duration_ms": round(duration_ms, 2), "success": success}
 
                 if error_type:
                     log_data["error_type"] = error_type
@@ -266,6 +225,7 @@ def track_performance(metric_name: Optional[str] = None) -> Callable:
 
         # Return appropriate wrapper based on function type
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         else:

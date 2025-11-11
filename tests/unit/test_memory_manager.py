@@ -24,8 +24,7 @@ class TestMemoryExtraction:
         """Test extracting important information from a human message."""
         # Mock the LLM response
         mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Experiencing anxiety following mother's death one month ago"
+            is_important=True, formatted_memory="Experiencing anxiety following mother's death one month ago"
         )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -47,10 +46,7 @@ class TestMemoryExtraction:
     @pytest.mark.asyncio
     async def test_skip_non_important_messages(self, mock_qdrant_client):
         """Test that non-important messages are not stored."""
-        mock_analysis = MemoryAnalysis(
-            is_important=False,
-            formatted_memory=None
-        )
+        mock_analysis = MemoryAnalysis(is_important=False, formatted_memory=None)
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
             mock_vs.return_value.store_memory = MagicMock()
@@ -81,10 +77,7 @@ class TestMemoryExtraction:
     @pytest.mark.asyncio
     async def test_extract_emotional_state(self, mock_qdrant_client):
         """Test extraction of emotional state information."""
-        mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Experiencing anxiety and sadness"
-        )
+        mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Experiencing anxiety and sadness")
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
             mock_vs.return_value.find_similar_memory.return_value = None
@@ -105,8 +98,7 @@ class TestMemoryExtraction:
     async def test_extract_coping_mechanism(self, mock_qdrant_client):
         """Test extraction of coping mechanisms."""
         mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Uses meditation as coping mechanism for grief"
+            is_important=True, formatted_memory="Uses meditation as coping mechanism for grief"
         )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -131,10 +123,7 @@ class TestMemoryStorage:
     @pytest.mark.asyncio
     async def test_store_new_memory(self, mock_qdrant_client):
         """Test storing a new memory when no duplicate exists."""
-        mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Name is Sarah, lives in Portland"
-        )
+        mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Name is Sarah, lives in Portland")
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
             mock_vs.return_value.find_similar_memory.return_value = None
@@ -155,17 +144,15 @@ class TestMemoryStorage:
     @pytest.mark.asyncio
     async def test_skip_duplicate_memory(self, mock_qdrant_client):
         """Test that duplicate memories are not stored."""
-        mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Name is Sarah, lives in Portland"
-        )
+        mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Name is Sarah, lives in Portland")
 
         # Mock a similar memory already exists
         from ai_companion.modules.memory.long_term.vector_store import Memory
+
         existing_memory = Memory(
             text="Name is Sarah, lives in Portland",
             metadata={"id": "existing_id", "timestamp": "2024-01-01T00:00:00"},
-            score=0.95
+            score=0.95,
         )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -188,8 +175,7 @@ class TestMemoryStorage:
     async def test_memory_includes_metadata(self, mock_qdrant_client):
         """Test that stored memories include proper metadata."""
         mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Healing goal: self-forgiveness related to past marriage"
+            is_important=True, formatted_memory="Healing goal: self-forgiveness related to past marriage"
         )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -222,12 +208,12 @@ class TestMemoryRetrieval:
             Memory(
                 text="Experiencing anxiety following mother's death one month ago",
                 metadata={"id": "mem1", "timestamp": "2024-01-15T10:00:00"},
-                score=0.92
+                score=0.92,
             ),
             Memory(
                 text="Uses meditation as coping mechanism for grief",
                 metadata={"id": "mem2", "timestamp": "2024-01-14T15:00:00"},
-                score=0.87
+                score=0.87,
             ),
         ]
 
@@ -260,10 +246,7 @@ class TestMemoryRetrieval:
         from ai_companion import settings
         from ai_companion.modules.memory.long_term.vector_store import Memory
 
-        mock_memories = [
-            Memory(text=f"Memory {i}", metadata={"id": f"mem{i}"}, score=0.9 - i*0.1)
-            for i in range(5)
-        ]
+        mock_memories = [Memory(text=f"Memory {i}", metadata={"id": f"mem{i}"}, score=0.9 - i * 0.1) for i in range(5)]
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
             mock_vs.return_value.search_memories.return_value = mock_memories[:3]
@@ -280,16 +263,8 @@ class TestMemoryRetrieval:
         from ai_companion.modules.memory.long_term.vector_store import Memory
 
         mock_memories = [
-            Memory(
-                text="Lost spouse six months ago in car accident",
-                metadata={"id": "mem1"},
-                score=0.94
-            ),
-            Memory(
-                text="Experiencing survivor's guilt",
-                metadata={"id": "mem2"},
-                score=0.89
-            ),
+            Memory(text="Lost spouse six months ago in car accident", metadata={"id": "mem1"}, score=0.94),
+            Memory(text="Experiencing survivor's guilt", metadata={"id": "mem2"}, score=0.89),
         ]
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -314,7 +289,7 @@ class TestMemoryFormatting:
             memories = [
                 "Name is Sarah, lives in Portland",
                 "Experiencing anxiety following mother's death",
-                "Uses meditation as coping mechanism"
+                "Uses meditation as coping mechanism",
             ]
 
             formatted = manager.format_memories_for_prompt(memories)

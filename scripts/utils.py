@@ -5,6 +5,7 @@
 Shared utilities for development and production scripts.
 Provides platform-aware subprocess execution and server health checking.
 """
+
 import shutil
 import socket
 import subprocess
@@ -308,77 +309,4 @@ def check_url_accessible(url: str, timeout: int = 5) -> bool:
             return False
     except Exception as e:
         logger.warning(f"{LOG_EMOJI_WARNING} url_not_accessible", url=url, error=str(e))
-        return False
-
-
-def check_command_exists(command: str) -> bool:
-    """
-    Check if a command exists in PATH.
-
-    Args:
-        command: Command name to check (e.g., 'npm', 'docker', 'uv')
-
-    Returns:
-        bool: True if command is available, False otherwise
-
-    Example:
-        >>> if check_command_exists('npm'):
-        ...     print("npm is installed")
-    """
-    # shutil.which handles cross-platform PATH lookup
-    # On Windows, it also checks .cmd, .bat, .exe extensions
-    import shutil
-    return shutil.which(command) is not None
-
-
-def check_port_available(port: int, host: str = "127.0.0.1") -> bool:
-    """
-    Check if a port is available (not in use).
-
-    Args:
-        port: Port number to check
-        host: Host address to check (default: localhost)
-
-    Returns:
-        bool: True if port is available, False if in use
-
-    Example:
-        >>> if check_port_available(8000):
-        ...     print("Port 8000 is free")
-        ... else:
-        ...     print("Port 8000 is in use")
-    """
-    import socket
-    try:
-        # Try to bind to the port
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(1)
-            # If bind succeeds, port is available
-            sock.bind((host, port))
-            return True
-    except (socket.error, OSError):
-        # Port is in use or other error
-        return False
-
-
-def check_url_accessible(url: str, timeout: int = 5) -> bool:
-    """
-    Check if a URL is accessible and returns 200 OK.
-
-    Args:
-        url: URL to check (e.g., 'http://localhost:6333/health')
-        timeout: Request timeout in seconds
-
-    Returns:
-        bool: True if URL is accessible, False otherwise
-
-    Example:
-        >>> if check_url_accessible('http://localhost:6333'):
-        ...     print("Qdrant is running")
-    """
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            return response.status == 200
-    except Exception:
-        # Any error means URL is not accessible
         return False

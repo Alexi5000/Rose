@@ -44,8 +44,8 @@ class HealthCheckResponse(BaseModel):
                         "groq": "connected",
                         "qdrant": "connected",
                         "elevenlabs": "connected",
-                        "sqlite": "connected"
-                    }
+                        "sqlite": "connected",
+                    },
                 }
             ]
         }

@@ -51,12 +51,7 @@ class TestMonitoringSystem:
 
     def test_alert_threshold_creation(self):
         """Test alert threshold creation."""
-        threshold = AlertThreshold(
-            name="test_alert",
-            metric_name="test_metric",
-            threshold=10.0,
-            comparison="gt"
-        )
+        threshold = AlertThreshold(name="test_alert", metric_name="test_metric", threshold=10.0, comparison="gt")
         assert threshold.name == "test_alert"
         assert threshold.metric_name == "test_metric"
         assert threshold.threshold == 10.0
@@ -65,13 +60,14 @@ class TestMonitoringSystem:
     def test_alert_creation(self):
         """Test alert creation."""
         from datetime import datetime
+
         alert = Alert(
             name="test_alert",
             message="Test alert message",
             severity="critical",
             metric_value=15.0,
             threshold=10.0,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
         assert alert.name == "test_alert"
         assert alert.severity == "critical"
@@ -88,11 +84,7 @@ class TestMonitoringSystem:
         monitor = MonitoringSystem()
         initial_count = len(monitor._alert_thresholds)
 
-        threshold = AlertThreshold(
-            name="custom_alert",
-            metric_name="custom_metric",
-            threshold=50.0
-        )
+        threshold = AlertThreshold(name="custom_alert", metric_name="custom_metric", threshold=50.0)
         monitor.add_threshold(threshold)
 
         assert len(monitor._alert_thresholds) == initial_count + 1
@@ -100,12 +92,7 @@ class TestMonitoringSystem:
     def test_check_threshold_greater_than(self):
         """Test threshold checking with greater than comparison."""
         monitor = MonitoringSystem()
-        threshold = AlertThreshold(
-            name="test",
-            metric_name="test",
-            threshold=10.0,
-            comparison="gt"
-        )
+        threshold = AlertThreshold(name="test", metric_name="test", threshold=10.0, comparison="gt")
 
         assert monitor._check_threshold(15.0, threshold) is True
         assert monitor._check_threshold(10.0, threshold) is False
@@ -114,12 +101,7 @@ class TestMonitoringSystem:
     def test_check_threshold_less_than(self):
         """Test threshold checking with less than comparison."""
         monitor = MonitoringSystem()
-        threshold = AlertThreshold(
-            name="test",
-            metric_name="test",
-            threshold=10.0,
-            comparison="lt"
-        )
+        threshold = AlertThreshold(name="test", metric_name="test", threshold=10.0, comparison="lt")
 
         assert monitor._check_threshold(5.0, threshold) is True
         assert monitor._check_threshold(10.0, threshold) is False
@@ -136,11 +118,7 @@ class TestMonitoringSystem:
     def test_format_alert_message(self):
         """Test alert message formatting."""
         monitor = MonitoringSystem()
-        threshold = AlertThreshold(
-            name="test_alert",
-            metric_name="test_metric",
-            threshold=10.0
-        )
+        threshold = AlertThreshold(name="test_alert", metric_name="test_metric", threshold=10.0)
 
         message = monitor._format_alert_message(threshold, 15.5)
         assert "test_alert" in message

@@ -1,6 +1,5 @@
 """Pytest configuration and shared fixtures."""
 
-
 # Import all fixtures to make them available to tests
 from tests.fixtures.mock_clients import (
     mock_elevenlabs_client,

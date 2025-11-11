@@ -24,6 +24,7 @@ Requirements:
 Environment:
     Reads configuration from src/ai_companion/config/server_config.py
 """
+
 import io
 import shutil
 import sys

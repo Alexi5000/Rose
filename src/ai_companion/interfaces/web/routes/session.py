@@ -35,7 +35,7 @@ class SessionStartResponse(BaseModel):
             "examples": [
                 {
                     "session_id": "123e4567-e89b-12d3-a456-426614174000",
-                    "message": "Session initialized. Ready to begin your healing journey with Rose."
+                    "message": "Session initialized. Ready to begin your healing journey with Rose.",
                 }
             ]
         }

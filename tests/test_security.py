@@ -134,9 +134,7 @@ class TestRateLimiting:
         mock_stt.transcribe = AsyncMock(return_value="Hello")
         mock_graph_instance = mock_graph.return_value
         mock_compiled = mock_graph_instance.compile.return_value
-        mock_compiled.ainvoke = AsyncMock(return_value={
-            "messages": [type("Message", (), {"content": "Hello there"})]
-        })
+        mock_compiled.ainvoke = AsyncMock(return_value={"messages": [type("Message", (), {"content": "Hello there"})]})
 
         # Create a test audio file
         audio_data = b"fake audio data"
@@ -145,7 +143,7 @@ class TestRateLimiting:
         response = client.post(
             "/api/voice/process",
             files={"audio": ("test.wav", audio_data, "audio/wav")},
-            data={"session_id": "test-session"}
+            data={"session_id": "test-session"},
         )
 
         # Should succeed (rate limit not actually enforced in test)
@@ -188,9 +186,7 @@ class TestSecureFileHandling:
 
         mock_graph_instance = mock_graph.return_value
         mock_compiled = mock_graph_instance.compile.return_value
-        mock_compiled.ainvoke = AsyncMock(return_value={
-            "messages": [type("Message", (), {"content": "Hello there"})]
-        })
+        mock_compiled.ainvoke = AsyncMock(return_value={"messages": [type("Message", (), {"content": "Hello there"})]})
 
         # Create a test audio file
         audio_data = b"fake audio data"
@@ -199,7 +195,7 @@ class TestSecureFileHandling:
         response = client.post(
             "/api/voice/process",
             files={"audio": ("test.wav", audio_data, "audio/wav")},
-            data={"session_id": "test-session"}
+            data={"session_id": "test-session"},
         )
 
         # Should succeed

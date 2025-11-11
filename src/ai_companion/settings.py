@@ -23,7 +23,6 @@ from pydantic import ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_companion.config.server_config import (
-    API_REQUEST_TIMEOUT_SECONDS,
     AUDIO_CLEANUP_MAX_AGE_HOURS,
     MAX_REQUEST_SIZE_BYTES,
     RATE_LIMIT_REQUESTS_PER_MINUTE,
@@ -163,7 +162,7 @@ class Settings(BaseSettings):
     # Increased for extended conversations (8+ turns, 120+ seconds)
     # Previous: 5 failures caused issues after 6-7 turns in stress testing
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 10  # Failures before opening circuit (max: 10)
-    CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 90   # Seconds before attempting recovery (increased for longer sessions)
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 90  # Seconds before attempting recovery (increased for longer sessions)
 
     # LLM timeout and retry configuration
     LLM_TIMEOUT_SECONDS: float = 30.0  # Timeout for LLM API calls
@@ -331,8 +330,7 @@ class Settings(BaseSettings):
         """
         if v <= 0:
             raise ValueError(
-                f"{info.field_name} must be a positive number (got {v}). "
-                "Timeout values must be greater than 0 seconds."
+                f"{info.field_name} must be a positive number (got {v}). Timeout values must be greater than 0 seconds."
             )
         return v
 

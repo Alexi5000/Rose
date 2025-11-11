@@ -64,8 +64,9 @@ class TestDeploymentHealth:
             for service_name in ["groq", "elevenlabs", "qdrant"]:
                 if service_name in services:
                     service_status = services[service_name]
-                    assert service_status.get("status") == "healthy", \
+                    assert service_status.get("status") == "healthy", (
                         f"Service {service_name} is not healthy: {service_status}"
+                    )
 
     def test_application_responds_quickly(self, base_url, api_timeout):
         """Test that application responds within acceptable time."""
@@ -105,8 +106,9 @@ class TestCriticalEndpoints:
         # Should return 422 (validation error) not 404
         response = requests.post(url, timeout=api_timeout)
 
-        assert response.status_code in [400, 422], \
+        assert response.status_code in [400, 422], (
             f"Voice process endpoint returned unexpected status {response.status_code}"
+        )
 
     def test_api_documentation_accessible(self, base_url, api_timeout):
         """Test that API documentation is accessible (if enabled)."""
@@ -115,8 +117,7 @@ class TestCriticalEndpoints:
         response = requests.get(url, timeout=api_timeout, allow_redirects=True)
 
         # Docs may be disabled in production, so 404 is acceptable
-        assert response.status_code in [200, 404], \
-            f"API docs returned unexpected status {response.status_code}"
+        assert response.status_code in [200, 404], f"API docs returned unexpected status {response.status_code}"
 
 
 class TestFrontendDeployment:
@@ -131,8 +132,7 @@ class TestFrontendDeployment:
         # Verify HTML content
         content = response.text
         assert len(content) > 0, "Frontend returned empty content"
-        assert "<html" in content.lower() or "<!doctype" in content.lower(), \
-            "Frontend did not return HTML content"
+        assert "<html" in content.lower() or "<!doctype" in content.lower(), "Frontend did not return HTML content"
 
     def test_frontend_static_assets(self, base_url, api_timeout):
         """Test that frontend static assets are accessible."""
@@ -147,8 +147,7 @@ class TestFrontendDeployment:
             response = requests.get(url, timeout=api_timeout, allow_redirects=True)
 
             # Assets may not exist, but should not return 500
-            assert response.status_code != 500, \
-                f"Static asset {path} returned server error"
+            assert response.status_code != 500, f"Static asset {path} returned server error"
 
 
 class TestSecurityHeaders:
@@ -171,11 +170,13 @@ class TestSecurityHeaders:
             if header in headers:
                 actual_value = headers[header]
                 if isinstance(expected_value, list):
-                    assert actual_value in expected_value, \
+                    assert actual_value in expected_value, (
                         f"Security header {header} has unexpected value: {actual_value}"
+                    )
                 else:
-                    assert actual_value == expected_value, \
+                    assert actual_value == expected_value, (
                         f"Security header {header} has unexpected value: {actual_value}"
+                    )
 
     def test_cors_headers_configured(self, base_url, api_timeout):
         """Test that CORS headers are properly configured."""
@@ -217,10 +218,7 @@ class TestRateLimiting:
 
             # Check for rate limit headers (implementation-specific)
             # Common headers: X-RateLimit-Limit, X-RateLimit-Remaining, RateLimit-*
-            [
-                h for h in headers.keys()
-                if "ratelimit" in h.lower() or "rate-limit" in h.lower()
-            ]
+            [h for h in headers.keys() if "ratelimit" in h.lower() or "rate-limit" in h.lower()]
 
             # If rate limiting is configured, headers should be present
             # This is optional - not all endpoints may have rate limiting
@@ -262,8 +260,7 @@ class TestErrorHandling:
         # Verify error response format
         try:
             data = response.json()
-            assert "error" in data or "detail" in data, \
-                "Error response missing error information"
+            assert "error" in data or "detail" in data, "Error response missing error information"
         except ValueError:
             # May return HTML for 404
             pass
@@ -275,8 +272,7 @@ class TestErrorHandling:
         # Send DELETE request to GET endpoint
         response = requests.delete(url, timeout=api_timeout)
 
-        assert response.status_code == 405, \
-            f"Expected 405 Method Not Allowed, got {response.status_code}"
+        assert response.status_code == 405, f"Expected 405 Method Not Allowed, got {response.status_code}"
 
     def test_invalid_json_handling(self, base_url, api_timeout):
         """Test that invalid JSON is handled gracefully."""
@@ -284,15 +280,11 @@ class TestErrorHandling:
 
         # Send invalid JSON
         response = requests.post(
-            url,
-            data="invalid json{",
-            headers={"Content-Type": "application/json"},
-            timeout=api_timeout
+            url, data="invalid json{", headers={"Content-Type": "application/json"}, timeout=api_timeout
         )
 
         # Should return 400 or 422, not 500
-        assert response.status_code in [400, 422], \
-            f"Invalid JSON returned {response.status_code} instead of 400/422"
+        assert response.status_code in [400, 422], f"Invalid JSON returned {response.status_code} instead of 400/422"
 
 
 class TestMonitoring:
@@ -403,16 +395,16 @@ class TestDeploymentReadiness:
             results["frontend_error"] = str(e)
 
         # Print summary
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("DEPLOYMENT READINESS SUMMARY")
-        print("="*50)
+        print("=" * 50)
         for check, status in results.items():
             if not check.endswith("_error"):
                 status_str = "✓ PASS" if status else "✗ FAIL"
                 print(f"{check:.<30} {status_str}")
                 if not status and f"{check}_error" in results:
                     print(f"  Error: {results[f'{check}_error']}")
-        print("="*50)
+        print("=" * 50)
 
         # All critical checks must pass
         critical_checks = ["health_check", "session_creation", "frontend"]

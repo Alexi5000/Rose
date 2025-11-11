@@ -30,6 +30,7 @@ class TestHandleApiErrors:
     @pytest.mark.asyncio
     async def test_async_function_success(self):
         """Test that async function executes successfully without errors."""
+
         @handle_api_errors("test_service")
         async def async_func():
             return "success"
@@ -39,6 +40,7 @@ class TestHandleApiErrors:
 
     def test_sync_function_success(self):
         """Test that sync function executes successfully without errors."""
+
         @handle_api_errors("test_service")
         def sync_func():
             return "success"
@@ -49,6 +51,7 @@ class TestHandleApiErrors:
     @pytest.mark.asyncio
     async def test_async_circuit_breaker_error(self):
         """Test async function handling of CircuitBreakerError."""
+
         @handle_api_errors("test_service", "Service unavailable")
         async def async_func():
             raise CircuitBreakerError("Circuit open")
@@ -61,6 +64,7 @@ class TestHandleApiErrors:
 
     def test_sync_circuit_breaker_error(self):
         """Test sync function handling of CircuitBreakerError."""
+
         @handle_api_errors("test_service", "Service unavailable")
         def sync_func():
             raise CircuitBreakerError("Circuit open")
@@ -74,6 +78,7 @@ class TestHandleApiErrors:
     @pytest.mark.asyncio
     async def test_async_external_api_error(self):
         """Test async function handling of ExternalAPIError."""
+
         @handle_api_errors("test_service")
         async def async_func():
             raise ExternalAPIError("API failed")
@@ -86,6 +91,7 @@ class TestHandleApiErrors:
 
     def test_sync_external_api_error(self):
         """Test sync function handling of ExternalAPIError."""
+
         @handle_api_errors("test_service")
         def sync_func():
             raise ExternalAPIError("API failed")
@@ -99,6 +105,7 @@ class TestHandleApiErrors:
     @pytest.mark.asyncio
     async def test_async_unexpected_error(self):
         """Test async function handling of unexpected errors."""
+
         @handle_api_errors("test_service")
         async def async_func():
             raise RuntimeError("Unexpected error")
@@ -111,6 +118,7 @@ class TestHandleApiErrors:
 
     def test_sync_unexpected_error(self):
         """Test sync function handling of unexpected errors."""
+
         @handle_api_errors("test_service")
         def sync_func():
             raise RuntimeError("Unexpected error")
@@ -126,6 +134,7 @@ class TestHandleApiErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     async def test_async_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that async errors are logged and metrics are recorded."""
+
         @handle_api_errors("test_service")
         async def async_func():
             raise ExternalAPIError("API failed")
@@ -140,6 +149,7 @@ class TestHandleApiErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     def test_sync_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that sync errors are logged and metrics are recorded."""
+
         @handle_api_errors("test_service")
         def sync_func():
             raise ExternalAPIError("API failed")
@@ -157,6 +167,7 @@ class TestHandleWorkflowErrors:
     @pytest.mark.asyncio
     async def test_async_function_success(self):
         """Test that async workflow function executes successfully."""
+
         @handle_workflow_errors
         async def async_workflow():
             return {"result": "success"}
@@ -166,6 +177,7 @@ class TestHandleWorkflowErrors:
 
     def test_sync_function_success(self):
         """Test that sync workflow function executes successfully."""
+
         @handle_workflow_errors
         def sync_workflow():
             return {"result": "success"}
@@ -176,6 +188,7 @@ class TestHandleWorkflowErrors:
     @pytest.mark.asyncio
     async def test_async_workflow_error(self):
         """Test async function handling of WorkflowError."""
+
         @handle_workflow_errors
         async def async_workflow():
             raise WorkflowError("Workflow failed")
@@ -188,6 +201,7 @@ class TestHandleWorkflowErrors:
 
     def test_sync_workflow_error(self):
         """Test sync function handling of WorkflowError."""
+
         @handle_workflow_errors
         def sync_workflow():
             raise WorkflowError("Workflow failed")
@@ -201,6 +215,7 @@ class TestHandleWorkflowErrors:
     @pytest.mark.asyncio
     async def test_async_unexpected_error(self):
         """Test async function handling of unexpected workflow errors."""
+
         @handle_workflow_errors
         async def async_workflow():
             raise ValueError("Unexpected error")
@@ -213,6 +228,7 @@ class TestHandleWorkflowErrors:
 
     def test_sync_unexpected_error(self):
         """Test sync function handling of unexpected workflow errors."""
+
         @handle_workflow_errors
         def sync_workflow():
             raise ValueError("Unexpected error")
@@ -228,6 +244,7 @@ class TestHandleWorkflowErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     async def test_async_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that async workflow errors are logged and metrics are recorded."""
+
         @handle_workflow_errors
         async def async_workflow():
             raise WorkflowError("Workflow failed")
@@ -242,6 +259,7 @@ class TestHandleWorkflowErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     def test_sync_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that sync workflow errors are logged and metrics are recorded."""
+
         @handle_workflow_errors
         def sync_workflow():
             raise WorkflowError("Workflow failed")
@@ -259,6 +277,7 @@ class TestHandleMemoryErrors:
     @pytest.mark.asyncio
     async def test_async_function_success(self):
         """Test that async memory function executes successfully."""
+
         @handle_memory_errors
         async def async_memory_op():
             return "memory_stored"
@@ -268,6 +287,7 @@ class TestHandleMemoryErrors:
 
     def test_sync_function_success(self):
         """Test that sync memory function executes successfully."""
+
         @handle_memory_errors
         def sync_memory_op():
             return "memory_stored"
@@ -278,6 +298,7 @@ class TestHandleMemoryErrors:
     @pytest.mark.asyncio
     async def test_async_memory_error_graceful_degradation(self):
         """Test async function gracefully handles MemoryError by returning None."""
+
         @handle_memory_errors
         async def async_memory_op():
             raise MemoryError("Memory operation failed")
@@ -287,6 +308,7 @@ class TestHandleMemoryErrors:
 
     def test_sync_memory_error_graceful_degradation(self):
         """Test sync function gracefully handles MemoryError by returning None."""
+
         @handle_memory_errors
         def sync_memory_op():
             raise MemoryError("Memory operation failed")
@@ -297,6 +319,7 @@ class TestHandleMemoryErrors:
     @pytest.mark.asyncio
     async def test_async_unexpected_error_graceful_degradation(self):
         """Test async function gracefully handles unexpected errors by returning None."""
+
         @handle_memory_errors
         async def async_memory_op():
             raise RuntimeError("Unexpected error")
@@ -306,6 +329,7 @@ class TestHandleMemoryErrors:
 
     def test_sync_unexpected_error_graceful_degradation(self):
         """Test sync function gracefully handles unexpected errors by returning None."""
+
         @handle_memory_errors
         def sync_memory_op():
             raise RuntimeError("Unexpected error")
@@ -318,6 +342,7 @@ class TestHandleMemoryErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     async def test_async_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that async memory errors are logged and metrics are recorded."""
+
         @handle_memory_errors
         async def async_memory_op():
             raise MemoryError("Memory operation failed")
@@ -332,6 +357,7 @@ class TestHandleMemoryErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     def test_sync_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that sync memory errors are logged and metrics are recorded."""
+
         @handle_memory_errors
         def sync_memory_op():
             raise MemoryError("Memory operation failed")
@@ -349,6 +375,7 @@ class TestHandleValidationErrors:
     @pytest.mark.asyncio
     async def test_async_function_success(self):
         """Test that async validation function executes successfully."""
+
         @handle_validation_errors
         async def async_validate():
             return True
@@ -358,6 +385,7 @@ class TestHandleValidationErrors:
 
     def test_sync_function_success(self):
         """Test that sync validation function executes successfully."""
+
         @handle_validation_errors
         def sync_validate():
             return True
@@ -368,6 +396,7 @@ class TestHandleValidationErrors:
     @pytest.mark.asyncio
     async def test_async_validation_error(self):
         """Test async function handling of ValueError."""
+
         @handle_validation_errors
         async def async_validate():
             raise ValueError("Invalid input")
@@ -380,6 +409,7 @@ class TestHandleValidationErrors:
 
     def test_sync_validation_error(self):
         """Test sync function handling of ValueError."""
+
         @handle_validation_errors
         def sync_validate():
             raise ValueError("Invalid input")
@@ -393,6 +423,7 @@ class TestHandleValidationErrors:
     @pytest.mark.asyncio
     async def test_async_other_exceptions_propagate(self):
         """Test that async function allows other exceptions to propagate."""
+
         @handle_validation_errors
         async def async_validate():
             raise RuntimeError("Not a validation error")
@@ -404,6 +435,7 @@ class TestHandleValidationErrors:
 
     def test_sync_other_exceptions_propagate(self):
         """Test that sync function allows other exceptions to propagate."""
+
         @handle_validation_errors
         def sync_validate():
             raise RuntimeError("Not a validation error")
@@ -418,6 +450,7 @@ class TestHandleValidationErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     async def test_async_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that async validation errors are logged and metrics are recorded."""
+
         @handle_validation_errors
         async def async_validate():
             raise ValueError("Invalid input")
@@ -432,6 +465,7 @@ class TestHandleValidationErrors:
     @patch("ai_companion.core.error_handlers.metrics")
     def test_sync_error_logging_and_metrics(self, mock_metrics, mock_logger):
         """Test that sync validation errors are logged and metrics are recorded."""
+
         @handle_validation_errors
         def sync_validate():
             raise ValueError("Invalid input")
@@ -449,6 +483,7 @@ class TestUserFacingErrorMessages:
     @pytest.mark.asyncio
     async def test_api_error_default_message(self):
         """Test default user-facing message for API errors."""
+
         @handle_api_errors("groq")
         async def call_api():
             raise ExternalAPIError("Internal error details")
@@ -463,6 +498,7 @@ class TestUserFacingErrorMessages:
     @pytest.mark.asyncio
     async def test_api_error_custom_message(self):
         """Test custom user-facing message for API errors."""
+
         @handle_api_errors("groq", "Speech recognition is temporarily unavailable")
         async def call_api():
             raise CircuitBreakerError("Circuit open")
@@ -475,6 +511,7 @@ class TestUserFacingErrorMessages:
     @pytest.mark.asyncio
     async def test_workflow_error_user_friendly_message(self):
         """Test user-friendly message for workflow errors."""
+
         @handle_workflow_errors
         async def execute_workflow():
             raise WorkflowError("Internal workflow state error")
@@ -489,6 +526,7 @@ class TestUserFacingErrorMessages:
     @pytest.mark.asyncio
     async def test_validation_error_clear_message(self):
         """Test clear, actionable message for validation errors."""
+
         @handle_validation_errors
         async def validate_input():
             raise ValueError("Audio file must be less than 10MB")

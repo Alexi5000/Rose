@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGLTF, useTexture } from '@react-three/drei';
 
 /**
@@ -85,6 +85,23 @@ export const useAssetLoader = (options: UseAssetLoaderOptions = {}) => {
   const [error, setError] = useState<Error | null>(null);
   const [failedAssets, setFailedAssets] = useState<string[]>([]);
 
+  // Store latest callbacks so effect doesn't thrash when parents re-render
+  const onProgressRef = useRef(onProgress);
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
   // Calculate total assets
   const totalAssets =
     CRITICAL_ASSETS.textures.length +
@@ -111,7 +128,7 @@ export const useAssetLoader = (options: UseAssetLoaderOptions = {}) => {
       };
 
       setLoadingState(progress);
-      onProgress?.(progress);
+  onProgressRef.current?.(progress);
     },
     [totalAssets, onProgress]
   );
@@ -208,14 +225,14 @@ export const useAssetLoader = (options: UseAssetLoaderOptions = {}) => {
         }
         updateProgress(totalAssets, 'complete', 'Ready', failed, criticalFailed);
         setIsLoading(false);
-        onComplete?.();
+        onCompleteRef.current?.();
       } catch (err) {
         if (!isCancelled) {
           const error = err instanceof Error ? err : new Error('Asset loading failed');
           console.error('❌ Asset loading failed:', error);
           setError(error);
           setIsLoading(false);
-          onError?.(error);
+          onErrorRef.current?.(error);
         }
       }
     };
@@ -225,7 +242,7 @@ export const useAssetLoader = (options: UseAssetLoaderOptions = {}) => {
     return () => {
       isCancelled = true;
     };
-  }, [enabled, updateProgress, totalAssets, onComplete, onError]);
+  }, [enabled, updateProgress, totalAssets]);
 
   return {
     isLoading,

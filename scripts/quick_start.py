@@ -8,6 +8,7 @@ Asks user questions and runs appropriate deployment.
 Usage:
     python scripts/quick_start.py
 """
+
 import io
 import sys
 from pathlib import Path
@@ -103,9 +104,9 @@ def main() -> None:
         [
             "Docker (Production-like, isolated)",
             "Local Development (Hot reload, debugging)",
-            "Just verify setup (Don't start anything)"
+            "Just verify setup (Don't start anything)",
         ],
-        default="Docker (Production-like, isolated)"
+        default="Docker (Production-like, isolated)",
     )
 
     print()
@@ -125,9 +126,10 @@ def main() -> None:
         print()
 
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(PROJECT_ROOT / "scripts" / "deploy_rose_clean.py"), "--mode", "docker"],
-            cwd=PROJECT_ROOT
+            cwd=PROJECT_ROOT,
         )
 
         if result.returncode == 0:
@@ -151,9 +153,10 @@ def main() -> None:
         print()
 
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(PROJECT_ROOT / "scripts" / "deploy_rose_clean.py"), "--mode", "local"],
-            cwd=PROJECT_ROOT
+            cwd=PROJECT_ROOT,
         )
 
         if result.returncode == 0:
@@ -163,19 +166,16 @@ def main() -> None:
             start_now = input("Start dev servers now? (y/n): ").strip().lower()
 
             if start_now == "y":
-                subprocess.run(
-                    [sys.executable, str(PROJECT_ROOT / "scripts" / "run_dev_server.py")],
-                    cwd=PROJECT_ROOT
-                )
+                subprocess.run([sys.executable, str(PROJECT_ROOT / "scripts" / "run_dev_server.py")], cwd=PROJECT_ROOT)
 
     else:  # Verify only
         print("🔍 Running verification checks...")
         print()
 
         import subprocess
+
         result = subprocess.run(
-            [sys.executable, str(PROJECT_ROOT / "scripts" / "verify_deployment.py")],
-            cwd=PROJECT_ROOT
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "verify_deployment.py")], cwd=PROJECT_ROOT
         )
 
         if result.returncode == 0:

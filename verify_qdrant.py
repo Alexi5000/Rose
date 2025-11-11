@@ -24,7 +24,6 @@ Exit codes:
 import sys
 import uuid
 from datetime import datetime
-from typing import List
 
 # Add src to path for imports
 sys.path.insert(0, "src")
@@ -40,9 +39,9 @@ from ai_companion.modules.memory.long_term.vector_store import get_vector_store
 
 def print_header(text: str) -> None:
     """Print a formatted test section header."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  {text}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
 
 def print_test(test_name: str, passed: bool, details: str = "") -> None:
@@ -120,11 +119,7 @@ def run_tests() -> bool:
                 "timestamp": datetime.now().isoformat(),
             }
             vector_store.store_memory(text, metadata, session_id=session_id)
-            print_test(
-                f"Store memory (session={session_id})",
-                True,
-                f"'{text[:40]}...'"
-            )
+            print_test(f"Store memory (session={session_id})", True, f"'{text[:40]}...'")
         except Exception as e:
             print_test(f"Store memory (session={session_id})", False, str(e))
             all_passed = False
@@ -141,14 +136,9 @@ def run_tests() -> bool:
         try:
             results = vector_store.search_memories(query, k=3, session_id=session_id)
             found_keywords = any(
-                any(keyword in result.text.lower() for keyword in expected_keywords)
-                for result in results
+                any(keyword in result.text.lower() for keyword in expected_keywords) for result in results
             )
-            print_test(
-                f"Search '{query}' (session={session_id})",
-                found_keywords,
-                f"Found {len(results)} memories"
-            )
+            print_test(f"Search '{query}' (session={session_id})", found_keywords, f"Found {len(results)} memories")
             if results:
                 for i, result in enumerate(results, 1):
                     print(f"       {i}. '{result.text[:50]}...' (score: {result.score:.3f})")
@@ -165,17 +155,9 @@ def run_tests() -> bool:
         similar = vector_store.find_similar_memory(duplicate_text, session_id="user_alice")
 
         if similar and similar.score and similar.score >= DUPLICATE_DETECTION_SIMILARITY_THRESHOLD:
-            print_test(
-                "Duplicate detection",
-                True,
-                f"Found similar memory (score: {similar.score:.3f})"
-            )
+            print_test("Duplicate detection", True, f"Found similar memory (score: {similar.score:.3f})")
         else:
-            print_test(
-                "Duplicate detection",
-                False,
-                "Should have detected duplicate"
-            )
+            print_test("Duplicate detection", False, "Should have detected duplicate")
             all_passed = False
     except Exception as e:
         print_test("Duplicate detection", False, str(e))
@@ -197,18 +179,14 @@ def run_tests() -> bool:
             print_test(
                 "Session isolation (Alice has hiking, Bob doesn't)",
                 isolated,
-                f"Alice: {len(alice_results)} results, Bob: {len(bob_results)} results"
+                f"Alice: {len(alice_results)} results, Bob: {len(bob_results)} results",
             )
             all_passed = all_passed and isolated
         except Exception as e:
             print_test("Session isolation", False, str(e))
             all_passed = False
     else:
-        print_test(
-            "Session isolation",
-            True,
-            "Skipped (ENABLE_SESSION_ISOLATION=False)"
-        )
+        print_test("Session isolation", True, "Skipped (ENABLE_SESSION_ISOLATION=False)")
 
     # TEST 8: Collection Info
     print_header("TEST 8: Collection Information")
@@ -235,33 +213,38 @@ def main() -> int:
     # Set UTF-8 encoding for Windows console
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-    print("\n" + "="*70)
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+
+    print("\n" + "=" * 70)
     print("  QDRANT MEMORY SYSTEM VERIFICATION")
-    print("="*70)
+    print("=" * 70)
     print("\n🔍 Running comprehensive tests...\n")
 
     try:
         all_passed = run_tests()
 
         # Final summary
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         if all_passed:
             print("  ✅ ALL TESTS PASSED")
-            print("="*70)
+            print("=" * 70)
             print("\n🎉 Qdrant memory system is working correctly!")
             print("\nNext steps:")
             print("  1. ✅ Qdrant is configured and working")
             print("  2. ✅ Memory storage and retrieval functional")
-            print("  3. ✅ Session isolation is active" if ENABLE_SESSION_ISOLATION else "  3. ⚠️  Session isolation disabled (single-user mode)")
+            print(
+                "  3. ✅ Session isolation is active"
+                if ENABLE_SESSION_ISOLATION
+                else "  3. ⚠️  Session isolation disabled (single-user mode)"
+            )
             print("  4. ✅ Duplicate detection is working")
             print("\nYou're ready to use the memory system! 🚀")
             return 0
         else:
             print("  ❌ SOME TESTS FAILED")
-            print("="*70)
+            print("=" * 70)
             print("\n⚠️  Please review the failures above and:")
             print("  1. Check Qdrant is running: docker ps | findstr qdrant")
             print("  2. Verify .env configuration (QDRANT_URL, QDRANT_API_KEY)")
@@ -274,6 +257,7 @@ def main() -> int:
     except Exception as e:
         print(f"\n\n❌ Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

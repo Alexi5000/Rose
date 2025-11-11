@@ -31,6 +31,7 @@ def create_test_audio_file(duration_seconds: float = 1.0, sample_rate: int = 160
 
     # Generate a simple sine wave
     import math
+
     frequency = 440.0  # A4 note
     num_samples = int(duration_seconds * sample_rate)
 
@@ -66,11 +67,7 @@ class TestGroqIntegration:
 
         from ai_companion.settings import settings
 
-        llm = ChatGroq(
-            model=settings.GROQ_MODEL_NAME,
-            api_key=settings.GROQ_API_KEY,
-            temperature=0.7
-        )
+        llm = ChatGroq(model=settings.GROQ_MODEL_NAME, api_key=settings.GROQ_API_KEY, temperature=0.7)
 
         response = await llm.ainvoke("Say 'Hello, this is a test' and nothing else.")
 
@@ -118,11 +115,7 @@ class TestGroqIntegration:
         # Make a successful call through circuit breaker
         @breaker
         async def call_groq():
-            llm = ChatGroq(
-                model=settings.GROQ_MODEL_NAME,
-                api_key=settings.GROQ_API_KEY,
-                temperature=0.7
-            )
+            llm = ChatGroq(model=settings.GROQ_MODEL_NAME, api_key=settings.GROQ_API_KEY, temperature=0.7)
             return await llm.ainvoke("Test")
 
         response = await call_groq()
@@ -219,19 +212,11 @@ class TestQdrantIntegration:
         test_memory = "I feel peaceful when I meditate in nature."
 
         # Store a memory
-        await store_memory(
-            session_id=test_session_id,
-            memory_text=test_memory,
-            memory_type="emotional_state"
-        )
+        await store_memory(session_id=test_session_id, memory_text=test_memory, memory_type="emotional_state")
 
         # Retrieve related memories
         query = "How do I find peace?"
-        memories = await retrieve_relevant_memories(
-            session_id=test_session_id,
-            query=query,
-            limit=5
-        )
+        memories = await retrieve_relevant_memories(session_id=test_session_id, query=query, limit=5)
 
         # Verify we got results
         assert memories is not None
@@ -294,30 +279,27 @@ class TestEndToEndVoiceFlow:
 
         try:
             # Step 3: Process voice input
-            with open(audio_path, "rb") as audio_file:
-                files = {"audio": ("test.wav", audio_file, "audio/wav")}
-                data = {"session_id": session_id}
+            # Read file content synchronously (appropriate for TestClient usage)
+            audio_content = audio_path.read_bytes()
+            files = {"audio": ("test.wav", audio_content, "audio/wav")}
+            data = {"session_id": session_id}
 
-                # Note: This may fail with sine wave audio, but tests the flow
-                voice_response = client.post(
-                    "/api/voice/process",
-                    files=files,
-                    data=data
-                )
+            # Note: This may fail with sine wave audio, but tests the flow
+            voice_response = client.post("/api/voice/process", files=files, data=data)
 
-                # If successful, verify response structure
-                if voice_response.status_code == 200:
-                    voice_data = voice_response.json()
-                    assert "text" in voice_data
-                    assert "session_id" in voice_data
-                    assert voice_data["session_id"] == session_id
+            # If successful, verify response structure
+            if voice_response.status_code == 200:
+                voice_data = voice_response.json()
+                assert "text" in voice_data
+                assert "session_id" in voice_data
+                assert voice_data["session_id"] == session_id
 
-                    # If audio URL is provided, verify it's accessible
-                    if voice_data.get("audio_url"):
-                        audio_url = voice_data["audio_url"]
-                        audio_response = client.get(audio_url)
-                        assert audio_response.status_code == 200
-                        assert len(audio_response.content) > 0
+                # If audio URL is provided, verify it's accessible
+                if voice_data.get("audio_url"):
+                    audio_url = voice_data["audio_url"]
+                    audio_response = client.get(audio_url)
+                    assert audio_response.status_code == 200
+                    assert len(audio_response.content) > 0
         finally:
             # Clean up test file
             audio_path.unlink(missing_ok=True)
@@ -340,29 +322,31 @@ class TestEndToEndVoiceFlow:
         audio_path1 = create_test_audio_file(duration_seconds=2.0)
 
         try:
-            with open(audio_path1, "rb") as audio_file:
-                files = {"audio": ("test1.wav", audio_file, "audio/wav")}
-                data = {"session_id": session_id}
+            # Read file content synchronously (appropriate for TestClient usage)
+            audio_content1 = audio_path1.read_bytes()
+            files = {"audio": ("test1.wav", audio_content1, "audio/wav")}
+            data = {"session_id": session_id}
 
-                response1 = client.post("/api/voice/process", files=files, data=data)
+            response1 = client.post("/api/voice/process", files=files, data=data)
 
-                # May fail with sine wave, but if successful, continue
-                if response1.status_code == 200:
-                    # Second interaction - reference previous conversation
-                    audio_path2 = create_test_audio_file(duration_seconds=2.0)
+            # May fail with sine wave, but if successful, continue
+            if response1.status_code == 200:
+                # Second interaction - reference previous conversation
+                audio_path2 = create_test_audio_file(duration_seconds=2.0)
 
-                    with open(audio_path2, "rb") as audio_file2:
-                        files2 = {"audio": ("test2.wav", audio_file2, "audio/wav")}
-                        data2 = {"session_id": session_id}
+                # Read file content synchronously (appropriate for TestClient usage)
+                audio_content2 = audio_path2.read_bytes()
+                files2 = {"audio": ("test2.wav", audio_content2, "audio/wav")}
+                data2 = {"session_id": session_id}
 
-                        response2 = client.post("/api/voice/process", files=files2, data=data2)
+                response2 = client.post("/api/voice/process", files=files2, data=data2)
 
-                        # Verify session continuity
-                        if response2.status_code == 200:
-                            data2 = response2.json()
-                            assert data2["session_id"] == session_id
+                # Verify session continuity
+                if response2.status_code == 200:
+                    data2 = response2.json()
+                    assert data2["session_id"] == session_id
 
-                    audio_path2.unlink(missing_ok=True)
+                audio_path2.unlink(missing_ok=True)
         finally:
             audio_path1.unlink(missing_ok=True)
 

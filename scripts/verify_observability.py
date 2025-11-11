@@ -20,6 +20,9 @@ def verify_imports():
             sanitize_error_message,
             validation_error_handler,
         )
+        # Verify imports are available (suppress unused import warnings)
+        _ = (ErrorResponse, ai_companion_error_handler, global_exception_handler, sanitize_error_message, validation_error_handler)
+
         print("✓ Error response module imported successfully")
     except ImportError as e:
         print(f"✗ Failed to import error response module: {e}")
@@ -31,6 +34,9 @@ def verify_imports():
             metrics,
             track_performance,
         )
+        # Verify imports are available (suppress unused import warnings)
+        _ = (MetricsCollector, metrics, track_performance)
+
         print("✓ Metrics module imported successfully")
     except ImportError as e:
         print(f"✗ Failed to import metrics module: {e}")
@@ -39,15 +45,9 @@ def verify_imports():
     # Note: Metrics route requires environment variables, so we skip importing it
     # The route itself is verified by checking the file exists
     import os
+
     metrics_route_path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "src",
-        "ai_companion",
-        "interfaces",
-        "web",
-        "routes",
-        "metrics.py"
+        os.path.dirname(__file__), "..", "src", "ai_companion", "interfaces", "web", "routes", "metrics.py"
     )
     if os.path.exists(metrics_route_path):
         print("✓ Metrics route file exists")
@@ -65,11 +65,7 @@ def verify_error_response_model():
     from ai_companion.core.error_responses import ErrorResponse
 
     # Create a sample error response
-    error = ErrorResponse(
-        error="test_error",
-        message="Test error message",
-        request_id="test-request-id"
-    )
+    error = ErrorResponse(error="test_error", message="Test error message", request_id="test-request-id")
 
     # Verify fields
     assert error.error == "test_error"
@@ -198,6 +194,7 @@ def main():
             failed += 1
             print(f"✗ {test_name} failed with exception: {e}")
             import traceback
+
             traceback.print_exc()
 
     print("\n" + "=" * 60)

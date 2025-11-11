@@ -154,12 +154,10 @@ DEV_FRONTEND_HOT_RELOAD_ENABLED = True  # Enable hot reload for frontend in deve
 
 # Audio validation errors
 ERROR_MSG_AUDIO_TOO_LARGE = (
-    f"🎤 Your audio file is too large. Please record a shorter message "
-    f"(maximum {MAX_AUDIO_FILE_SIZE_MB}MB)."
+    f"🎤 Your audio file is too large. Please record a shorter message (maximum {MAX_AUDIO_FILE_SIZE_MB}MB)."
 )
 ERROR_MSG_AUDIO_EMPTY = (
-    "🎤 I didn't receive any audio. Please try recording again and ensure "
-    "your microphone is working."
+    "🎤 I didn't receive any audio. Please try recording again and ensure your microphone is working."
 )
 ERROR_MSG_AUDIO_INVALID_FORMAT = (
     "🎤 I couldn't process that audio format. Please use WAV, MP3, WebM, M4A, or OGG format."
@@ -176,8 +174,7 @@ ERROR_MSG_STT_FAILED = (
 
 # Workflow processing errors
 ERROR_MSG_WORKFLOW_TIMEOUT = (
-    "⏱️ I'm taking longer than usual to respond. This might be due to high demand. "
-    "Please try again in a moment."
+    "⏱️ I'm taking longer than usual to respond. This might be due to high demand. Please try again in a moment."
 )
 ERROR_MSG_WORKFLOW_FAILED = (
     "💭 I'm having trouble processing your message right now. Please try again. "
@@ -198,18 +195,13 @@ ERROR_MSG_TTS_FAILED = (
 
 # Audio file serving errors
 ERROR_MSG_AUDIO_NOT_FOUND = (
-    "🔊 That audio file has expired or doesn't exist. "
-    "Audio responses are available for 24 hours after generation."
+    "🔊 That audio file has expired or doesn't exist. Audio responses are available for 24 hours after generation."
 )
-ERROR_MSG_AUDIO_SAVE_FAILED = (
-    "💾 I generated a response but couldn't save the audio file. "
-    "Please try again."
-)
+ERROR_MSG_AUDIO_SAVE_FAILED = "💾 I generated a response but couldn't save the audio file. Please try again."
 
 # Generic errors
 ERROR_MSG_INTERNAL_ERROR = (
-    "❌ Something unexpected happened on my end. Please try again. "
-    "If this keeps happening, please contact support."
+    "❌ Something unexpected happened on my end. Please try again. If this keeps happening, please contact support."
 )
 ERROR_MSG_RATE_LIMIT_EXCEEDED = (
     "⏸️ You're sending messages too quickly. Please wait a moment before trying again. "

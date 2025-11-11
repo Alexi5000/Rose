@@ -25,7 +25,9 @@ class TestRetryUtilities(unittest.TestCase):
         self.assertEqual(calls["n"], 3)
 
     def test_retry_skips_on_skip_exceptions(self):
-        @retry_with_exponential_backoff(max_retries=5, initial_backoff=0.0, max_backoff=0.0, skip_exceptions=(ValueError,))
+        @retry_with_exponential_backoff(
+            max_retries=5, initial_backoff=0.0, max_backoff=0.0, skip_exceptions=(ValueError,)
+        )
         def will_raise():
             raise ValueError("bad input")
 

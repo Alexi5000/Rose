@@ -12,6 +12,7 @@ Timing Expectations:
 - End-to-end workflow: <5s for typical conversation
 """
 
+import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,8 +30,7 @@ class TestMemoryPerformance:
     async def test_memory_extraction_performance(self, mock_qdrant_client):
         """Benchmark: Memory extraction should complete in <500ms."""
         mock_analysis = MemoryAnalysis(
-            is_important=True,
-            formatted_memory="Experiencing anxiety following mother's death one month ago"
+            is_important=True, formatted_memory="Experiencing anxiety following mother's death one month ago"
         )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
@@ -38,6 +38,7 @@ class TestMemoryPerformance:
             mock_vs.return_value.store_memory = MagicMock()
 
             from ai_companion.modules.memory.long_term.memory_manager import MemoryManager
+
             manager = MemoryManager()
             manager.llm = AsyncMock()
             manager.llm.ainvoke.return_value = mock_analysis
@@ -51,7 +52,7 @@ class TestMemoryPerformance:
 
             # Assert performance requirement
             assert elapsed_time < 0.5, f"Memory extraction took {elapsed_time:.3f}s, expected <0.5s"
-            print(f"\n✓ Memory extraction: {elapsed_time*1000:.1f}ms (target: <500ms)")
+            print(f"\n✓ Memory extraction: {elapsed_time * 1000:.1f}ms (target: <500ms)")
 
     @pytest.mark.asyncio
     async def test_memory_retrieval_performance(self, mock_qdrant_client):
@@ -62,7 +63,7 @@ class TestMemoryPerformance:
             Memory(
                 text=f"Memory {i}: Important therapeutic information",
                 metadata={"id": f"mem{i}", "timestamp": "2024-01-15T10:00:00"},
-                score=0.9 - i*0.05
+                score=0.9 - i * 0.05,
             )
             for i in range(3)
         ]
@@ -71,6 +72,7 @@ class TestMemoryPerformance:
             mock_vs.return_value.search_memories.return_value = mock_memories
 
             from ai_companion.modules.memory.long_term.memory_manager import MemoryManager
+
             manager = MemoryManager()
 
             # Benchmark the operation
@@ -81,7 +83,7 @@ class TestMemoryPerformance:
             # Assert performance requirement
             assert elapsed_time < 0.2, f"Memory retrieval took {elapsed_time:.3f}s, expected <0.2s"
             assert len(memories) == 3
-            print(f"✓ Memory retrieval: {elapsed_time*1000:.1f}ms (target: <200ms)")
+            print(f"✓ Memory retrieval: {elapsed_time * 1000:.1f}ms (target: <200ms)")
 
 
 @pytest.mark.slow
@@ -96,16 +98,19 @@ class TestSpeechPerformance:
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
+
                 # Make call_async properly async - await if coroutine
                 async def async_call(func):
                     result = func()
                     if hasattr(result, "__await__"):
                         return await result
                     return result
+
                 mock_breaker.call_async = async_call
                 mock_cb.return_value = mock_breaker
 
                 from ai_companion.modules.speech.speech_to_text import SpeechToText
+
                 stt = SpeechToText()
 
                 # Benchmark the operation
@@ -116,7 +121,7 @@ class TestSpeechPerformance:
                 # Assert performance requirement
                 assert elapsed_time < 2.0, f"STT transcription took {elapsed_time:.3f}s, expected <2.0s"
                 assert result == "This is a test transcription from audio."
-                print(f"✓ STT transcription: {elapsed_time*1000:.1f}ms (target: <2000ms)")
+                print(f"✓ STT transcription: {elapsed_time * 1000:.1f}ms (target: <2000ms)")
 
     @pytest.mark.asyncio
     async def test_tts_synthesis_performance(self, mock_elevenlabs_client):
@@ -128,16 +133,19 @@ class TestSpeechPerformance:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
+
                 # Make call_async properly async - await if coroutine
                 async def async_call(func):
                     result = func()
                     if hasattr(result, "__await__"):
                         return await result
                     return result
+
                 mock_breaker.call_async = async_call
                 mock_cb.return_value = mock_breaker
 
                 from ai_companion.modules.speech.text_to_speech import TextToSpeech
+
                 tts = TextToSpeech()
 
                 # Benchmark the operation
@@ -148,7 +156,7 @@ class TestSpeechPerformance:
                 # Assert performance requirement
                 assert elapsed_time < 1.0, f"TTS synthesis took {elapsed_time:.3f}s, expected <1.0s"
                 assert result == b"audio_chunk_1audio_chunk_2"
-                print(f"✓ TTS synthesis: {elapsed_time*1000:.1f}ms (target: <1000ms)")
+                print(f"✓ TTS synthesis: {elapsed_time * 1000:.1f}ms (target: <1000ms)")
 
     @pytest.mark.asyncio
     async def test_tts_cache_hit_performance(self, mock_elevenlabs_client):
@@ -158,16 +166,19 @@ class TestSpeechPerformance:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
+
                 # Make call_async properly async - await if coroutine
                 async def async_call(func):
                     result = func()
                     if hasattr(result, "__await__"):
                         return await result
                     return result
+
                 mock_breaker.call_async = async_call
                 mock_cb.return_value = mock_breaker
 
                 from ai_companion.modules.speech.text_to_speech import TextToSpeech
+
                 tts = TextToSpeech(enable_cache=True)
 
                 # First call to populate cache
@@ -181,7 +192,7 @@ class TestSpeechPerformance:
                 # Assert cache hit is fast
                 assert elapsed_time < 0.05, f"TTS cache hit took {elapsed_time:.3f}s, expected <0.05s"
                 assert result == b"cached_audio"
-                print(f"✓ TTS cache hit: {elapsed_time*1000:.1f}ms (target: <50ms)")
+                print(f"✓ TTS cache hit: {elapsed_time * 1000:.1f}ms (target: <50ms)")
 
 
 @pytest.mark.slow
@@ -200,11 +211,11 @@ class TestWorkflowPerformance:
             mock_vs.return_value.store_memory = MagicMock()
 
             from ai_companion.modules.memory.long_term.memory_manager import MemoryAnalysis, MemoryManager
+
             manager = MemoryManager()
             manager.llm = AsyncMock()
             manager.llm.ainvoke.return_value = MemoryAnalysis(
-                is_important=True,
-                formatted_memory="User is feeling anxious today"
+                is_important=True, formatted_memory="User is feeling anxious today"
             )
 
             message = HumanMessage(content="I'm feeling really anxious today")
@@ -225,7 +236,7 @@ class TestWorkflowPerformance:
 
             # Assert performance requirement
             assert elapsed_time < 5.0, f"End-to-end workflow took {elapsed_time:.3f}s, expected <5.0s"
-            print(f"✓ End-to-end workflow: {elapsed_time*1000:.1f}ms (target: <5000ms)")
+            print(f"✓ End-to-end workflow: {elapsed_time * 1000:.1f}ms (target: <5000ms)")
 
     @pytest.mark.asyncio
     async def test_memory_injection_performance(self):
@@ -236,7 +247,7 @@ class TestWorkflowPerformance:
             Memory(
                 text=f"Memory {i}: Important therapeutic information about the user's background",
                 metadata={"id": f"mem{i}"},
-                score=0.9
+                score=0.9,
             )
             for i in range(5)
         ]
@@ -245,6 +256,7 @@ class TestWorkflowPerformance:
             mock_vs.return_value.search_memories.return_value = mock_memories
 
             from ai_companion.modules.memory.long_term.memory_manager import MemoryManager
+
             manager = MemoryManager()
 
             # Benchmark memory retrieval and formatting
@@ -256,7 +268,7 @@ class TestWorkflowPerformance:
             # Assert performance requirement
             assert elapsed_time < 0.1, f"Memory injection took {elapsed_time:.3f}s, expected <0.1s"
             assert len(formatted) > 0
-            print(f"✓ Memory injection: {elapsed_time*1000:.1f}ms (target: <100ms)")
+            print(f"✓ Memory injection: {elapsed_time * 1000:.1f}ms (target: <100ms)")
 
 
 @pytest.mark.slow
@@ -270,11 +282,7 @@ class TestCircuitBreakerPerformance:
         def fast_operation():
             return "success"
 
-        breaker = CircuitBreaker(
-            failure_threshold=5,
-            recovery_timeout=60,
-            expected_exception=Exception
-        )
+        breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60, expected_exception=Exception)
 
         # Benchmark circuit breaker overhead
         start_time = time.perf_counter()
@@ -297,11 +305,7 @@ class TestCircuitBreakerPerformance:
         async def fast_async_operation():
             return "success"
 
-        breaker = CircuitBreaker(
-            failure_threshold=5,
-            recovery_timeout=60,
-            expected_exception=Exception
-        )
+        breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60, expected_exception=Exception)
 
         # Benchmark async circuit breaker overhead
         start_time = time.perf_counter()
@@ -317,17 +321,13 @@ class TestCircuitBreakerPerformance:
         print(f"✓ Async circuit breaker overhead: {avg_overhead:.2f}ms per call (target: <10ms)")
 
 
-# Import asyncio for workflow test
-import asyncio
-
-
 def print_benchmark_summary():
     """Print a summary of all benchmark results."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PERFORMANCE BENCHMARK SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print("All benchmarks passed their performance targets!")
-    print("="*60)
+    print("=" * 60)
 
 
 # Run summary after all tests

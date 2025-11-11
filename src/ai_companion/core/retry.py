@@ -52,8 +52,7 @@ def retry_with_exponential_backoff(
                 except exceptions as e:
                     last_exception = e
                     logger.warning(
-                        f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: "
-                        f"{type(e).__name__}: {str(e)}",
+                        f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {str(e)}",
                         exc_info=attempt == max_retries - 1,  # Full traceback on last attempt
                     )
 
@@ -126,7 +125,7 @@ async def async_retry_with_exponential_backoff(
         except exceptions as e:
             last_exception = e
             logger.warning(
-                f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: " f"{type(e).__name__}: {str(e)}",
+                f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {str(e)}",
                 exc_info=attempt == max_retries - 1,  # Full traceback on last attempt
             )
 

@@ -126,13 +126,7 @@ class DependencyAnalyzer:
 
     def categorize_modules(self) -> Dict[str, List[str]]:
         """Categorize modules by their layer."""
-        categories = {
-            "core": [],
-            "modules": [],
-            "graph": [],
-            "interfaces": [],
-            "other": []
-        }
+        categories = {"core": [], "modules": [], "graph": [], "interfaces": [], "other": []}
 
         for module in self.module_files:
             if "core" in module:
