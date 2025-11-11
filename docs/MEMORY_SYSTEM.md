@@ -214,7 +214,7 @@ INFO:   📌 'User has peanut allergy' (score: 0.923)
 ### Run Verification Script
 
 ```bash
-python verify_qdrant.py
+python scripts/verify_qdrant.py
 ```
 
 This comprehensive test script verifies:
