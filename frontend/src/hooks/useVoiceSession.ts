@@ -25,6 +25,7 @@ import {
   FALLBACK_MIME_TYPES,
   SESSION_RETRY_ATTEMPTS,
   SESSION_RETRY_DELAY_MS,
+  VAD_LOOP_INTERVAL_MS,
 } from '@/config/voice';
 import {
   calculateRms,
@@ -33,6 +34,11 @@ import {
 } from '@/lib/audio-utils';
 import { processVoice, createSession } from '@/lib/api';
 import type { VoiceState, VoiceResponse } from '@/types/voice';
+
+const STATUS_LOG_FRAME_INTERVAL = Math.max(
+  1,
+  Math.round(1000 / VAD_LOOP_INTERVAL_MS)
+);
 
 interface UseVoiceSessionReturn {
   /** Current state of voice session */
@@ -82,6 +88,9 @@ export function useVoiceSession({
   const animationFrameRef = useRef<number | null>(null);
   const inactivityTimeoutRef = useRef<number | null>(null);
   const recordingStartTimeRef = useRef<number | null>(null);
+  const recorderStartingRef = useRef(false);
+  const deferredStopTimeoutRef = useRef<number | null>(null);
+  const maxRecordingTimeoutRef = useRef<number | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   // VAD state (frame-based detection)
@@ -90,6 +99,30 @@ export function useVoiceSession({
   const utteranceActiveRef = useRef(false);
   const frameCountRef = useRef(0); // For periodic logging
   const stateRef = useRef<VoiceState>(state); // Ref for animation frame loop
+  const vadStatusRef = useRef<'idle' | 'active' | 'paused'>('idle');
+
+  const setVoiceState = useCallback((next: VoiceState) => {
+    if (stateRef.current === next) {
+      return;
+    }
+    console.info(`🧠 State transition: ${stateRef.current} → ${next}`);
+    stateRef.current = next;
+    setState(next);
+  }, []);
+
+  const clearDeferredStopTimeout = useCallback(() => {
+    if (deferredStopTimeoutRef.current !== null) {
+      clearTimeout(deferredStopTimeoutRef.current);
+      deferredStopTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearMaxRecordingTimeout = useCallback(() => {
+    if (maxRecordingTimeoutRef.current !== null) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+      maxRecordingTimeoutRef.current = null;
+    }
+  }, []);
 
   // Keep stateRef in sync with state
   useEffect(() => {
@@ -140,7 +173,9 @@ export function useVoiceSession({
    * 🎙️ Start recording audio
    */
   const startRecording = useCallback(() => {
-    if (!streamRef.current || utteranceActiveRef.current) return;
+    if (!streamRef.current || utteranceActiveRef.current || recorderStartingRef.current) {
+      return;
+    }
 
     const mimeType = getSupportedMimeType(PREFERRED_MIME_TYPE, FALLBACK_MIME_TYPES);
     if (!mimeType) {
@@ -151,11 +186,19 @@ export function useVoiceSession({
     console.log('🔴 Starting recording');
     setIsUserSpeaking(true);
     utteranceActiveRef.current = true;
+    recorderStartingRef.current = true;
     recordingStartTimeRef.current = Date.now();
     audioChunksRef.current = [];
+    clearDeferredStopTimeout();
+    clearMaxRecordingTimeout();
 
     const mediaRecorder = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.onstart = () => {
+      console.log('🎬 Recorder armed');
+      recorderStartingRef.current = false;
+    };
 
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -164,8 +207,14 @@ export function useVoiceSession({
     };
 
     mediaRecorder.onstop = async () => {
+      clearMaxRecordingTimeout();
+      clearDeferredStopTimeout();
+      recorderStartingRef.current = false;
       const duration = Date.now() - (recordingStartTimeRef.current || 0);
       console.log(`⏹️ Recording stopped - Duration: ${duration}ms`);
+      setIsUserSpeaking(false);
+      utteranceActiveRef.current = false;
+      console.log('🧹 Recorder teardown complete');
 
       // Validate recording duration
       if (duration < MIN_RECORDING_DURATION_MS) {
@@ -182,11 +231,11 @@ export function useVoiceSession({
         console.error('❌ No session ID - this should never happen!');
         console.error(`   sessionId state: ${sessionId}, sessionIdRef: ${sessionIdRef.current}`);
         onError('Session error. Please refresh and try again.');
-        setState('listening');
+        setVoiceState('listening');
         return;
       }
 
-      setState('processing');
+      setVoiceState('processing');
       try {
         console.log(`📤 Sending to backend with session: ${currentSessionId.slice(0, 8)}...`);
         const response = await processVoice(audioBlob, currentSessionId);
@@ -195,22 +244,32 @@ export function useVoiceSession({
       } catch (err) {
         console.error('❌ Voice processing error:', err);
         onError('Failed to process your voice. Please try again.');
-        setState('listening');
+      } finally {
+        if (stateRef.current !== 'idle') {
+          setVoiceState('listening');
+        } else {
+          console.info('🧠 Skipping listening resume - session already idle');
+        }
       }
     };
 
     mediaRecorder.start();
 
     // Auto-stop after max duration
-    setTimeout(() => {
+    maxRecordingTimeoutRef.current = window.setTimeout(() => {
       if (mediaRecorder.state === 'recording') {
         console.log('⏱️ Max recording duration reached - stopping');
-        mediaRecorder.stop();
-        setIsUserSpeaking(false);
-        utteranceActiveRef.current = false;
+        stopRecording();
       }
     }, MAX_RECORDING_DURATION_MS);
-  }, [onResponse, onError]);
+  }, [
+    onResponse,
+    onError,
+    clearDeferredStopTimeout,
+    clearMaxRecordingTimeout,
+    setVoiceState,
+    sessionId,
+  ]);
 
   /**
    * 🛑 Stop recording audio
@@ -218,27 +277,47 @@ export function useVoiceSession({
   const stopRecording = useCallback(() => {
     if (!utteranceActiveRef.current || !mediaRecorderRef.current) return;
 
+    const duration = Date.now() - (recordingStartTimeRef.current || 0);
+    if (duration < MIN_RECORDING_DURATION_MS) {
+      const remaining = MIN_RECORDING_DURATION_MS - duration;
+      if (deferredStopTimeoutRef.current === null) {
+        console.log(
+          `⏳ Recording needs ${remaining}ms more before stopping (elapsed ${duration}ms)`
+        );
+        deferredStopTimeoutRef.current = window.setTimeout(() => {
+          deferredStopTimeoutRef.current = null;
+          stopRecording();
+        }, remaining);
+      }
+      return;
+    }
+
     console.log('🛑 Stopping recording');
+    clearMaxRecordingTimeout();
+    clearDeferredStopTimeout();
+
     if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
-    setIsUserSpeaking(false);
-    utteranceActiveRef.current = false;
-  }, []);
+  }, [clearMaxRecordingTimeout, clearDeferredStopTimeout]);
 
   /**
    * 🔊 VAD analysis loop (runs at 60fps)
    */
   const analyzeAudio = useCallback(() => {
     // Early exit check with logging
-    if (!analyserRef.current) {
-      console.warn('⚠️ VAD Loop: No analyser available');
+    if (!analyserRef.current || stateRef.current !== 'listening') {
+      if (vadStatusRef.current === 'active') {
+        console.info(`🟡 VAD paused (state: ${stateRef.current})`);
+        vadStatusRef.current = 'paused';
+      }
+      animationFrameRef.current = null;
       return;
     }
 
-    if (stateRef.current !== 'listening') {
-      console.warn(`⚠️ VAD Loop: Wrong state (${stateRef.current}), expected 'listening'`);
-      return;
+    if (vadStatusRef.current !== 'active') {
+      console.info('🟢 VAD resumed');
+      vadStatusRef.current = 'active';
     }
 
     const analyser = analyserRef.current;
@@ -252,7 +331,7 @@ export function useVoiceSession({
 
     // Periodic diagnostic logging (every 60 frames = 1 second at 60fps)
     frameCountRef.current += 1;
-    if (frameCountRef.current >= 60) {
+    if (frameCountRef.current >= STATUS_LOG_FRAME_INTERVAL) {
       console.log(
         `🔊 VAD Status: RMS=${rms.toFixed(4)} | ` +
         `Threshold=${RMS_ACTIVATION_THRESHOLD} | ` +
@@ -306,6 +385,31 @@ export function useVoiceSession({
     animationFrameRef.current = requestAnimationFrame(analyzeAudio);
   }, [startRecording, stopRecording, resetInactivityTimer]);
 
+  const startVadLoop = useCallback(() => {
+    if (animationFrameRef.current !== null) return;
+    console.info('▶️ VAD loop scheduled');
+    animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+  }, [analyzeAudio]);
+
+  const stopVadLoop = useCallback(() => {
+    if (animationFrameRef.current === null) return;
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+    if (vadStatusRef.current !== 'idle') {
+      console.info(`⏹️ VAD loop halted (state: ${stateRef.current})`);
+    }
+    vadStatusRef.current = 'idle';
+    frameCountRef.current = 0;
+  }, []);
+
+  useEffect(() => {
+    if (state === 'listening') {
+      startVadLoop();
+    } else {
+      stopVadLoop();
+    }
+  }, [state, startVadLoop, stopVadLoop]);
+
   /**
    * ▶️ Start voice session
    */
@@ -347,14 +451,22 @@ export function useVoiceSession({
         ANALYSER_SMOOTHING
       );
 
+      if (audioContext.state === 'suspended') {
+        console.log('⏯️ Resuming microphone AudioContext');
+        try {
+          await audioContext.resume();
+        } catch (resumeError) {
+          console.error('❌ Failed to resume AudioContext', resumeError);
+          throw resumeError;
+        }
+      }
+
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      setState('listening');
+      setVoiceState('listening');
 
       // Step 4: Start VAD loop
-      animationFrameRef.current = requestAnimationFrame(analyzeAudio);
-
       // Step 5: Start inactivity timer
       resetInactivityTimer();
 
@@ -363,7 +475,7 @@ export function useVoiceSession({
       console.error('❌ Failed to start voice session:', err);
       onError('Failed to access microphone. Please check permissions.');
     }
-  }, [state, sessionId, analyzeAudio, resetInactivityTimer, onError]);
+  }, [state, sessionId, resetInactivityTimer, onError, setVoiceState]);
 
   /**
    * ⏹️ Stop voice session
@@ -377,16 +489,16 @@ export function useVoiceSession({
     }
 
     // Stop VAD loop
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+    stopVadLoop();
 
     // Clear inactivity timer
     if (inactivityTimeoutRef.current) {
       clearTimeout(inactivityTimeoutRef.current);
       inactivityTimeoutRef.current = null;
     }
+
+    clearDeferredStopTimeout();
+    clearMaxRecordingTimeout();
 
     // Stop stream
     if (streamRef.current) {
@@ -408,10 +520,16 @@ export function useVoiceSession({
     utteranceActiveRef.current = false;
     setUserAmplitude(0);
     setIsUserSpeaking(false);
-    setState('idle');
+    setVoiceState('idle');
 
     console.log('✅ Voice session stopped');
-  }, [stopRecording]);
+  }, [
+    stopRecording,
+    stopVadLoop,
+    clearDeferredStopTimeout,
+    clearMaxRecordingTimeout,
+    setVoiceState,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {

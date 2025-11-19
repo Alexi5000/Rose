@@ -205,6 +205,19 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
         with track_api_call("groq_stt", session_id, success_emoji="✅", error_emoji="❌") as ctx:
             transcribed_text = await stt.transcribe(audio_data)
             ctx["transcribed_length"] = len(transcribed_text)
+
+            # 📝 Log transcription for debugging
+            logger.info(f"📝 [Transcription] '{transcribed_text}'", session_id=session_id)
+
+            # 🛡️ Input Guard: Filter out hallucinations and empty segments
+            # Whisper sometimes outputs these phrases for silence
+            hallucinations = ["...", "thank you.", "thank you", "subtitles by", "copyright", "audio"]
+            cleaned = transcribed_text.strip().lower()
+
+            if not cleaned or any(h in cleaned for h in hallucinations):
+                logger.warning(f"⚠️ [Input Guard] Ignoring garbage input: '{transcribed_text}'", session_id=session_id)
+                return ""
+
             return transcribed_text
 
     except ValueError as e:
@@ -219,7 +232,7 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
         raise SpeechToTextError(ERROR_MSG_STT_FAILED)
 
 
-async def _process_workflow(transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver) -> str:
+async def _process_workflow(transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver) -> tuple[str, Optional[bytes]]:
     """Process through LangGraph workflow with timeout and error handling.
 
     Args:
@@ -228,7 +241,7 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
         checkpointer: AsyncSqliteSaver instance for session persistence
 
     Returns:
-        str: Response text from workflow
+        tuple[str, Optional[bytes]]: Response text and optional audio buffer from workflow
 
     Raises:
         HTTPException: If workflow times out or circuit breaker is open
@@ -269,6 +282,7 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
 
         # Extract response text from the last AI message
         response_text = result["messages"][-1].content
+        audio_buffer = result.get("audio_buffer")
         workflow_duration_ms = (time.time() - workflow_start) * 1000
         metrics.record_workflow_execution(session_id, workflow_duration_ms, success=True)
         logger.info(
@@ -283,7 +297,7 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
             response_length=len(response_text),
             duration_ms=round(workflow_duration_ms, 2),
         )
-        return response_text
+        return response_text, audio_buffer
 
     except CircuitBreakerError as e:
         # Circuit breaker is open for one of the services
@@ -475,11 +489,25 @@ async def process_voice(
         # Transcribe audio
         transcribed_text = await _transcribe_audio(audio_data, session_id, stt)
 
+        # 🛡️ Input Guard: Skip workflow if input is empty/garbage
+        if not transcribed_text:
+            logger.info("🤫 [Silence Detected] Skipping workflow to prevent loops", session_id=session_id)
+            # Return empty response to keep connection alive but do nothing
+            return VoiceProcessResponse(
+                text="",
+                audio_url="",
+                session_id=session_id,
+            )
+
         # Process through workflow
-        response_text = await _process_workflow(transcribed_text, session_id, checkpointer)
+        response_text, workflow_audio = await _process_workflow(transcribed_text, session_id, checkpointer)
 
         # Generate audio response
-        audio_bytes = await _generate_audio_response(response_text, session_id, tts)
+        if workflow_audio:
+            audio_bytes = workflow_audio
+            logger.info("✅ using_workflow_generated_audio", session_id=session_id)
+        else:
+            audio_bytes = await _generate_audio_response(response_text, session_id, tts)
 
         # Save and return
         audio_url = await _save_audio_file(audio_bytes, session_id, audio_dir)

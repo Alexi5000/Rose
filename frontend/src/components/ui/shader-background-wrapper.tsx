@@ -35,7 +35,7 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
       setCurrentState('speaking');
 
       // Play Rose's audio response
-      roseAudio.playAudio(response.audio_url);
+      void roseAudio.playAudio(response);
     },
     onError: (error) => {
       console.error('❌ Voice error:', error);

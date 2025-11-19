@@ -135,7 +135,8 @@ class TextToSpeech:
 
         logger.info(
             f"Synthesizing speech for Rose: {len(text)} chars, "
-            f"voice_id={selected_voice_id}, stability={voice_stability}, similarity={voice_similarity}"
+            f"voice_id={selected_voice_id}, stability={voice_stability}, similarity={voice_similarity}, "
+            f"latency_level={settings.TTS_STREAMING_LATENCY_LEVEL}, format={settings.TTS_OUTPUT_FORMAT}"
         )
 
         try:
@@ -153,9 +154,12 @@ class TextToSpeech:
                             settings=VoiceSettings(
                                 stability=voice_stability,
                                 similarity_boost=voice_similarity,
+                                use_speaker_boost=settings.TTS_USE_SPEAKER_BOOST,
                             ),
                         ),
                         model=settings.TTS_MODEL_NAME,
+                        output_format=settings.TTS_OUTPUT_FORMAT,
+                        optimize_streaming_latency=settings.TTS_STREAMING_LATENCY_LEVEL,
                     )
                     # Convert generator to bytes
                     return b"".join(audio_generator)

@@ -153,6 +153,9 @@ class Settings(BaseSettings):
     TTS_CACHE_TTL_HOURS: int = 24  # Cache time-to-live in hours
     TTS_VOICE_STABILITY: float = 0.75  # Voice stability (0.0-1.0)
     TTS_VOICE_SIMILARITY: float = 0.5  # Voice similarity boost (0.0-1.0)
+    TTS_STREAMING_LATENCY_LEVEL: int = 0  # 0 (highest quality) to 4 (lowest latency)
+    TTS_OUTPUT_FORMAT: str = "mp3_44100_128"  # ElevenLabs output encoding
+    TTS_USE_SPEAKER_BOOST: bool = True  # Enable ElevenLabs speaker boost for warmth
     TTS_MAX_TEXT_LENGTH: int = 5000  # Maximum text length for TTS
 
     # Audio file cleanup configuration
@@ -305,6 +308,15 @@ class Settings(BaseSettings):
                 f"{info.field_name} must be between 0.0 and 1.0 (got {v}). "
                 "This controls randomness/sampling for the respective feature."
             )
+        return v
+
+    @field_validator("TTS_STREAMING_LATENCY_LEVEL")
+    @classmethod
+    def validate_tts_streaming_latency(cls, v: int) -> int:
+        """Validate streaming latency optimization level (0-4)."""
+
+        if v < 0 or v > 4:
+            raise ValueError("TTS_STREAMING_LATENCY_LEVEL must be between 0 (quality) and 4 (fastest)")
         return v
 
     @field_validator(

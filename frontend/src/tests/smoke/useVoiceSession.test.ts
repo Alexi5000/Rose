@@ -15,7 +15,8 @@ console.log('🎤 Loading useVoiceSession tests');
 // Mock the API
 vi.mock('@/lib/api', () => ({
   processVoice: vi.fn(),
-  getErrorMessage: vi.fn((error) => 'Mock error message'),
+  getErrorMessage: vi.fn(() => 'Mock error message'),
+  createSession: vi.fn(),
 }));
 
 // Constants (no magic numbers!)
@@ -38,6 +39,11 @@ describe('🎤 useVoiceSession Hook', () => {
       text: MOCK_TRANSCRIPTION,
       audio_url: MOCK_AUDIO_URL,
       session_id: MOCK_SESSION_ID,
+    });
+
+    vi.mocked(api.createSession).mockResolvedValue({
+      session_id: MOCK_SESSION_ID,
+      message: 'Session started',
     });
   });
 

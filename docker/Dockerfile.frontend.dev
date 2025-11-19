@@ -1,0 +1,14 @@
+# Development Dockerfile for Frontend
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# The source code will be mounted via volume
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev", "--", "--host"]

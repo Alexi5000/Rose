@@ -222,7 +222,7 @@ async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[st
     )
     output_audio = await text_to_speech_module.synthesize(response)
 
-    return {"messages": response, "audio_buffer": output_audio}
+    return {"messages": AIMessage(content=response), "audio_buffer": output_audio}
 
 
 async def summarize_conversation_node(state: AICompanionState) -> dict[str, str | list[RemoveMessage]]:

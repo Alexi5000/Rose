@@ -144,6 +144,11 @@ SENTRY_DSN=your_sentry_dsn
 # Custom Configuration (optional)
 WORKFLOW_TIMEOUT_SECONDS=60
 MAX_REQUEST_SIZE=10485760
+
+# ElevenLabs TTS tuning (optional)
+TTS_STREAMING_LATENCY_LEVEL=0   # 0=highest quality, 4=fastest
+TTS_OUTPUT_FORMAT=mp3_44100_128 # Match your plan's allowed encodings
+TTS_USE_SPEAKER_BOOST=true      # Warmer, fuller voice when supported
 ```
 
 ## Resource Limits

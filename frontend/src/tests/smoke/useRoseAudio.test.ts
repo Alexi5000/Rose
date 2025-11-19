@@ -4,27 +4,151 @@
  * Tests Rose audio playback hook initialization and basic functionality.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useRoseAudio } from '@/hooks/useRoseAudio';
+import type { VoiceResponse } from '@/types/voice';
 
 console.log('🔊 Loading useRoseAudio tests');
 
-// Constants (no magic numbers!)
-const MOCK_AUDIO_URL = 'http://test.example.com/rose-response.mp3';
+vi.mock('@/lib/audio-utils', () => {
+  const analyser = {
+    fftSize: 32,
+    getFloatTimeDomainData: (array: Float32Array) => {
+      array.fill(0.2);
+    },
+  } as unknown as AnalyserNode;
+
+  const audioContext = {
+    state: 'running',
+    close: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AudioContext;
+
+  return {
+    calculateRms: (samples: Float32Array) => samples[0] ?? 0,
+    createPlaybackAnalyzer: vi.fn(() => ({
+      audioContext,
+      analyser,
+    })),
+  };
+});
+
 const INITIAL_AMPLITUDE = 0;
-const EXPECTED_PLAYING_STATE = true;
 const EXPECTED_STOPPED_STATE = false;
+const MOCK_RESPONSE: VoiceResponse = {
+  text: 'Test response audio',
+  audio_url: 'https://rose.test/audio.mp3',
+  session_id: 'test-session-1234',
+};
+
+class MockAudio {
+  public src = '';
+  public volume = 1;
+  public crossOrigin: string | null = null;
+  public preload = 'auto';
+  public duration = 1;
+  public currentTime = 0;
+  public readyState = 0;
+  public onplay: (() => void) | null = null;
+  public onended: (() => void) | null = null;
+  public onerror: ((event: Event) => void) | null = null;
+  private listeners: Record<string, Set<(event: Event) => void>> = {};
+
+  constructor(src?: string) {
+    if (src) {
+      this.src = src;
+    }
+  }
+
+  addEventListener(eventName: string, callback: (event: Event) => void) {
+    if (!this.listeners[eventName]) {
+      this.listeners[eventName] = new Set();
+    }
+    this.listeners[eventName]?.add(callback);
+  }
+
+  removeEventListener(eventName: string, callback: (event: Event) => void) {
+    this.listeners[eventName]?.delete(callback);
+  }
+
+  private emit(eventName: string) {
+    this.listeners[eventName]?.forEach((listener) => listener(new Event(eventName)));
+  }
+
+  load() {
+    this.readyState = 4;
+    this.emit('loadedmetadata');
+  }
+
+  pause() {
+    // noop for tests
+  }
+
+  async play() {
+    this.onplay?.();
+    queueMicrotask(() => {
+      this.onended?.();
+    });
+    return Promise.resolve();
+  }
+}
+
+class MockSpeechSynthesisUtterance {
+  public text: string;
+  public lang = 'en-US';
+  public pitch = 1;
+  public rate = 1;
+  public onend: ((event: Event) => void) | null = null;
+  public onerror: ((event: Event) => void) | null = null;
+
+  constructor(text: string) {
+    this.text = text;
+  }
+}
+
+const createMockSpeechSynthesis = () => {
+  return {
+    speaking: false,
+    pending: false,
+    paused: false,
+    cancel: vi.fn(function cancel(this: SpeechSynthesis) {
+      this.speaking = false;
+    }),
+    speak: vi.fn(function speak(this: SpeechSynthesis, utterance: SpeechSynthesisUtterance) {
+      this.speaking = true;
+      queueMicrotask(() => {
+        this.speaking = false;
+        utterance.onend?.(new Event('end'));
+      });
+    }),
+    getVoices: () => [],
+    pause: vi.fn(),
+    resume: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  } as unknown as SpeechSynthesis;
+};
 
 describe('🔊 useRoseAudio Hook', () => {
   beforeEach(() => {
     console.log('  🔧 Resetting mocks');
     vi.clearAllMocks();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['test'], { type: 'audio/mpeg' }),
+    }) as unknown as typeof fetch;
+
+    global.Audio = MockAudio as unknown as typeof Audio;
+    global.SpeechSynthesisUtterance = MockSpeechSynthesisUtterance as unknown as typeof SpeechSynthesisUtterance;
+    Object.assign(window, {
+      speechSynthesis: createMockSpeechSynthesis(),
+    });
   });
 
   it('✅ initializes with correct default state', () => {
-    console.log('  🔍 Testing initial state');
-
     const { result } = renderHook(() => useRoseAudio());
 
     expect(result.current.isPlaying).toBe(false);
@@ -32,124 +156,82 @@ describe('🔊 useRoseAudio Hook', () => {
     expect(result.current.error).toBeNull();
     expect(typeof result.current.playAudio).toBe('function');
     expect(typeof result.current.stopAudio).toBe('function');
-
-    console.log('  ✅ Initial state correct');
   });
 
-  it('✅ playAudio updates isPlaying state', async () => {
-    console.log('  🔍 Testing playAudio state update');
-
+  it('✅ playAudio triggers playback callbacks', async () => {
     const onPlaybackStart = vi.fn();
-    const { result } = renderHook(() => useRoseAudio({ onPlaybackStart }));
+    const onPlaybackEnd = vi.fn();
+    const { result } = renderHook(() => useRoseAudio({ onPlaybackStart, onPlaybackEnd }));
 
-    // Start playback
-    await result.current.playAudio(MOCK_AUDIO_URL);
-
-    await waitFor(() => {
-      expect(result.current.isPlaying).toBe(EXPECTED_PLAYING_STATE);
+    await act(async () => {
+      await result.current.playAudio(MOCK_RESPONSE);
     });
 
     expect(onPlaybackStart).toHaveBeenCalled();
-
-    console.log('  ✅ playAudio state updated');
+    expect(onPlaybackEnd).toHaveBeenCalled();
   });
 
   it('✅ stopAudio resets state', async () => {
-    console.log('  🔍 Testing stopAudio');
-
     const { result } = renderHook(() => useRoseAudio());
 
-    // Start then stop
-    await result.current.playAudio(MOCK_AUDIO_URL);
-    result.current.stopAudio();
+    await act(async () => {
+      await result.current.playAudio(MOCK_RESPONSE);
+    });
+
+    await act(async () => {
+      result.current.stopAudio();
+    });
 
     await waitFor(() => {
       expect(result.current.isPlaying).toBe(EXPECTED_STOPPED_STATE);
       expect(result.current.roseAmplitude).toBe(INITIAL_AMPLITUDE);
     });
-
-    console.log('  ✅ stopAudio reset state');
   });
 
-  it('✅ onPlaybackEnd callback is configured', () => {
-    console.log('  🔍 Testing onPlaybackEnd callback setup');
+  it('✅ falls back to speech synthesis when no audio URL is available', async () => {
+    const { result } = renderHook(() => useRoseAudio());
 
-    const onPlaybackEnd = vi.fn();
-    const { result } = renderHook(() => useRoseAudio({ onPlaybackEnd }));
+    await act(async () => {
+      await result.current.playAudio({ ...MOCK_RESPONSE, audio_url: '' });
+    });
 
-    expect(result.current).toBeDefined();
-    expect(onPlaybackEnd).toBeDefined();
-
-    console.log('  ✅ onPlaybackEnd configured');
+    await waitFor(() => {
+      expect(window.speechSynthesis.speak).toHaveBeenCalled();
+    });
   });
 
-  it('✅ handles playback errors gracefully', async () => {
-    console.log('  🔍 Testing error handling');
-
+  it('✅ surfaces errors when playback fails', async () => {
     const onError = vi.fn();
+    global.fetch = vi.fn().mockRejectedValue(new Error('network down')) as unknown as typeof fetch;
+
     const { result } = renderHook(() => useRoseAudio({ onError }));
 
-    // Mock audio element to throw error
-    const mockPlay = vi.fn().mockRejectedValue(new Error('Playback failed'));
-    global.Audio = class MockErrorAudio {
-      play = mockPlay;
-      pause = vi.fn();
-      addEventListener = vi.fn();
-      removeEventListener = vi.fn();
-    } as any;
-
-    await result.current.playAudio(MOCK_AUDIO_URL);
+    await expect(
+      act(async () => {
+        await result.current.playAudio({ ...MOCK_RESPONSE, text: '' });
+      })
+    ).rejects.toThrow();
 
     await waitFor(() => {
-      expect(result.current.error).toBeTruthy();
+      expect(onError).toHaveBeenCalled();
     });
-
-    console.log('  ✅ Error handled gracefully');
   });
 
-  it('✅ updates amplitude during playback', async () => {
-    console.log('  🔍 Testing amplitude tracking');
+  it('✅ resolves relative audio URLs against window origin', async () => {
+    const relativeResponse: VoiceResponse = {
+      ...MOCK_RESPONSE,
+      audio_url: '/api/v1/voice/audio/test-file',
+    };
 
     const { result } = renderHook(() => useRoseAudio());
 
-    await result.current.playAudio(MOCK_AUDIO_URL);
-
-    // Amplitude should update from analyser
-    // (In reality, this would be updated by requestAnimationFrame loop)
-    await waitFor(() => {
-      expect(result.current.roseAmplitude).toBeGreaterThanOrEqual(0);
-      expect(result.current.roseAmplitude).toBeLessThanOrEqual(1);
+    await act(async () => {
+      await result.current.playAudio(relativeResponse);
     });
 
-    console.log('  ✅ Amplitude tracking works');
-  });
-
-  it('✅ cleans up on unmount', async () => {
-    console.log('  🔍 Testing cleanup');
-
-    const { result, unmount } = renderHook(() => useRoseAudio());
-
-    await result.current.playAudio(MOCK_AUDIO_URL);
-
-    // Unmount should cleanup
-    unmount();
-
-    // Verify no errors thrown during cleanup
-    expect(true).toBe(true);
-
-    console.log('  ✅ Cleanup successful');
-  });
-
-  it('✅ can play audio URLs', async () => {
-    console.log('  🔍 Testing playAudio function');
-
-    const { result } = renderHook(() => useRoseAudio());
-
-    // Verify playAudio function exists
-    expect(result.current.playAudio).toBeDefined();
-    expect(typeof result.current.playAudio).toBe('function');
-
-    console.log('  ✅ playAudio function available');
+    expect(global.fetch).toHaveBeenCalled();
+    const fetchUrl = (global.fetch as any).mock.calls[0][0];
+    expect(fetchUrl).toBe(`${window.location.origin}/api/v1/voice/audio/test-file`);
   });
 });
 
