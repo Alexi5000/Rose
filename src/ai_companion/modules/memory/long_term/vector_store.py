@@ -77,9 +77,9 @@ from ai_companion.modules.memory.long_term.constants import (
 from ai_companion.settings import settings
 
 # Type aliases for common memory types
-MemoryMetadata = Dict[str, Any]
-MemorySearchResult = List["Memory"]
-CollectionInfo = Dict[str, Any]
+type MemoryMetadata = dict[str, Any]
+type MemorySearchResult = list[Memory]
+type CollectionInfo = dict[str, Any]
 
 
 @dataclass

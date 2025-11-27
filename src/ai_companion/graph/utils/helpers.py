@@ -5,17 +5,19 @@ components used in the LangGraph workflow, including chat models,
 speech modules, and text parsers.
 """
 
-import re
-from typing import Optional
-
-from langchain_core.output_parsers import StrOutputParser
+# Standard library
 import asyncio
 import logging
+import re
 from functools import wraps
+from typing import Optional
 
-from ai_companion.core.exceptions import WorkflowError, CircuitBreakerError
+# Third-party
+from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
 
+# Local
+from ai_companion.core.exceptions import CircuitBreakerError, WorkflowError
 from ai_companion.modules.speech import TextToSpeech
 from ai_companion.settings import settings
 

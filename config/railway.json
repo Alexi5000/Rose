@@ -5,7 +5,7 @@
     "buildCommand": "uv sync --frozen && cd frontend && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port $PORT --workers 2",
+    "startCommand": "uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port $PORT --workers 4",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "healthcheckInterval": 10,
@@ -14,5 +14,21 @@
     "restartPolicyMaxRetries": 3,
     "numReplicas": 1,
     "sleepApplication": false
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "ENVIRONMENT": "production",
+        "LOG_LEVEL": "INFO",
+        "LOG_FORMAT": "json",
+        "ENABLE_API_DOCS": "false",
+        "RATE_LIMIT_ENABLED": "true",
+        "RATE_LIMIT_PER_MINUTE": "10",
+        "ENABLE_SECURITY_HEADERS": "true",
+        "WORKFLOW_TIMEOUT_SECONDS": "60",
+        "MAX_REQUEST_SIZE": "10485760",
+        "SESSION_RETENTION_DAYS": "7"
+      }
+    }
   }
 }

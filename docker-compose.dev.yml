@@ -20,7 +20,6 @@ services:
       - ./pyproject.toml:/app/pyproject.toml
       - ./uv.lock:/app/uv.lock
       - ./short_term_memory:/app/data
-      - ./.files:/app/.files
     env_file:
       - .env
     environment:
