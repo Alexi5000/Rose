@@ -32,10 +32,10 @@ AUDIO_TEMP_DIR = PROJECT_ROOT / ".files"  # Temporary audio file storage
 # ========================
 # Timeout values for various operations (in seconds)
 
-API_REQUEST_TIMEOUT_SECONDS = 60  # Maximum time for API request processing
-WORKFLOW_TIMEOUT_SECONDS = 55  # LangGraph workflow timeout (slightly less than API timeout)
+API_REQUEST_TIMEOUT_SECONDS = 120  # Maximum time for API request processing
+WORKFLOW_TIMEOUT_SECONDS = 110  # LangGraph workflow timeout (slightly less than API timeout)
 HEALTH_CHECK_TIMEOUT_SECONDS = 5  # Health check endpoint timeout
-AUDIO_PROCESSING_TIMEOUT_SECONDS = 30  # Audio transcription and generation timeout
+AUDIO_PROCESSING_TIMEOUT_SECONDS = 60  # Audio transcription and generation timeout
 
 # 📦 File Size Limits
 # ===================

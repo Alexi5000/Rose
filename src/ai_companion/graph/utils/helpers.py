@@ -9,6 +9,11 @@ import re
 from typing import Optional
 
 from langchain_core.output_parsers import StrOutputParser
+import asyncio
+import logging
+from functools import wraps
+
+from ai_companion.core.exceptions import WorkflowError, CircuitBreakerError
 from langchain_groq import ChatGroq
 
 from ai_companion.modules.image.image_to_text import ImageToText
@@ -93,3 +98,46 @@ class AsteriskRemovalParser(StrOutputParser):
             str: Cleaned text with asterisk content removed
         """
         return remove_asterisk_content(super().parse(text))
+
+
+def node_error_wrapper(func):
+    """Decorator for LangGraph nodes to add structured exception logging.
+
+    This decorator logs entry/exit, catches exceptions within node functions,
+    emits a full stack trace, and re-raises WorkflowError or CircuitBreakerError
+    so the upper layers have consistent error handling.
+    """
+    logger = logging.getLogger(__name__)
+
+    @wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        node_name = func.__name__
+        logger.info(f"➡️ Entering node: {node_name}")
+        try:
+            result = await func(*args, **kwargs)
+            logger.info(f"✅ Exiting node: {node_name}")
+            return result
+        except CircuitBreakerError:
+            logger.exception(f"⚡ Circuit breaker error in node {node_name}")
+            raise
+        except Exception as e:
+            logger.exception(f"❌ Exception in node {node_name}: {type(e).__name__}: {str(e)}")
+            raise WorkflowError(f"Node {node_name} failed: {type(e).__name__}: {str(e)}") from e
+
+    return async_wrapper
+
+
+def node_wrapper(func):
+    """Compatibility wrapper to handle both sync and async node functions.
+
+    If the decorated function is synchronous we'll execute it in a thread pool.
+    """
+    if asyncio.iscoroutinefunction(func):
+        return node_error_wrapper(func)
+
+    @wraps(func)
+    async def sync_to_async_wrapper(*args, **kwargs):
+        return await asyncio.to_thread(func, *args, **kwargs)
+
+    return node_error_wrapper(sync_to_async_wrapper)
+

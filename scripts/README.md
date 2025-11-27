@@ -98,6 +98,23 @@ Git history cleanup script for removing secrets from commit history.
 
 **Note:** This script is for emergency use only. Prefer preventing secrets from being committed in the first place using `.gitignore` and pre-commit hooks.
 
+### e2e_test_voice.py
+End-to-end testing script for voice interaction functionality.
+
+### utils.py
+Shared utility functions used by other scripts.
+
+## Archived Scripts
+
+The `archive/` folder contains one-time deployment, diagnostic, and migration scripts that are kept for reference but not actively used:
+
+- `analyze_dependencies.py` - Dependency analysis
+- `deploy_rose_*.py` - Legacy deployment scripts
+- `diagnose_deployment.py` - Deployment diagnostics
+- `verify_*.py` - Various verification scripts
+- `qdrant_*.py` - Qdrant database utilities
+- `profile_performance.py` - Performance profiling
+
 ## Adding New Scripts
 
 When adding new scripts to this directory:

@@ -59,23 +59,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && apt-get autoremove -y
 
-# Copy virtual environment from builder
-COPY --from=python-builder /app/.venv /app/.venv
-
-# Copy application code
-COPY --from=python-builder /app/src /app/src
-COPY --from=python-builder /app/pyproject.toml /app/README.md /app/
-
 # Copy frontend build from frontend-builder stage to correct location
 # Vite outputs to /frontend/dist, we copy to the path expected by FastAPI
 COPY --from=frontend-builder /frontend/dist /app/src/ai_companion/interfaces/web/static
 
-# Create data directories for memory databases and backups
-RUN mkdir -p /app/data /app/data/backups
-
 # Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser
+
+# Create data directories for memory databases and backups
+RUN mkdir -p /app/data /app/data/backups && \
+    chown -R appuser:appuser /app/data
+
+# Copy virtual environment from builder
+COPY --from=python-builder --chown=appuser:appuser /app/.venv /app/.venv
+
+# Copy application code
+COPY --from=python-builder --chown=appuser:appuser /app/src /app/src
+COPY --from=python-builder --chown=appuser:appuser /app/pyproject.toml /app/README.md /app/
 
 # Switch to non-root user
 USER appuser
@@ -83,15 +83,12 @@ USER appuser
 # Define volumes
 VOLUME ["/app/data"]
 
-# Set memory limit environment variable (can be overridden at runtime)
-ENV MEMORY_LIMIT=512m
-
-# Expose the port (configurable via PORT env var)
-EXPOSE 8080
+# Expose the port
+EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8080}/api/health')" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
 # Run the Rose web interface using uvicorn
-CMD uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port ${PORT:-8080}
+CMD uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port 8000

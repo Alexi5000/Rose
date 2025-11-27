@@ -53,9 +53,10 @@ from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
-from ai_companion.interfaces.web.routes import health, monitoring, session, voice
+from ai_companion.interfaces.web.routes import admin, health, monitoring, session, voice
 from ai_companion.interfaces.web.routes import metrics as metrics_route
 from ai_companion.settings import settings
+from ai_companion.modules.memory.long_term.vector_store import get_vector_store
 
 # Configure structured logging before any other imports
 configure_logging()
@@ -66,7 +67,24 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    logger.info(f"{LOG_EMOJI_STARTUP} app_starting", service="rose_web_interface")
+    logger.info("app_starting", emoji=LOG_EMOJI_STARTUP, service="rose_web_interface")
+
+    # Validate external connectivity (Qdrant, DB)
+    try:
+        settings.validate_connectivity()
+    except Exception:
+        logger.warning("⚠️ Connectivity validation encountered issues; continuing in degraded mode", exc_info=True)
+
+    # Initialize Qdrant collection and validate vector dimensions
+    try:
+        store = get_vector_store()
+        initialized = store.initialize_collection()
+        if initialized:
+            logger.info("✅ Qdrant collection initialization succeeded")
+        else:
+            logger.warning("⚠️ Qdrant collection initialization returned False; check logs for details")
+    except Exception:
+        logger.warning("⚠️ Qdrant collection initialization check failed; continuing in degraded mode", exc_info=True)
 
     # Initialize scheduler for background jobs
     scheduler = AsyncIOScheduler()
@@ -108,23 +126,23 @@ async def lifespan(app: FastAPI):
 
     # Start the scheduler
     scheduler.start()
-    logger.info(f"{LOG_EMOJI_SUCCESS} scheduler_started", jobs=["audio_cleanup", "database_backup", "session_cleanup"])
+    logger.info("scheduler_started", emoji=LOG_EMOJI_SUCCESS, jobs=["audio_cleanup", "database_backup", "session_cleanup"])
 
     # Start monitoring scheduler
     await monitoring_scheduler.start()
     logger.info(
-        f"{LOG_EMOJI_SUCCESS} monitoring_scheduler_started", evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL
+        "monitoring_scheduler_started", emoji=LOG_EMOJI_SUCCESS, evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL
     )
 
     yield
 
     # Shutdown monitoring scheduler
     await monitoring_scheduler.stop()
-    logger.info(f"{LOG_EMOJI_SUCCESS} monitoring_scheduler_stopped")
+    logger.info("monitoring_scheduler_stopped", emoji=LOG_EMOJI_SUCCESS)
 
     # Shutdown scheduler
     scheduler.shutdown()
-    logger.info(f"{LOG_EMOJI_SUCCESS} app_shutdown", service="rose_web_interface")
+    logger.info("app_shutdown", emoji=LOG_EMOJI_SUCCESS, service="rose_web_interface")
 
 
 def create_app() -> FastAPI:
@@ -142,16 +160,16 @@ def create_app() -> FastAPI:
     # Configure request size limits to prevent memory exhaustion
     # This is set at the application level and applies to all endpoints
     app.state.max_request_size = MAX_REQUEST_SIZE_BYTES
-    logger.info(f"{LOG_EMOJI_SUCCESS} request_size_limit_configured", max_size_mb=MAX_REQUEST_SIZE_BYTES / 1024 / 1024)
+    logger.info("request_size_limit_configured", emoji=LOG_EMOJI_SUCCESS, max_size_mb=MAX_REQUEST_SIZE_BYTES / 1024 / 1024)
 
     if settings.ENABLE_API_DOCS:
-        logger.info(f"{LOG_EMOJI_SUCCESS} api_documentation_enabled", docs_url=API_DOCS_PATH, redoc_url=API_REDOC_PATH)
+        logger.info("api_documentation_enabled", emoji=LOG_EMOJI_SUCCESS, docs_url=API_DOCS_PATH, redoc_url=API_REDOC_PATH)
     else:
-        logger.info(f"{LOG_EMOJI_SUCCESS} api_documentation_disabled")
+        logger.info("api_documentation_disabled", emoji=LOG_EMOJI_SUCCESS)
 
     # Add request ID middleware (should be first to track all requests)
     app.add_middleware(RequestIDMiddleware)
-    logger.info(f"{LOG_EMOJI_SUCCESS} request_id_middleware_enabled")
+    logger.info("request_id_middleware_enabled", emoji=LOG_EMOJI_SUCCESS)
 
     # Add request size limit middleware
     @app.middleware("http")
@@ -178,7 +196,7 @@ def create_app() -> FastAPI:
         allowed_origins = settings.get_allowed_origins()
 
     logger.info(
-        f"{LOG_EMOJI_CONNECTION} cors_configured", allowed_origins=allowed_origins, environment=settings.ENVIRONMENT
+        "cors_configured", emoji=LOG_EMOJI_CONNECTION, allowed_origins=allowed_origins, environment=settings.ENVIRONMENT
     )
 
     app.add_middleware(
@@ -192,24 +210,24 @@ def create_app() -> FastAPI:
     # Add security headers middleware
     if settings.ENABLE_SECURITY_HEADERS:
         app.add_middleware(SecurityHeadersMiddleware)
-        logger.info(f"{LOG_EMOJI_SUCCESS} security_headers_enabled")
+        logger.info("security_headers_enabled", emoji=LOG_EMOJI_SUCCESS)
 
     # Configure rate limiting
     if RATE_LIMIT_ENABLED:
         limiter = Limiter(key_func=get_remote_address)
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-        logger.info(f"{LOG_EMOJI_SUCCESS} rate_limiting_enabled", requests_per_minute=RATE_LIMIT_REQUESTS_PER_MINUTE)
+        logger.info("rate_limiting_enabled", emoji=LOG_EMOJI_SUCCESS, requests_per_minute=RATE_LIMIT_REQUESTS_PER_MINUTE)
     else:
         # Create a no-op limiter if rate limiting is disabled
         app.state.limiter = None
-        logger.info(f"{LOG_EMOJI_SUCCESS} rate_limiting_disabled")
+        logger.info("rate_limiting_disabled", emoji=LOG_EMOJI_SUCCESS)
 
     # Register exception handlers
     app.add_exception_handler(AICompanionError, ai_companion_error_handler)
     app.add_exception_handler(ValueError, validation_error_handler)
     app.add_exception_handler(Exception, global_exception_handler)
-    logger.info(f"{LOG_EMOJI_SUCCESS} exception_handlers_registered")
+    logger.info("exception_handlers_registered", emoji=LOG_EMOJI_SUCCESS)
 
     # Register API routes with v1 versioning
     app.include_router(health.router, prefix=API_BASE_PATH, tags=["Health"])
@@ -217,19 +235,13 @@ def create_app() -> FastAPI:
     app.include_router(voice.router, prefix=API_BASE_PATH, tags=["Voice Processing"])
     app.include_router(metrics_route.router, prefix=API_BASE_PATH, tags=["Metrics"])
     app.include_router(monitoring.router, prefix=API_BASE_PATH, tags=["Monitoring"])
+    app.include_router(admin.router, prefix=API_BASE_PATH, tags=["Admin"])
 
-    # Maintain backward compatibility with non-versioned routes (deprecated)
-    app.include_router(health.router, prefix="/api", tags=["Health (Deprecated)"], deprecated=True)
-    app.include_router(session.router, prefix="/api", tags=["Session Management (Deprecated)"], deprecated=True)
-    app.include_router(voice.router, prefix="/api", tags=["Voice Processing (Deprecated)"], deprecated=True)
-    app.include_router(metrics_route.router, prefix="/api", tags=["Metrics (Deprecated)"], deprecated=True)
-    app.include_router(monitoring.router, prefix="/api", tags=["Monitoring (Deprecated)"], deprecated=True)
-
-    logger.info(f"{LOG_EMOJI_SUCCESS} api_routes_registered", version="v1", backward_compatible=True)
+    logger.info("api_routes_registered", emoji=LOG_EMOJI_SUCCESS, version="v1")
 
     # Serve React frontend static files (if build directory exists)
     if FRONTEND_BUILD_DIR.exists():
-        logger.info(f"{LOG_EMOJI_FRONTEND} frontend_serving_enabled", build_dir=str(FRONTEND_BUILD_DIR))
+        logger.info("frontend_serving_enabled", emoji=LOG_EMOJI_FRONTEND, build_dir=str(FRONTEND_BUILD_DIR))
 
         # Check if assets directory exists
         assets_dir = FRONTEND_BUILD_DIR / "assets"
@@ -237,9 +249,9 @@ def create_app() -> FastAPI:
             # Mount static assets (JS, CSS, images, etc.) with cache headers
             # Static files are immutable and can be cached for 1 year
             app.mount("/assets", StaticFiles(directory=assets_dir, html=False), name="assets")
-            logger.info(f"{LOG_EMOJI_SUCCESS} static_assets_mounted", assets_dir=str(assets_dir))
+            logger.info("static_assets_mounted", emoji=LOG_EMOJI_SUCCESS, assets_dir=str(assets_dir))
         else:
-            logger.warning(f"{LOG_EMOJI_WARNING} assets_directory_not_found", expected_path=str(assets_dir))
+            logger.warning("assets_directory_not_found", emoji=LOG_EMOJI_WARNING, expected_path=str(assets_dir))
 
         # Add cache headers for static files
         @app.middleware("http")
@@ -272,15 +284,15 @@ def create_app() -> FastAPI:
             if index_path.exists():
                 return FileResponse(index_path)
 
-            logger.error(f"{LOG_EMOJI_ERROR} index_html_not_found", expected_path=str(index_path))
+            logger.error("index_html_not_found", emoji=LOG_EMOJI_ERROR, expected_path=str(index_path))
             return {"detail": "Frontend not found"}
 
     else:
-        logger.error(f"{LOG_EMOJI_ERROR} frontend_build_not_found", expected_path=str(FRONTEND_BUILD_DIR))
-        logger.warning(f"{LOG_EMOJI_WARNING} frontend_not_served - run 'npm run build' in frontend directory")
+        logger.error("frontend_build_not_found", emoji=LOG_EMOJI_ERROR, expected_path=str(FRONTEND_BUILD_DIR))
+        logger.warning("frontend_not_served", emoji=LOG_EMOJI_WARNING, message="run 'npm run build' in frontend directory")
 
     logger.info(
-        f"{LOG_EMOJI_CONNECTION} server_ready", port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists()
+        "server_ready", emoji=LOG_EMOJI_CONNECTION, port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists()
     )
 
     return app

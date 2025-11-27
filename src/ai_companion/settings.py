@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     QDRANT_URL: str
     QDRANT_PORT: str = "6333"
     QDRANT_HOST: str | None = None
+    # Qdrant retry/backoff configuration (for transient internal server errors)
+    QDRANT_MAX_RETRIES: int = 3
+    QDRANT_INITIAL_BACKOFF: float = 0.5
+    QDRANT_MAX_BACKOFF: float = 5.0
 
     # Model configurations
     TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
@@ -90,10 +94,10 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str | None = None
 
     # Memory configuration
-    MEMORY_TOP_K: int = 3
-    ROUTER_MESSAGES_TO_ANALYZE: int = 3
-    TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 20
-    TOTAL_MESSAGES_AFTER_SUMMARY: int = 5
+    MEMORY_TOP_K: int = 5
+    ROUTER_MESSAGES_TO_ANALYZE: int = 5
+    TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 30
+    TOTAL_MESSAGES_AFTER_SUMMARY: int = 10
 
     SHORT_TERM_MEMORY_DB_PATH: str = "/app/data/memory.db"
 

@@ -127,9 +127,11 @@ def track_api_call(
 
         # Record success metrics
         metrics.record_api_call(service_name, success=True, duration_ms=duration_ms)
-        logger.info(f"📊 {service_name}_metrics_recorded", duration_ms=round(duration_ms, 2), success=True)
+        logger.info("metrics_recorded", service=service_name, duration_ms=round(duration_ms, 2), success=True)
         logger.info(
-            f"{success_emoji} {service_name}_success",
+            "service_success",
+            service=service_name,
+            emoji=success_emoji,
             duration_ms=round(duration_ms, 2),
             **context,
         )
@@ -139,8 +141,8 @@ def track_api_call(
 
         # Record failure metrics
         metrics.record_api_call(service_name, success=False, duration_ms=duration_ms)
-        logger.info(f"📊 {service_name}_metrics_recorded", duration_ms=round(duration_ms, 2), success=False)
-        logger.error(f"{error_emoji} {service_name}_failed", error=str(e), **context, exc_info=True)
+        logger.info("metrics_recorded", service=service_name, duration_ms=round(duration_ms, 2), success=False)
+        logger.error("service_failed", service=service_name, emoji=error_emoji, error=str(e), **context, exc_info=True)
         raise
 
 
@@ -207,7 +209,7 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
             ctx["transcribed_length"] = len(transcribed_text)
 
             # 📝 Log transcription for debugging
-            logger.info(f"📝 [Transcription] '{transcribed_text}'", session_id=session_id)
+            logger.info("transcription_complete", text=transcribed_text, session_id=session_id)
 
             # 🛡️ Input Guard: Filter out hallucinations and empty segments
             # Whisper sometimes outputs these phrases for silence
@@ -215,7 +217,7 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
             cleaned = transcribed_text.strip().lower()
 
             if not cleaned or any(h in cleaned for h in hallucinations):
-                logger.warning(f"⚠️ [Input Guard] Ignoring garbage input: '{transcribed_text}'", session_id=session_id)
+                logger.warning("input_guard_filtered", reason="hallucination_detected", text=transcribed_text, session_id=session_id)
                 return ""
 
             return transcribed_text
@@ -327,8 +329,15 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
             success=False,
         )
         record_error_metrics("workflow_execution_failed")
-        logger.error("❌ workflow_execution_failed", error=str(e), session_id=session_id, exc_info=True)
-        raise WorkflowError(ERROR_MSG_WORKFLOW_FAILED)
+        logger.error(
+            "❌ workflow_execution_failed",
+            error=str(e),
+            session_id=session_id,
+            input_text=(transcribed_text[:200] + "..." if len(transcribed_text) > 200 else transcribed_text),
+            exc_info=True,
+        )
+        # Raise a WorkflowError with a concise message while logging the full stack trace
+        raise WorkflowError(f"{ERROR_MSG_WORKFLOW_FAILED} (type={type(e).__name__})")
 
 
 async def _generate_audio_response(response_text: str, session_id: str, tts: TextToSpeech) -> bytes:
@@ -526,8 +535,16 @@ async def process_voice(
 
     except HTTPException:
         raise
-    except (SpeechToTextError, TextToSpeechError, WorkflowError):
-        # These will be handled by the global exception handler
+    except SpeechToTextError as e:
+        logger.exception("❌ SpeechToTextError during voice processing", session_id=session_id)
+        raise
+    except TextToSpeechError as e:
+        logger.exception("❌ TextToSpeechError during voice processing", session_id=session_id)
+        raise
+    except WorkflowError as e:
+        # Log extra details for workflow failures to help debugging
+        logger.exception("❌ WorkflowError during voice processing", session_id=session_id)
+        record_error_metrics("workflow_execution_failed")
         raise
     except Exception as e:
         record_error_metrics("unexpected_error")

@@ -53,15 +53,20 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
+from qdrant_client.http import exceptions as qdrant_exceptions
 from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_qdrant_circuit_breaker
+from ai_companion.core.metrics import metrics
+from ai_companion.modules.memory.long_term.guard import guard as memory_guard
+from ai_companion.core.retry import retry_with_exponential_backoff
 from ai_companion.modules.memory.long_term.constants import (
     DEFAULT_MEMORY_SEARCH_LIMIT,
     DEFAULT_SESSION_ID,
     DUPLICATE_DETECTION_SIMILARITY_THRESHOLD,
     EMBEDDING_MODEL_NAME,
+    EMBEDDING_VECTOR_DIMENSIONS,
     ENABLE_SESSION_ISOLATION,
     LOG_CIRCUIT_BREAKER_EVENTS,
     LOG_DUPLICATE_DETECTION,
@@ -282,6 +287,18 @@ class VectorStore:
 
             # 🧠 Generate embedding using sentence transformer model
             embedding: Any = self.model.encode(text)
+            # Log embedding dimension for observability
+            try:
+                self.logger.debug(f"🧩 Memory embedding dimension: {len(embedding)}")
+            except Exception:
+                self.logger.debug("🧩 Memory embedding dimension: unknown")
+            # Validate embedding shape/dimensions to avoid Qdrant panics
+            if not hasattr(embedding, "__len__") or len(embedding) != EMBEDDING_VECTOR_DIMENSIONS:
+                self.logger.warning(
+                    "⚠️ Generated embedding has unexpected dimensions - skipping memory storage: "
+                    f"dim={getattr(embedding, '__len__', lambda: 'unknown')()} expected={EMBEDDING_VECTOR_DIMENSIONS}"
+                )
+                return
             point: PointStruct = PointStruct(
                 id=metadata.get("id", hash(text)),
                 vector=embedding.tolist(),
@@ -297,7 +314,19 @@ class VectorStore:
                     points=[point],
                 )
 
-            self._circuit_breaker.call(_upsert)
+            # Wrap upsert with retry/backoff to mitigate transient Qdrant errors
+            _upsert_with_retry = retry_with_exponential_backoff(
+                max_retries=settings.QDRANT_MAX_RETRIES,
+                initial_backoff=settings.QDRANT_INITIAL_BACKOFF,
+                max_backoff=settings.QDRANT_MAX_BACKOFF,
+            )(_upsert)
+
+            try:
+                self._circuit_breaker.call(_upsert_with_retry)
+            except Exception as e:
+                # Log and continue - memory storage shouldn't break the workflow
+                self.logger.exception(f"⚠️ Failed to store memory to Qdrant: {type(e).__name__}: {str(e)}")
+                return
             self.logger.debug(f"✅ Memory stored successfully: {metadata.get('id')}")
 
         except CircuitBreakerError:
@@ -353,6 +382,19 @@ class VectorStore:
 
             # 🧠 Generate embedding for the query using the same model as storage
             query_embedding: Any = self.model.encode(query)
+            # Log query embedding dimension for observability
+            try:
+                self.logger.debug(f"🧩 Query embedding dimension: {len(query_embedding)}")
+            except Exception:
+                self.logger.debug("🧩 Query embedding dimension: unknown")
+
+            # Validate query embedding dimensions to avoid Qdrant internal panics
+            if not hasattr(query_embedding, "__len__") or len(query_embedding) != EMBEDDING_VECTOR_DIMENSIONS:
+                self.logger.warning(
+                    "⚠️ Query embedding has unexpected dimensions - aborting search: "
+                    f"dim={getattr(query_embedding, '__len__', lambda: 'unknown')()} expected={EMBEDDING_VECTOR_DIMENSIONS}"
+                )
+                return []
 
             def _search() -> List[Any]:
                 return self.client.search(
@@ -362,7 +404,19 @@ class VectorStore:
                     query_filter=query_filter,  # Apply session filter if enabled
                 )
 
-            results: List[Any] = self._circuit_breaker.call(_search)
+            # If guard indicates Qdrant is degraded, skip search immediately and return empty list
+            if memory_guard.is_disabled():
+                self.logger.warning("⚠️ Qdrant is degraded; skipping memory search due to recent errors")
+                return []
+
+            # Wrap search with retry/backoff to handle transient Qdrant internal errors
+            _search_with_retry = retry_with_exponential_backoff(
+                max_retries=settings.QDRANT_MAX_RETRIES,
+                initial_backoff=settings.QDRANT_INITIAL_BACKOFF,
+                max_backoff=settings.QDRANT_MAX_BACKOFF,
+            )(_search)
+
+            results: List[Any] = self._circuit_breaker.call(_search_with_retry)
 
             # Convert Qdrant results to Memory objects
             memories = [
@@ -387,6 +441,37 @@ class VectorStore:
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
                 self.logger.error("⚡ Circuit breaker OPEN: Cannot search memories")
+            return []
+        except Exception as e:
+            # Unexpected Qdrant or embedding errors should not crash the app
+            # Log more details for qdrant UnexpectedResponse
+            if isinstance(e, getattr(qdrant_exceptions, "UnexpectedResponse", (Exception,))):
+                try:
+                    status = getattr(e, "status", None)
+                    content = getattr(e, "content", None)
+                    self.logger.error(
+                        "⚠️ UnexpectedResponse from Qdrant",
+                        status=status,
+                        content=str(content)[:500],
+                        exc_info=True,
+                    )
+                except Exception:
+                    self.logger.exception("⚠️ UnexpectedResponse from Qdrant (unable to extract details)")
+                # Record metric for monitoring so alerting picks this up
+                try:
+                    metrics.record_error("qdrant_unexpected_response", endpoint="qdrant_search")
+                    memory_guard.record_error()
+                except Exception:
+                    self.logger.debug("Failed to record qdrant_unexpected_response metric")
+            else:
+                self.logger.exception(
+                    f"⚠️ Memory search failed with an unexpected error: {type(e).__name__}: {str(e)}"
+                )
+                try:
+                    metrics.record_error("qdrant_unexpected_response", endpoint="qdrant_search")
+                    memory_guard.record_error()
+                except Exception:
+                    self.logger.debug("Failed to record qdrant_unexpected_response metric")
             return []
 
     def get_collection_info(self) -> Optional[CollectionInfo]:
@@ -450,6 +535,11 @@ class VectorStore:
                 info = self.get_collection_info()
                 if info:
                     self.logger.info(f"📊 Current state: {info['points_count']} memories stored")
+                # Validate collection vector dimensions on startup
+                if not self._validate_collection_vector_dimensions():
+                    self.logger.error(
+                        "❌ Collection dimension validation failed: the configured vector size does not match the embedding model"
+                    )
                 return True
             else:
                 self.logger.info(f"🏗️ Collection does not exist, creating '{QDRANT_COLLECTION_NAME}'...")
@@ -464,6 +554,102 @@ class VectorStore:
         except Exception as e:
             self.logger.error(f"❌ Collection initialization failed: {e}")
             return False
+
+    def _extract_vector_size_from_collection_info(self, collection_info: Any) -> Optional[int]:
+        """Attempt to extract configured vector size using several possible shapes returned by qdrant-client.
+
+        Qdrant client representations vary slightly between versions. This helper tries a few common
+        attribute paths and returns the integer size if found, or None otherwise.
+        """
+        try:
+            # pattern 0: collection_info.result.config.params.vectors.size (Qdrant API raw JSON 'result' shape)
+            result = getattr(collection_info, "result", None)
+            if result and hasattr(result, "config") and hasattr(result.config, "params"):
+                vectors_conf = getattr(result.config.params, "vectors", None)
+                if vectors_conf and hasattr(vectors_conf, "size"):
+                    return int(vectors_conf.size)
+
+            # pattern 1: collection_info.config.params.vectors.size (qdrant_client v1.12 representation)
+            if hasattr(collection_info, "config") and hasattr(collection_info.config, "params"):
+                vectors_conf = getattr(collection_info.config.params, "vectors", None)
+                if vectors_conf and hasattr(vectors_conf, "size"):
+                    return int(vectors_conf.size)
+
+            # pattern 2: collection_info.vectors.params.size
+            vectors = getattr(collection_info, "vectors", None)
+            if vectors is not None and hasattr(vectors, "params") and hasattr(vectors.params, "size"):
+                return int(vectors.params.size)
+
+            # pattern 2: collection_info.params.vectors.size
+            params = getattr(collection_info, "params", None)
+            if params is not None and hasattr(params, "vectors") and hasattr(params.vectors, "size"):
+                return int(params.vectors.size)
+
+            # pattern 3: dictionary-like access (raw JSON returned by the API)
+            if isinstance(collection_info, dict):
+                vectors_conf = (
+                    collection_info.get("vectors")
+                    or (collection_info.get("config", {}) or {}).get("params", {}).get("vectors")
+                    or collection_info.get("params", {}).get("vectors")
+                )
+                if isinstance(vectors_conf, dict) and "size" in vectors_conf:
+                    return int(vectors_conf["size"])
+        except Exception:
+            pass
+        return None
+
+    def _validate_collection_vector_dimensions(self) -> bool:
+        """Validate the collection vector dimensions match expected embedding size.
+
+        Returns:
+            bool: True if dimension is as expected or collection doesn't provide size info, False if mismatch.
+        """
+        try:
+            if not self._collection_exists():
+                self.logger.debug("📭 Collection does not exist for dimension validation")
+                return True
+
+            def _get() -> Any:
+                return self.client.get_collection(collection_name=QDRANT_COLLECTION_NAME)
+
+            coll_info = self._circuit_breaker.call(_get)
+            # For debugging - log collection_info attributes if we cannot determine vector size
+            try:
+                self.logger.debug(f"collection_info_dump: {repr(coll_info)[:2000]}")
+            except Exception:
+                pass
+            if not coll_info:
+                self.logger.debug("📭 Collection info is unavailable for dimension validation")
+                return True
+
+            vector_size = self._extract_vector_size_from_collection_info(coll_info)
+            if vector_size is None:
+                self.logger.warning(
+                    "⚠️ Could not determine collection vector size; skipping strict validation (Qdrant client returned unknown format)"
+                )
+                return True
+
+            if vector_size != EMBEDDING_VECTOR_DIMENSIONS:
+                self.logger.error(
+                    "❌ Qdrant collection vector dimension mismatch",
+                    expected=EMBEDDING_VECTOR_DIMENSIONS,
+                    configured=vector_size,
+                    collection=QDRANT_COLLECTION_NAME,
+                )
+                # Return False to indicate mismatch detected (but do not auto-recreate by default)
+                return False
+
+            self.logger.info(
+                f"✅ Qdrant collection vector dimension validated: {vector_size} == {EMBEDDING_VECTOR_DIMENSIONS}"
+            )
+            return True
+        except CircuitBreakerError:
+            if LOG_CIRCUIT_BREAKER_EVENTS:
+                self.logger.warning("⚡ Circuit breaker OPEN: Cannot validate collection dimensions")
+            return True
+        except Exception as e:
+            self.logger.error("❌ Failed to validate collection dimensions", error=str(e))
+            return True
 
 
 @lru_cache

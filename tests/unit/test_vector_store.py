@@ -169,6 +169,29 @@ class TestMemorySearch:
         assert results[1].text == "User finds deep breathing exercises helpful for anxiety"
         assert results[1].score == 0.87
 
+    def test_search_memories_handles_qdrant_errors(self, mock_vector_store_deps):
+        """Test that search returns empty list when Qdrant raises an unexpected error."""
+        mock_client = mock_vector_store_deps["client"]
+
+        # Mock collection exists
+        mock_collections_response = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_collections_response.collections = [mock_collection]
+        mock_client.get_collections.return_value = mock_collections_response
+
+        # Mock client.search to raise an internal exception
+        def _raise():
+            raise Exception("OutputTooSmall: qdrant internal panic")
+
+        mock_client.search.side_effect = _raise
+
+        store = VectorStore()
+        results = store.search_memories("simulate error")
+
+        # Should return empty list and not raise
+        assert results == []
+
     def test_search_memories_with_k_parameter(self, mock_vector_store_deps):
         """Test that search respects the k parameter."""
         mock_client = mock_vector_store_deps["client"]

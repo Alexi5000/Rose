@@ -76,17 +76,7 @@ format-check:
 lint-check:
 	uv run ruff check $(CHECK_DIRS)
 
-# ============================================
-# Legacy Commands (for backward compatibility)
-# ============================================
-
-ava-build: rose-build
-ava-run: rose-start
-ava-stop: rose-stop
-ava-delete: rose-delete
-
 .PHONY: rose-run rose-build rose-start rose-stop rose-delete \
         frontend-install frontend-build frontend-dev frontend-clean \
         install dev clean \
-        format-fix lint-fix format-check lint-check \
-        ava-build ava-run ava-stop ava-delete
+        format-fix lint-fix format-check lint-check

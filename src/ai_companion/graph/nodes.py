@@ -68,6 +68,7 @@ from ai_companion.graph.utils.helpers import (
     get_chat_model,
     get_text_to_image_module,
     get_text_to_speech_module,
+    node_wrapper,
 )
 from ai_companion.modules.memory.long_term.memory_manager import get_memory_manager
 from ai_companion.modules.schedules.context_generation import ScheduleContextGenerator
@@ -76,6 +77,7 @@ from ai_companion.settings import settings
 logger = get_logger(__name__)
 
 
+@node_wrapper
 async def router_node(state: AICompanionState) -> dict[str, str]:
     """Route the conversation to the appropriate workflow type.
 
@@ -118,6 +120,7 @@ def context_injection_node(state: AICompanionState) -> dict[str, bool | str]:
     return {"apply_activity": apply_activity, "current_activity": schedule_context}
 
 
+@node_wrapper
 async def conversation_node(state: AICompanionState, config: RunnableConfig) -> dict[str, AIMessage]:
     """Generate a conversational response using Rose's character.
 
@@ -136,17 +139,25 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig) -> 
 
     chain = get_character_response_chain(state.get("summary", ""))
 
-    response = await chain.ainvoke(
-        {
-            "messages": state["messages"],
-            "current_activity": current_activity,
-            "memory_context": memory_context,
-        },
-        config,
-    )
+    try:
+        response = await chain.ainvoke(
+            {
+                "messages": state["messages"],
+                "current_activity": current_activity,
+                "memory_context": memory_context,
+            },
+            config,
+        )
+    except Exception as e:
+        # Return a gentle fallback message instead of failing the entire workflow
+        logger.exception("❌ conversation chain invocation failed; returning fallback message")
+        fallback_text = "I'm having trouble processing that right now. Could you try asking in a different way?"
+        return {"messages": AIMessage(content=fallback_text)}
+
     return {"messages": AIMessage(content=response)}
 
 
+@node_wrapper
 async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[str, AIMessage | str]:
     """Generate an image and respond with context about it.
 
@@ -176,7 +187,7 @@ async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[st
     await text_to_image_module.generate_image(scenario.image_prompt, img_path)
 
     # Inject the image prompt information as an AI message
-    scenario_message = HumanMessage(content=f"<image attached by Ava generated from prompt: {scenario.image_prompt}>")
+    scenario_message = HumanMessage(content=f"<image attached by Rose generated from prompt: {scenario.image_prompt}>")
     updated_messages = state["messages"] + [scenario_message]
 
     response = await chain.ainvoke(
@@ -187,10 +198,15 @@ async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[st
         },
         config,
     )
+    try:
+        return {"messages": AIMessage(content=response), "image_path": img_path}
+    except Exception:
+        logger.exception("❌ image_node chain invocation failed; returning fallback text-only response")
+        fallback_text = "I created an image but had trouble describing it. If you'd like, I can try again." 
+        return {"messages": AIMessage(content=fallback_text), "image_path": img_path}
 
-    return {"messages": AIMessage(content=response), "image_path": img_path}
 
-
+@node_wrapper
 async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[str, str | bytes]:
     """Generate a voice response with audio output.
 
@@ -212,7 +228,8 @@ async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[st
     chain = get_character_response_chain(state.get("summary", ""))
     text_to_speech_module = get_text_to_speech_module()
 
-    response = await chain.ainvoke(
+    try:
+        response = await chain.ainvoke(
         {
             "messages": state["messages"],
             "current_activity": current_activity,
@@ -220,11 +237,22 @@ async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[st
         },
         config,
     )
-    output_audio = await text_to_speech_module.synthesize(response)
+    except Exception as e:
+        logger.exception("❌ conversation chain invocation failed in audio_node")
+        raise
 
-    return {"messages": AIMessage(content=response), "audio_buffer": output_audio}
+    # Use safe TTS with fallback to avoid failing the whole workflow
+    try:
+        audio_bytes, text_fallback = await text_to_speech_module.synthesize_with_fallback(response)
+    except Exception:
+        logger.exception("❌ TTS synth failed in audio_node; falling back to text-only")
+        audio_bytes = None
+        text_fallback = response
+
+    return {"messages": AIMessage(content=text_fallback), "audio_buffer": audio_bytes}
 
 
+@node_wrapper
 async def summarize_conversation_node(state: AICompanionState) -> dict[str, str | list[RemoveMessage]]:
     """Summarize conversation history and trim old messages.
 
@@ -245,24 +273,30 @@ async def summarize_conversation_node(state: AICompanionState) -> dict[str, str 
 
     if summary:
         summary_message = (
-            f"This is summary of the conversation to date between Ava and the user: {summary}\n\n"
+            f"This is summary of the conversation to date between Rose and the user: {summary}\n\n"
             "Extend the summary by taking into account the new messages above:"
         )
     else:
         summary_message = (
-            "Create a summary of the conversation above between Ava and the user. "
+            "Create a summary of the conversation above between Rose and the user. "
             "The summary must be a short description of the conversation so far, "
-            "but that captures all the relevant information shared between Ava and the user:"
+            "but that captures all the relevant information shared between Rose and the user:"
         )
 
     messages = state["messages"] + [HumanMessage(content=summary_message)]
-    response = await model.ainvoke(messages)
+    try:
+        response = await model.ainvoke(messages)
+    except Exception:
+        logger.exception("❌ summarize_conversation_node model invocation failed; keeping current summary unchanged")
+        # Preserve the existing summary and avoid deleting current messages
+        return {"summary": summary, "messages": []}
 
     delete_messages = [RemoveMessage(id=m.id) for m in state["messages"][: -settings.TOTAL_MESSAGES_AFTER_SUMMARY]]
     return {"summary": response.content, "messages": delete_messages}
 
 
-async def memory_extraction_node(state: AICompanionState) -> dict[str, Any]:
+@node_wrapper
+async def memory_extraction_node(state: AICompanionState, config: RunnableConfig) -> dict[str, Any]:
     """Extract and store important information from the last message.
 
     Analyzes the most recent message and stores relevant memories
@@ -270,6 +304,7 @@ async def memory_extraction_node(state: AICompanionState) -> dict[str, Any]:
 
     Args:
         state: Current conversation state
+        config: LangGraph runnable configuration (contains session_id)
 
     Returns:
         Empty dictionary (state update handled by memory manager)
@@ -277,17 +312,20 @@ async def memory_extraction_node(state: AICompanionState) -> dict[str, Any]:
     if not state["messages"]:
         return {}
 
-    # 🔧 YAGNI FIX: Make long-term memory optional
-    # Skip memory extraction if Qdrant is not available (graceful degradation)
     try:
+        # Extract session_id from config for memory isolation
+        session_id = config.get("configurable", {}).get("thread_id") if config else None
+
         memory_manager = get_memory_manager()
-        await memory_manager.extract_and_store_memories(state["messages"][-1])
-    except (ValueError, ConnectionError, Exception) as e:
-        logger.warning(f"⚠️ Long-term memory unavailable, skipping extraction: {e}")
+        await memory_manager.extract_and_store_memories(state["messages"][-1], session_id=session_id)
+    except Exception as e:
+        # Memory extraction must not break the workflow. Log the exception and continue.
+        logger.warning(f"⚠️ Long-term memory extraction failed: {e}", exc_info=True)
     return {}
 
 
-def memory_injection_node(state: AICompanionState) -> dict[str, str]:
+@node_wrapper
+def memory_injection_node(state: AICompanionState, config: RunnableConfig) -> dict[str, str]:
     """Retrieve and inject relevant memories into the character card.
 
     Searches long-term memory for relevant context based on recent
@@ -295,23 +333,25 @@ def memory_injection_node(state: AICompanionState) -> dict[str, str]:
 
     Args:
         state: Current conversation state
+        config: LangGraph runnable configuration (contains session_id)
 
     Returns:
         Dictionary with memory context: {"memory_context": str}
     """
-    # 🔧 YAGNI FIX: Make long-term memory optional
-    # Skip memory injection if Qdrant is not available (graceful degradation)
+    memory_manager = get_memory_manager()
+
+    # Extract session_id from config for memory isolation
+    session_id = config.get("configurable", {}).get("thread_id") if config else None
+
+    # Get relevant memories based on recent conversation
+    recent_context = " ".join([m.content for m in state["messages"][-3:]])
     try:
-        memory_manager = get_memory_manager()
+        memories = memory_manager.get_relevant_memories(recent_context, session_id=session_id)
+    except Exception as e:
+        logger.warning(f"⚠️ Long-term memory retrieval failed: {e}", exc_info=True)
+        memories = []
 
-        # Get relevant memories based on recent conversation
-        recent_context = " ".join([m.content for m in state["messages"][-3:]])
-        memories = memory_manager.get_relevant_memories(recent_context)
-
-        # Format memories for the character card
-        memory_context = memory_manager.format_memories_for_prompt(memories)
-    except (ValueError, ConnectionError, Exception) as e:
-        logger.warning(f"⚠️ Long-term memory unavailable, skipping injection: {e}")
-        memory_context = ""
+    # Format memories for the character card
+    memory_context = memory_manager.format_memories_for_prompt(memories)
 
     return {"memory_context": memory_context}

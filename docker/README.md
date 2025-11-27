@@ -6,23 +6,20 @@ This directory contains Docker-related configuration files for building and depl
 
 ## Files
 
-### Dockerfile.chainlit
-Docker configuration for the Chainlit web interface.
-
-**Purpose:** Builds a containerized version of Rose's Chainlit chat interface for local development and testing.
+### Dockerfile.backend.dev
+Development Dockerfile for the backend with hot-reload support.
 
 **Usage:**
 ```bash
-# Build the image
-docker build -f docker/Dockerfile.chainlit -t rose-chainlit .
-
-# Run the container
-docker run -p 8000:8000 --env-file .env rose-chainlit
+docker-compose -f docker-compose.dev.yml up backend
 ```
 
-**Or use docker-compose:**
+### Dockerfile.frontend.dev
+Development Dockerfile for the React frontend with Vite dev server.
+
+**Usage:**
 ```bash
-docker-compose up chainlit
+docker-compose -f docker-compose.dev.yml up frontend
 ```
 
 ### cloudbuild.yaml
@@ -35,11 +32,6 @@ Google Cloud Build configuration for deploying to Google Cloud Run.
 # Deploy to Cloud Run
 gcloud builds submit --config=docker/cloudbuild.yaml
 ```
-
-**Configuration:**
-- Builds Docker image from root Dockerfile
-- Pushes to Google Container Registry
-- Deploys to Cloud Run with specified settings
 
 ## Main Dockerfile
 
@@ -56,40 +48,39 @@ The main `Dockerfile` remains in the project root for Railway and other platform
 - Health check configuration
 - Non-root user for security
 
-## Docker Compose
+## Docker Compose Files
 
-The `docker-compose.yml` file remains in the project root for easy access.
-
+### docker-compose.yml (Production)
 **Location:** `/docker-compose.yml` (root directory)
 
 **Services:**
-- `chainlit` - Web chat interface (port 8000)
-- `qdrant` - Vector database for long-term memory (port 6333)
+- `rose` - FastAPI web interface (port 8000)
+- `qdrant` - Vector database for long-term memory (port 6335)
 
 **Usage:**
 ```bash
-# Start all services
-docker-compose up
-
-# Start specific service
-docker-compose up chainlit
-
-# Build and start
 docker-compose up --build
+```
 
-# Stop all services
-docker-compose down
+### docker-compose.dev.yml (Development)
+**Location:** `/docker-compose.dev.yml` (root directory)
+
+**Services:**
+- `backend` - FastAPI with hot-reload (port 8000)
+- `frontend` - Vite dev server (port 3000)
+- `qdrant` - Vector database (port 6333)
+
+**Usage:**
+```bash
+docker-compose -f docker-compose.dev.yml up
 ```
 
 ## Building Images
 
 ### Development Build
 ```bash
-# Build Chainlit interface
-docker-compose build chainlit
-
-# Or build directly
-docker build -f docker/Dockerfile.chainlit -t rose-chainlit .
+# Start dev environment with docker-compose
+docker-compose -f docker-compose.dev.yml up --build
 ```
 
 ### Production Build
@@ -109,12 +100,11 @@ All Docker containers require environment variables from `.env` file:
 - `GROQ_API_KEY` - Groq API for LLM and STT
 - `ELEVENLABS_API_KEY` - ElevenLabs for TTS
 - `ELEVENLABS_VOICE_ID` - Voice ID for Rose
-- `TOGETHER_API_KEY` - Together AI for image generation
 - `QDRANT_URL` - Qdrant vector database URL
 - `QDRANT_API_KEY` - Qdrant API key (if using cloud)
 
 **Optional:**
-- `PORT` - Server port (default: 8080)
+- `PORT` - Server port (default: 8080 production, 8000 development)
 - `HOST` - Server host (default: 0.0.0.0)
 - `LOG_LEVEL` - Logging level (default: INFO)
 
@@ -127,22 +117,32 @@ Docker Compose configures volumes for data persistence:
 
 - `long_term_memory/` - Qdrant vector database storage
 - `short_term_memory/` - SQLite conversation checkpoints
-- `generated_images/` - Generated image outputs
 
 These directories are automatically created and mounted.
+
+## Port Configuration
+
+| Environment | Service | Internal Port | External Port |
+|-------------|---------|---------------|---------------|
+| Production  | rose    | 8000          | 8000          |
+| Production  | qdrant  | 6333          | 6335          |
+| Development | backend | 8000          | 8000          |
+| Development | frontend| 3000          | 3000          |
+| Development | qdrant  | 6333          | 6333          |
+| Railway     | rose    | 8080          | 8080          |
 
 ## Networking
 
 ### Internal Network
 Docker Compose creates a bridge network for service communication:
 
-- Chainlit → Qdrant: `http://qdrant:6333`
-- API → Qdrant: `http://qdrant:6333`
+- Backend → Qdrant: `http://qdrant:6333`
 
 ### External Access
-- Chainlit UI: http://localhost:8000
-- Qdrant API: http://localhost:6333
-- API Server: http://localhost:8080
+- Production UI: http://localhost:8000
+- Dev Frontend: http://localhost:3000
+- Dev Backend: http://localhost:8000
+- Qdrant API: http://localhost:6333 (dev) or http://localhost:6335 (prod)
 
 ## Troubleshooting
 
