@@ -52,30 +52,6 @@ class TextToSpeechError(ExternalAPIError):
     pass
 
 
-class TextToImageError(ExternalAPIError):
-    """Exception raised when text-to-image generation fails.
-
-    This typically indicates issues with:
-    - Together AI API connectivity
-    - Invalid prompt or generation parameters
-    - Image generation timeout or quota limits
-    """
-
-    pass
-
-
-class ImageToTextError(ExternalAPIError):
-    """Exception raised when image-to-text conversion fails.
-
-    This typically indicates issues with:
-    - Groq Vision API connectivity
-    - Invalid image format or corrupted image data
-    - Image size exceeding limits
-    """
-
-    pass
-
-
 class MemoryError(AICompanionError):
     """Exception raised when memory operations fail.
 

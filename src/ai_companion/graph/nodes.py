@@ -3,10 +3,9 @@
 This module defines all the node functions used in the LangGraph workflow.
 Each node represents a discrete processing step in the conversation flow:
 
-- router_node: Determines workflow type (conversation/image/audio)
+- router_node: Determines workflow type (conversation/audio)
 - context_injection_node: Injects current activity context
 - conversation_node: Generates text responses
-- image_node: Generates images with contextual responses
 - audio_node: Generates voice responses with TTS
 - summarize_conversation_node: Summarizes and trims conversation history
 - memory_extraction_node: Extracts and stores important information
@@ -50,10 +49,7 @@ Example:
     >>> # ... add more nodes and edges
 """
 
-import asyncio
-import os
 from typing import Any
-from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
@@ -66,7 +62,6 @@ from ai_companion.graph.utils.chains import (
 )
 from ai_companion.graph.utils.helpers import (
     get_chat_model,
-    get_text_to_image_module,
     get_text_to_speech_module,
     node_wrapper,
 )
@@ -155,55 +150,6 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig) -> 
         return {"messages": AIMessage(content=fallback_text)}
 
     return {"messages": AIMessage(content=response)}
-
-
-@node_wrapper
-async def image_node(state: AICompanionState, config: RunnableConfig) -> dict[str, AIMessage | str]:
-    """Generate an image and respond with context about it.
-
-    Creates an image based on conversation context, then generates a
-    conversational response about the generated image.
-
-    Args:
-        state: Current conversation state
-        config: LangGraph runnable configuration
-
-    Returns:
-        Dictionary with response and image path: {
-            "messages": AIMessage,
-            "image_path": str
-        }
-    """
-    current_activity = ScheduleContextGenerator.get_current_activity()
-    memory_context = state.get("memory_context", "")
-
-    chain = get_character_response_chain(state.get("summary", ""))
-    text_to_image_module = get_text_to_image_module()
-
-    scenario = await text_to_image_module.create_scenario(state["messages"][-5:])
-    # Create directory asynchronously to avoid blocking event loop
-    await asyncio.to_thread(os.makedirs, "generated_images", exist_ok=True)
-    img_path = f"generated_images/image_{str(uuid4())}.png"
-    await text_to_image_module.generate_image(scenario.image_prompt, img_path)
-
-    # Inject the image prompt information as an AI message
-    scenario_message = HumanMessage(content=f"<image attached by Rose generated from prompt: {scenario.image_prompt}>")
-    updated_messages = state["messages"] + [scenario_message]
-
-    response = await chain.ainvoke(
-        {
-            "messages": updated_messages,
-            "current_activity": current_activity,
-            "memory_context": memory_context,
-        },
-        config,
-    )
-    try:
-        return {"messages": AIMessage(content=response), "image_path": img_path}
-    except Exception:
-        logger.exception("❌ image_node chain invocation failed; returning fallback text-only response")
-        fallback_text = "I created an image but had trouble describing it. If you'd like, I can try again." 
-        return {"messages": AIMessage(content=fallback_text), "image_path": img_path}
 
 
 @node_wrapper

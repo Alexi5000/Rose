@@ -16,8 +16,6 @@ from functools import wraps
 from ai_companion.core.exceptions import WorkflowError, CircuitBreakerError
 from langchain_groq import ChatGroq
 
-from ai_companion.modules.image.image_to_text import ImageToText
-from ai_companion.modules.image.text_to_image import TextToImage
 from ai_companion.modules.speech import TextToSpeech
 from ai_companion.settings import settings
 
@@ -49,24 +47,6 @@ def get_text_to_speech_module() -> TextToSpeech:
         TextToSpeech: Configured TTS module for audio generation
     """
     return TextToSpeech()
-
-
-def get_text_to_image_module() -> TextToImage:
-    """Get TextToImage module instance.
-
-    Returns:
-        TextToImage: Configured image generation module
-    """
-    return TextToImage()
-
-
-def get_image_to_text_module() -> ImageToText:
-    """Get ImageToText module instance.
-
-    Returns:
-        ImageToText: Configured image analysis module
-    """
-    return ImageToText()
 
 
 def remove_asterisk_content(text: str) -> str:
