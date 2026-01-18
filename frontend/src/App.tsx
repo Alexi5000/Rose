@@ -60,12 +60,23 @@ function App() {
     <div className="relative w-full h-screen overflow-hidden">
       {/* Main voice interface with shader background */}
       <ShaderBackgroundWrapper onError={setError}>
-        {/* Error alert */}
+        {/* Phase 8: Error alert with retry button */}
         {error && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 w-full max-w-md pointer-events-auto z-50 px-4">
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="relative">
+              <AlertTitle className="flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Error</span>
+              </AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="self-start text-sm underline hover:no-underline opacity-80 hover:opacity-100 transition-opacity"
+                >
+                  Dismiss
+                </button>
+              </AlertDescription>
             </Alert>
           </div>
         )}

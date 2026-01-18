@@ -11,7 +11,7 @@ export const RMS_DEACTIVATION_THRESHOLD = 0.001; // Max amplitude to consider as
 
 // 🎯 Frame-Based Detection (prevents false positives)
 export const ACTIVATION_FRAMES_REQUIRED = 1; // Consecutive frames above threshold to start recording (reduced for faster response)
-export const DEACTIVATION_FRAMES_REQUIRED = 30; // Consecutive frames below threshold to stop recording (increased to avoid cutting off speech)
+export const DEACTIVATION_FRAMES_REQUIRED = 15; // Consecutive frames below threshold to stop recording (~250ms at 60fps - Phase 1 optimization)
 
 // ⏱️ Recording Duration Limits
 export const MIN_RECORDING_DURATION_MS = 300; // Discard recordings shorter than this (filters coughs, clicks)
@@ -49,6 +49,10 @@ export const VAD_LOOP_INTERVAL_MS = 1000 / ANIMATION_FRAME_RATE; // ~16.67ms cad
 export const API_BASE_URL = '/api/v1';
 export const SESSION_START_ENDPOINT = `${API_BASE_URL}/session/start`;
 export const VOICE_PROCESS_ENDPOINT = `${API_BASE_URL}/voice/process`;
+export const VOICE_STREAM_TTS_ENDPOINT = `${API_BASE_URL}/voice/stream-tts`; // Phase 2: Streaming TTS
 export const API_TIMEOUT_MS = 60000; // 60 seconds for voice processing
 export const SESSION_RETRY_ATTEMPTS = 3; // Number of retries for session creation
 export const SESSION_RETRY_DELAY_MS = 1000; // Delay between retries
+
+// 🎛️ Feature Flags
+export const ENABLE_STREAMING_TTS = true; // Phase 2: Enable streaming TTS for lower latency

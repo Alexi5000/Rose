@@ -2,7 +2,7 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     ports:
-      - "6333:6333"
+      - "6335:6333"
     volumes:
       - ./long_term_memory:/qdrant/storage
     restart: unless-stopped
@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.backend.dev
     ports:
-      - "8000:8000"
+      - "8005:8000"
     volumes:
       - ./src:/app/src
       - ./pyproject.toml:/app/pyproject.toml
@@ -43,7 +43,7 @@ services:
       context: ./frontend
       dockerfile: ../docker/Dockerfile.frontend.dev
     ports:
-      - "3000:3000"
+      - "3005:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -1,9 +1,7 @@
 import unittest
 
 from ai_companion.core.exceptions import (
-    ImageToTextError,
     SpeechToTextError,
-    TextToImageError,
     TextToSpeechError,
 )
 from ai_companion.core.retry import retry_with_exponential_backoff
@@ -49,7 +47,7 @@ class TestRetryUtilities(unittest.TestCase):
 
 class TestCustomExceptions(unittest.TestCase):
     def test_exceptions_are_subclasses(self):
-        for exc in (SpeechToTextError, TextToSpeechError, TextToImageError, ImageToTextError):
+        for exc in (SpeechToTextError, TextToSpeechError):
             self.assertTrue(issubclass(exc, Exception))
 
     def test_exception_messages(self):

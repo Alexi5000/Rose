@@ -45,10 +45,11 @@ Example:
     ['User enjoys hiking in mountainous terrain']
 """
 
+import hashlib
 import logging
 import uuid
-from datetime import datetime
-from typing import Any, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
@@ -57,6 +58,10 @@ from pydantic import BaseModel, Field
 from ai_companion.core.prompts import MEMORY_ANALYSIS_PROMPT
 from ai_companion.modules.memory.long_term.vector_store import VectorStore, get_vector_store
 from ai_companion.settings import settings
+
+# Phase 3: Memory search cache configuration
+MEMORY_CACHE_TTL_SECONDS = 60  # Cache search results for 1 minute
+MEMORY_CACHE_MAX_SIZE = 100  # Maximum number of cached search results
 
 
 class MemoryAnalysis(BaseModel):
@@ -80,10 +85,14 @@ class MemoryManager:
     determine what information is worth remembering. It then stores memories in a
     vector database for semantic search and retrieval.
 
+    Phase 3 Optimization: Includes search result caching to reduce Qdrant query
+    latency for repeated or similar queries within the same session.
+
     Attributes:
         vector_store: VectorStore instance for memory persistence
         logger: Logger for memory operations
         llm: Language model configured for memory analysis with structured output
+        _search_cache: LRU-style cache for search results
 
     Example:
         >>> manager = MemoryManager()
@@ -108,6 +117,10 @@ class MemoryManager:
             timeout=settings.LLM_TIMEOUT_SECONDS,
             max_retries=settings.LLM_MAX_RETRIES,
         ).with_structured_output(MemoryAnalysis)
+        
+        # Phase 3: Search result caching for reduced Qdrant query latency
+        # Cache key: hash of (context, session_id), value: (memories, timestamp)
+        self._search_cache: Dict[str, Tuple[List[str], datetime]] = {}
 
     async def _analyze_memory(self, message: str) -> MemoryAnalysis:
         """Analyze a message to determine importance and format if needed.
@@ -181,9 +194,88 @@ class MemoryManager:
                 },
                 session_id=session_id,
             )
+            
+            # Invalidate cache to ensure fresh results include the new memory
+            self.invalidate_cache(session_id=session_id)
+
+    def _get_cache_key(self, context: str, session_id: Optional[str]) -> str:
+        """Generate a cache key for memory search results.
+        
+        Args:
+            context: Search context
+            session_id: Session identifier
+            
+        Returns:
+            str: SHA256 hash of the combined key
+        """
+        cache_input = f"{context}|{session_id or 'default'}|{settings.MEMORY_TOP_K}"
+        return hashlib.sha256(cache_input.encode()).hexdigest()
+    
+    def _get_from_cache(self, cache_key: str) -> Optional[List[str]]:
+        """Retrieve cached search results if available and not expired.
+        
+        Args:
+            cache_key: Cache key to look up
+            
+        Returns:
+            Optional[List[str]]: Cached memories or None if not found/expired
+        """
+        if cache_key in self._search_cache:
+            memories, timestamp = self._search_cache[cache_key]
+            age = datetime.now() - timestamp
+            if age < timedelta(seconds=MEMORY_CACHE_TTL_SECONDS):
+                self.logger.debug(f"📦 Memory cache hit: {cache_key[:16]}... (age: {age.total_seconds():.1f}s)")
+                return memories
+            else:
+                # Expired - remove from cache
+                del self._search_cache[cache_key]
+                self.logger.debug(f"📦 Memory cache expired: {cache_key[:16]}...")
+        return None
+    
+    def _add_to_cache(self, cache_key: str, memories: List[str]) -> None:
+        """Add search results to cache with LRU eviction.
+        
+        Args:
+            cache_key: Cache key
+            memories: List of memory texts to cache
+        """
+        # LRU-style eviction: remove oldest entries if cache is full
+        if len(self._search_cache) >= MEMORY_CACHE_MAX_SIZE:
+            # Find and remove the oldest entry
+            oldest_key = min(
+                self._search_cache.keys(),
+                key=lambda k: self._search_cache[k][1]
+            )
+            del self._search_cache[oldest_key]
+            self.logger.debug(f"📦 Memory cache evicted: {oldest_key[:16]}...")
+        
+        self._search_cache[cache_key] = (memories, datetime.now())
+        self.logger.debug(f"📦 Memory cached: {cache_key[:16]}... ({len(memories)} memories)")
+    
+    def invalidate_cache(self, session_id: Optional[str] = None) -> None:
+        """Invalidate cache entries, optionally filtered by session.
+        
+        Called after storing new memories to ensure fresh results on next retrieval.
+        
+        Args:
+            session_id: If provided, only invalidate entries for this session
+        """
+        if session_id is None:
+            count = len(self._search_cache)
+            self._search_cache.clear()
+            self.logger.debug(f"📦 Memory cache cleared: {count} entries")
+        else:
+            # Invalidate entries that might be affected by this session
+            # Since we hash the key, we can't easily filter - clear all for safety
+            count = len(self._search_cache)
+            self._search_cache.clear()
+            self.logger.debug(f"📦 Memory cache cleared for session update: {count} entries")
 
     def get_relevant_memories(self, context: str, session_id: Optional[str] = None) -> List[str]:
         """Retrieve relevant memories based on the current context.
+
+        Phase 3 Optimization: Results are cached for MEMORY_CACHE_TTL_SECONDS to
+        reduce repeated Qdrant queries during a conversation turn.
 
         Performs semantic search in the vector store to find memories that are
         relevant to the given context. Returns the top-K most similar memories
@@ -205,9 +297,38 @@ class MemoryManager:
             >>> print(memories)
             ['User enjoys hiking in mountainous terrain', 'User likes camping']
         """
+        # #region agent log
+        from ai_companion.modules.memory.long_term.constants import ENABLE_SESSION_ISOLATION as _ESI; import json as _json; _log_path = "/app/src/debug.log"; _log_data = {"location": "memory_manager.py:get_relevant_memories:start", "message": "Memory search starting", "hypothesisId": "B,E", "data": {"context_preview": context[:200] if context else "(empty)", "session_id": session_id, "top_k": settings.MEMORY_TOP_K, "session_isolation": _ESI}, "timestamp": datetime.now().isoformat()}; open(_log_path, "a").write(_json.dumps(_log_data) + "\n")
+        # #endregion
+        # Check cache first
+        cache_key = self._get_cache_key(context, session_id)
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - query vector store
         memories = self.vector_store.search_memories(context, k=settings.MEMORY_TOP_K, session_id=session_id)
-        # Detailed logging is now handled in vector_store.search_memories()
-        return [memory.text for memory in memories]
+        # #region agent log
+        import json as _json; _log_path = "/app/src/debug.log"; _log_data = {"location": "memory_manager.py:get_relevant_memories:raw_results", "message": "Raw Qdrant search results", "hypothesisId": "B", "data": {"raw_memory_count": len(memories), "raw_memories": [{"text": m.text[:100], "score": m.score, "temporal_score": m.temporal_score, "session": m.metadata.get("session_id")} for m in memories[:5]]}, "timestamp": datetime.now().isoformat()}; open(_log_path, "a").write(_json.dumps(_log_data) + "\n")
+        # #endregion
+        
+        # Phase 5: Sort by temporal score (recent memories weighted higher)
+        # This ensures fresh memories are prioritized over stale ones
+        memories_sorted = sorted(memories, key=lambda m: m.temporal_score, reverse=True)
+        
+        # Log temporal scoring for debugging
+        if memories_sorted:
+            self.logger.debug(
+                f"⏱️ Temporal scoring applied: "
+                f"{[f'{m.text[:30]}... (age: {m.age_days:.1f}d, score: {m.temporal_score:.2f})' for m in memories_sorted[:3]]}"
+            )
+        
+        memory_texts = [memory.text for memory in memories_sorted]
+        
+        # Add to cache
+        self._add_to_cache(cache_key, memory_texts)
+        
+        return memory_texts
 
     def format_memories_for_prompt(self, memories: List[str]) -> str:
         """Format retrieved memories as bullet points for inclusion in prompts.

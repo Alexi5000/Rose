@@ -11,6 +11,7 @@
 
 import React, { useCallback, useState } from 'react';
 import ShaderBackground from './shader-background';
+import VoiceStatusIndicator from './voice-status-indicator';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useRoseAudio } from '@/hooks/useRoseAudio';
 import type { VoiceState } from '@/types/voice';
@@ -65,6 +66,7 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
   });
 
   // 👆 Handle screen tap
+  // Phase 7: Now supports barge-in (interrupting Rose while speaking)
   const handleScreenTap = useCallback(() => {
     if (voiceSession.state === 'idle') {
       // Start session
@@ -77,21 +79,32 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
       voiceSession.stopSession();
       roseAudio.stopAudio();
       setCurrentState('idle');
+    } else if (currentState === 'speaking' && roseAudio.isPlaying) {
+      // Phase 7: Barge-in - interrupt Rose and start listening
+      console.log('👆 Screen tapped during speaking - BARGE-IN');
+      roseAudio.stopAudio();
+      
+      // Start listening immediately after interruption
+      if (voiceSession.state !== 'listening') {
+        voiceSession.startSession();
+      }
+      setCurrentState('listening');
     }
-    // Ignore taps during processing/speaking
-  }, [voiceSession, roseAudio]);
+    // Ignore taps during processing
+  }, [voiceSession, roseAudio, currentState]);
 
   // 🎨 Get cursor style based on state
+  // Phase 7: Speaking state is now interruptible (barge-in)
   const getCursorClass = (): string => {
     switch (currentState) {
       case 'idle':
-        return 'cursor-pointer'; // Clickable
+        return 'cursor-pointer'; // Clickable to start
       case 'listening':
         return 'cursor-pointer'; // Can tap to stop
       case 'processing':
-        return 'cursor-wait'; // Processing
+        return 'cursor-wait'; // Processing - wait
       case 'speaking':
-        return 'cursor-not-allowed'; // Can't interrupt Rose
+        return 'cursor-pointer'; // Phase 7: Can interrupt Rose (barge-in)
       default:
         return 'cursor-pointer';
     }
@@ -114,6 +127,8 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
           ? 'Tap to talk to Rose'
           : currentState === 'listening'
           ? 'Tap to stop listening'
+          : currentState === 'speaking'
+          ? 'Tap to interrupt Rose'
           : 'Processing'
       }
       tabIndex={0}
@@ -129,6 +144,9 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
         roseAmplitude={roseAudio.roseAmplitude}
         state={currentState}
       />
+
+      {/* Phase 8: Voice status indicator with clear affordances */}
+      <VoiceStatusIndicator state={currentState} />
 
       {/* Overlay children (error alerts, dev panel, etc.) */}
       <div className="relative z-10 pointer-events-none">

@@ -321,6 +321,128 @@ class TestCircuitBreakerPerformance:
         print(f"✓ Async circuit breaker overhead: {avg_overhead:.2f}ms per call (target: <10ms)")
 
 
+@pytest.mark.slow
+class TestPipelineTimingInstrumentation:
+    """Tests for pipeline timing instrumentation (Phase 0)."""
+
+    def test_pipeline_timings_dataclass(self):
+        """Verify PipelineTimings captures all required stages."""
+        from ai_companion.interfaces.web.routes.voice import PipelineTimings
+        
+        timings = PipelineTimings()
+        
+        # Verify all expected fields exist
+        expected_fields = [
+            "audio_validation_ms",
+            "stt_ms",
+            "workflow_ms",
+            "tts_ms",
+            "audio_save_ms",
+            "total_ms",
+            "memory_retrieval_ms",
+            "llm_generation_ms",
+            "memory_extraction_ms",
+        ]
+        
+        for field in expected_fields:
+            assert hasattr(timings, field), f"Missing field: {field}"
+            assert getattr(timings, field) == 0.0, f"Field {field} should default to 0.0"
+        
+        # Verify to_dict returns all fields
+        timing_dict = timings.to_dict()
+        for field in expected_fields:
+            assert field in timing_dict, f"Missing field in to_dict: {field}"
+        
+        print("✓ PipelineTimings dataclass has all required fields")
+
+    @pytest.mark.asyncio
+    async def test_timed_stage_context_manager(self):
+        """Verify timed_stage accurately captures stage duration."""
+        from ai_companion.interfaces.web.routes.voice import PipelineTimings, timed_stage
+        
+        timings = PipelineTimings()
+        
+        # Simulate a 100ms stage
+        async with timed_stage(timings, "stt_ms"):
+            await asyncio.sleep(0.1)
+        
+        # Verify timing is captured (allow 50ms tolerance)
+        assert 80 < timings.stt_ms < 200, f"Expected ~100ms, got {timings.stt_ms}ms"
+        print(f"✓ timed_stage captured: {timings.stt_ms:.1f}ms (expected ~100ms)")
+
+    def test_pipeline_timings_response_model(self):
+        """Verify PipelineTimingsResponse is properly structured."""
+        from ai_companion.interfaces.web.routes.voice import PipelineTimingsResponse
+        
+        # Create from dict (simulates JSON deserialization)
+        response = PipelineTimingsResponse(
+            audio_validation_ms=10.5,
+            stt_ms=850.3,
+            workflow_ms=1200.0,
+            tts_ms=980.2,
+            audio_save_ms=15.8,
+            total_ms=3056.8,
+            memory_retrieval_ms=150.0,
+            llm_generation_ms=800.0,
+            memory_extraction_ms=100.0,
+        )
+        
+        # Verify serialization
+        response_dict = response.model_dump()
+        assert response_dict["total_ms"] == 3056.8
+        assert response_dict["stt_ms"] == 850.3
+        
+        print("✓ PipelineTimingsResponse serializes correctly")
+
+    def test_voice_process_response_includes_timings(self):
+        """Verify VoiceProcessResponse can include optional timings."""
+        from ai_companion.interfaces.web.routes.voice import (
+            PipelineTimingsResponse,
+            VoiceProcessResponse,
+        )
+        
+        # Response without timings
+        response_no_timings = VoiceProcessResponse(
+            text="Hello",
+            audio_url="/api/v1/voice/audio/test",
+            session_id="test-session",
+        )
+        assert response_no_timings.timings is None
+        
+        # Response with timings
+        timings = PipelineTimingsResponse(
+            audio_validation_ms=10.0,
+            stt_ms=800.0,
+            workflow_ms=1000.0,
+            tts_ms=900.0,
+            audio_save_ms=15.0,
+            total_ms=2725.0,
+            memory_retrieval_ms=100.0,
+            llm_generation_ms=700.0,
+            memory_extraction_ms=50.0,
+        )
+        response_with_timings = VoiceProcessResponse(
+            text="Hello",
+            audio_url="/api/v1/voice/audio/test",
+            session_id="test-session",
+            timings=timings,
+        )
+        assert response_with_timings.timings is not None
+        assert response_with_timings.timings.total_ms == 2725.0
+        
+        print("✓ VoiceProcessResponse supports optional timings")
+
+    def test_feature_flag_controls_timing_output(self):
+        """Verify FEATURE_TIMING_METRICS_ENABLED controls timing inclusion."""
+        from ai_companion.settings import settings
+        
+        # Verify the feature flag exists and is enabled by default
+        assert hasattr(settings, "FEATURE_TIMING_METRICS_ENABLED")
+        assert settings.FEATURE_TIMING_METRICS_ENABLED is True
+        
+        print(f"✓ FEATURE_TIMING_METRICS_ENABLED = {settings.FEATURE_TIMING_METRICS_ENABLED}")
+
+
 def print_benchmark_summary():
     """Print a summary of all benchmark results."""
     print("\n" + "=" * 60)

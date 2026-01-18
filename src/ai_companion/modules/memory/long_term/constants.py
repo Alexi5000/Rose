@@ -126,7 +126,7 @@ Do NOT change this value unless changing the embedding model.
 # USER ISOLATION CONFIGURATION
 # ==============================================================================
 
-ENABLE_SESSION_ISOLATION = True
+ENABLE_SESSION_ISOLATION = False
 """Enable session-based isolation for multi-user deployments.
 
 When enabled:
@@ -138,8 +138,8 @@ When disabled:
 ⚠️ All memories are global (ONLY safe for single-user deployments)
 ⚠️ Multi-user scenarios WILL leak data between users
 
-Current: True (safe default)
-Recommendation: Always keep True unless you have a specific single-user use case
+Current: False (single-user demo mode - Rose remembers everything across sessions)
+Recommendation: Set to True for multi-user deployments
 """
 
 SESSION_ID_METADATA_KEY = "session_id"

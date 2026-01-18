@@ -53,10 +53,11 @@ from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
-from ai_companion.interfaces.web.routes import admin, health, monitoring, session, voice
+from ai_companion.interfaces.web.routes import admin, health, monitoring, session, voice, voice_websocket
 from ai_companion.interfaces.web.routes import metrics as metrics_route
 from ai_companion.settings import settings
 from ai_companion.modules.memory.long_term.vector_store import get_vector_store
+from ai_companion.modules.speech.text_to_speech import TextToSpeech
 
 # Configure structured logging before any other imports
 configure_logging()
@@ -133,6 +134,16 @@ async def lifespan(app: FastAPI):
     logger.info(
         "monitoring_scheduler_started", emoji=LOG_EMOJI_SUCCESS, evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL
     )
+
+    # Phase 1 Optimization: Warm TTS cache on startup
+    # Pre-generate common therapeutic phrases to improve first-response latency
+    if settings.FEATURE_TTS_CACHE_ENABLED:
+        try:
+            tts = TextToSpeech(enable_cache=True)
+            await tts.warm_cache()
+            logger.info("tts_cache_warmed", emoji=LOG_EMOJI_SUCCESS, phrases_cached=len(tts._cache))
+        except Exception as e:
+            logger.warning(f"⚠️ TTS cache warming failed (non-critical): {e}", exc_info=True)
 
     yield
 
@@ -233,6 +244,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=API_BASE_PATH, tags=["Health"])
     app.include_router(session.router, prefix=API_BASE_PATH, tags=["Session Management"])
     app.include_router(voice.router, prefix=API_BASE_PATH, tags=["Voice Processing"])
+    app.include_router(voice_websocket.router, prefix=API_BASE_PATH, tags=["Voice WebSocket"])
     app.include_router(metrics_route.router, prefix=API_BASE_PATH, tags=["Metrics"])
     app.include_router(monitoring.router, prefix=API_BASE_PATH, tags=["Monitoring"])
     app.include_router(admin.router, prefix=API_BASE_PATH, tags=["Admin"])

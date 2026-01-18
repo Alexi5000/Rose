@@ -78,9 +78,11 @@ class Settings(BaseSettings):
     QDRANT_MAX_BACKOFF: float = 5.0
 
     # Model configurations
-    TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
+    TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
     SMALL_TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
     STT_MODEL_NAME: str = "whisper-large-v3"
+    STT_PROVIDER: str = "groq"  # Phase 4: STT provider ('groq' or 'deepgram')
+    DEEPGRAM_API_KEY: str | None = None  # Optional: Deepgram API key for streaming STT
     TTS_MODEL_NAME: str = "eleven_flash_v2_5"
     TTI_MODEL_NAME: str = "black-forest-labs/FLUX.1-schnell-Free"
     ITT_MODEL_NAME: str = "llama-3.2-90b-vision-preview"
@@ -135,6 +137,7 @@ class Settings(BaseSettings):
     FEATURE_SESSION_AFFINITY_ENABLED: bool = False  # Enable sticky sessions
     FEATURE_READ_REPLICA_ENABLED: bool = False  # Use read replicas for queries
     FEATURE_MULTI_REGION_ENABLED: bool = False  # Enable multi-region routing
+    FEATURE_TIMING_METRICS_ENABLED: bool = True  # Include pipeline timing metrics in response
 
     # Database configuration (for PostgreSQL)
     DATABASE_URL: str | None = None  # PostgreSQL connection string
@@ -157,7 +160,7 @@ class Settings(BaseSettings):
     TTS_CACHE_TTL_HOURS: int = 24  # Cache time-to-live in hours
     TTS_VOICE_STABILITY: float = 0.75  # Voice stability (0.0-1.0)
     TTS_VOICE_SIMILARITY: float = 0.5  # Voice similarity boost (0.0-1.0)
-    TTS_STREAMING_LATENCY_LEVEL: int = 0  # 0 (highest quality) to 4 (lowest latency)
+    TTS_STREAMING_LATENCY_LEVEL: int = 4  # 0 (highest quality) to 4 (lowest latency) - Phase 1: maximum speed optimization
     TTS_OUTPUT_FORMAT: str = "mp3_44100_128"  # ElevenLabs output encoding
     TTS_USE_SPEAKER_BOOST: bool = True  # Enable ElevenLabs speaker boost for warmth
     TTS_MAX_TEXT_LENGTH: int = 5000  # Maximum text length for TTS
@@ -174,7 +177,7 @@ class Settings(BaseSettings):
     # LLM timeout and retry configuration
     LLM_TIMEOUT_SECONDS: float = 30.0  # Timeout for LLM API calls
     LLM_MAX_RETRIES: int = 3  # Maximum retry attempts for LLM calls
-    LLM_TEMPERATURE_DEFAULT: float = 0.7  # Default temperature for LLM responses
+    LLM_TEMPERATURE_DEFAULT: float = 0.85  # Default temperature for LLM responses - higher for more natural variation
     LLM_TEMPERATURE_ROUTER: float = 0.3  # Temperature for routing decisions
     LLM_TEMPERATURE_MEMORY: float = 0.1  # Temperature for memory extraction
     LLM_TEMPERATURE_IMAGE_SCENARIO: float = 0.4  # Temperature for image scenario generation

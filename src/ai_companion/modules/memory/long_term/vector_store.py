@@ -84,11 +84,18 @@ type CollectionInfo = dict[str, Any]
 
 @dataclass
 class Memory:
-    """Represents a memory entry in the vector store."""
+    """Represents a memory entry in the vector store.
+    
+    Phase 5 Enhancement: Includes temporal scoring for memory decay.
+    """
 
     text: str
     metadata: MemoryMetadata
     score: Optional[float] = None
+
+    # Phase 5: Temporal decay configuration
+    DECAY_FACTOR_PER_DAY: float = 0.98  # 2% decay per day
+    MAX_DECAY: float = 0.5  # Never decay below 50% of original score
 
     @property
     def id(self) -> Optional[str]:
@@ -98,6 +105,55 @@ class Memory:
     def timestamp(self) -> Optional[datetime]:
         ts: Optional[str] = self.metadata.get("timestamp")
         return datetime.fromisoformat(ts) if ts else None
+    
+    @property
+    def age_days(self) -> float:
+        """Calculate age of memory in days.
+        
+        Returns:
+            float: Age in days, or 0 if no timestamp available
+        """
+        if self.timestamp is None:
+            return 0.0
+        age = datetime.now() - self.timestamp
+        return age.total_seconds() / 86400.0  # Seconds per day
+    
+    @property
+    def temporal_score(self) -> float:
+        """Calculate score adjusted for memory age (temporal decay).
+        
+        Phase 5: Recent memories are weighted higher than older ones.
+        Uses exponential decay with configurable decay factor.
+        
+        Formula: adjusted_score = raw_score * max(DECAY_FACTOR^age_days, MAX_DECAY)
+        
+        Returns:
+            float: Temporally-adjusted score (0.0 to 1.0)
+        """
+        if self.score is None:
+            return 0.0
+        
+        # Apply exponential decay based on age
+        decay_multiplier = self.DECAY_FACTOR_PER_DAY ** self.age_days
+        
+        # Ensure we don't decay below the minimum threshold
+        decay_multiplier = max(decay_multiplier, self.MAX_DECAY)
+        
+        return self.score * decay_multiplier
+    
+    @property
+    def importance_tier(self) -> str:
+        """Categorize memory importance based on temporal score.
+        
+        Returns:
+            str: 'high', 'medium', or 'low'
+        """
+        if self.temporal_score >= 0.8:
+            return "high"
+        elif self.temporal_score >= 0.5:
+            return "medium"
+        else:
+            return "low"
 
 
 class VectorStore:
