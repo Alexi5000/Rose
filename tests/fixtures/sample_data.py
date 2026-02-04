@@ -54,7 +54,7 @@ def sample_conversation_state() -> dict:
         ],
         "workflow_type": "conversation",
         "audio_buffer": None,
-        "image_path": None,
+
         "memory_context": {
             "relevant_memories": [],
             "conversation_summary": "",

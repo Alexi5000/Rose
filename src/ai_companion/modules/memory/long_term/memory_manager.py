@@ -49,6 +49,7 @@ import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import BaseMessage
@@ -297,9 +298,6 @@ class MemoryManager:
             >>> print(memories)
             ['User enjoys hiking in mountainous terrain', 'User likes camping']
         """
-        # #region agent log
-        from ai_companion.modules.memory.long_term.constants import ENABLE_SESSION_ISOLATION as _ESI; import json as _json; _log_path = "/app/src/debug.log"; _log_data = {"location": "memory_manager.py:get_relevant_memories:start", "message": "Memory search starting", "hypothesisId": "B,E", "data": {"context_preview": context[:200] if context else "(empty)", "session_id": session_id, "top_k": settings.MEMORY_TOP_K, "session_isolation": _ESI}, "timestamp": datetime.now().isoformat()}; open(_log_path, "a").write(_json.dumps(_log_data) + "\n")
-        # #endregion
         # Check cache first
         cache_key = self._get_cache_key(context, session_id)
         cached_result = self._get_from_cache(cache_key)
@@ -308,10 +306,7 @@ class MemoryManager:
         
         # Cache miss - query vector store
         memories = self.vector_store.search_memories(context, k=settings.MEMORY_TOP_K, session_id=session_id)
-        # #region agent log
-        import json as _json; _log_path = "/app/src/debug.log"; _log_data = {"location": "memory_manager.py:get_relevant_memories:raw_results", "message": "Raw Qdrant search results", "hypothesisId": "B", "data": {"raw_memory_count": len(memories), "raw_memories": [{"text": m.text[:100], "score": m.score, "temporal_score": m.temporal_score, "session": m.metadata.get("session_id")} for m in memories[:5]]}, "timestamp": datetime.now().isoformat()}; open(_log_path, "a").write(_json.dumps(_log_data) + "\n")
-        # #endregion
-        
+
         # Phase 5: Sort by temporal score (recent memories weighted higher)
         # This ensures fresh memories are prioritized over stale ones
         memories_sorted = sorted(memories, key=lambda m: m.temporal_score, reverse=True)
@@ -354,17 +349,14 @@ class MemoryManager:
         return "\n".join(f"- {memory}" for memory in memories)
 
 
+@lru_cache(maxsize=1)
 def get_memory_manager() -> MemoryManager:
-    """Get a MemoryManager instance.
+    """Get the singleton MemoryManager instance.
 
-    Factory function for creating MemoryManager instances. This pattern allows
-    for future enhancements like singleton behavior or dependency injection.
+    Returns a cached singleton so the search cache persists across requests
+    and the LLM/VectorStore connections are reused.
 
     Returns:
-        MemoryManager: A new MemoryManager instance
-
-    Example:
-        >>> manager = get_memory_manager()
-        >>> memories = manager.get_relevant_memories("user preferences")
+        MemoryManager: The singleton MemoryManager instance
     """
     return MemoryManager()

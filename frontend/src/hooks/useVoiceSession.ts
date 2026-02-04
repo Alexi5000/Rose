@@ -327,10 +327,13 @@ export function useVoiceSession({
 
     // Calculate RMS amplitude
     const rms = calculateRms(dataArray);
-    setUserAmplitude(rms);
 
-    // Periodic diagnostic logging (every 60 frames = 1 second at 60fps)
+    // Throttle state updates to ~15fps (every 4th frame) to reduce re-renders.
+    // The shader still gets smooth-enough animation at 15fps.
     frameCountRef.current += 1;
+    if (frameCountRef.current % 4 === 0) {
+      setUserAmplitude(rms);
+    }
     if (frameCountRef.current >= STATUS_LOG_FRAME_INTERVAL) {
       console.log(
         `🔊 VAD Status: RMS=${rms.toFixed(4)} | ` +

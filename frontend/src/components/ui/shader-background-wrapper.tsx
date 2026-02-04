@@ -1,121 +1,117 @@
 /**
- * 🎭 Shader Background Wrapper Component
+ * Shader Background Wrapper Component
  *
  * Orchestrates the full voice interaction experience:
- * - Handles full-screen click events (entire screen is a button)
- * - Manages voice session lifecycle
- * - Manages Rose audio playback
- * - Updates shader with real-time audio data
- * - Controls cursor states for visual feedback
+ * - Full-screen tap to start/stop/interrupt
+ * - Voice session lifecycle via useVoiceSession
+ * - Rose audio playback via useRoseAudio
+ * - Real-time shader visualization
+ * - Conversation transcript overlay
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import ShaderBackground from './shader-background';
 import VoiceStatusIndicator from './voice-status-indicator';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useRoseAudio } from '@/hooks/useRoseAudio';
-import type { VoiceState } from '@/types/voice';
+import type { VoiceState, VoiceResponse } from '@/types/voice';
+
+interface TranscriptEntry {
+  role: 'user' | 'rose';
+  text: string;
+  timestamp: number;
+}
 
 interface ShaderBackgroundWrapperProps {
-  /** Callback when error occurs */
   onError: (error: string) => void;
-  /** Children to render on top of shader */
   children?: React.ReactNode;
 }
+
+const TRANSCRIPT_MAX_ENTRIES = 4;
+const TRANSCRIPT_FADE_MS = 8000;
 
 const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
   onError,
   children,
 }) => {
-  const [currentState, setCurrentState] = useState<VoiceState>('idle');
+  // Conversation transcript state
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
 
-  // 🎙️ Voice session hook
+  // Stable ref to roseAudio.playAudio — avoids stale closure in onResponse
+  const playAudioRef = useRef<((response: VoiceResponse) => Promise<void>) | undefined>(undefined);
+
+  const handleResponse = useCallback((response: VoiceResponse) => {
+    // Add Rose's reply to transcript
+    if (response.text) {
+      setTranscript((prev) => {
+        const next = [...prev];
+        next.push({ role: 'rose', text: response.text, timestamp: Date.now() });
+        return next.slice(-TRANSCRIPT_MAX_ENTRIES);
+      });
+    }
+
+    // Play audio via ref (always current, no stale closure)
+    playAudioRef.current?.(response);
+  }, []);
+
+  const handleError = useCallback(
+    (error: string) => {
+      onError(error);
+    },
+    [onError]
+  );
+
+  // Voice session hook
   const voiceSession = useVoiceSession({
-    onResponse: (response) => {
-      console.log(`💬 User said: "${response.text}"`);
-      setCurrentState('speaking');
-
-      // Play Rose's audio response
-      void roseAudio.playAudio(response);
-    },
-    onError: (error) => {
-      console.error('❌ Voice error:', error);
-      onError(error);
-    },
+    onResponse: handleResponse,
+    onError: handleError,
   });
 
-  // 🔊 Rose audio hook
+  // Rose audio hook
   const roseAudio = useRoseAudio({
-    onPlaybackStart: () => {
-      console.log('🗣️ Rose started speaking');
-      setCurrentState('speaking');
-    },
-    onPlaybackEnd: () => {
-      console.log('✅ Rose finished speaking');
-      // Return to listening if session is active
-      if (voiceSession.state === 'listening' || voiceSession.state === 'processing') {
-        setCurrentState('listening');
-      } else {
-        setCurrentState('idle');
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Audio playback error:', error);
-      onError(error);
-    },
+    onError: (error) => onError(error),
   });
 
-  // 👆 Handle screen tap
-  // Phase 7: Now supports barge-in (interrupting Rose while speaking)
+  // Keep playAudioRef current (not a hook, just assignment during render)
+  playAudioRef.current = roseAudio.playAudio;
+
+  // Derived display state: single source of truth.
+  // voiceSession.state knows idle/listening/processing.
+  // roseAudio.isPlaying knows if Rose is speaking.
+  // No duplicate useState, no sync useEffect, no race conditions.
+  const displayState: VoiceState = roseAudio.isPlaying
+    ? 'speaking'
+    : voiceSession.state;
+
+  // Handle screen tap
   const handleScreenTap = useCallback(() => {
     if (voiceSession.state === 'idle') {
-      // Start session
-      console.log('👆 Screen tapped - starting session');
       voiceSession.startSession();
-      setCurrentState('listening');
     } else if (voiceSession.state === 'listening') {
-      // Stop session
-      console.log('👆 Screen tapped - stopping session');
       voiceSession.stopSession();
       roseAudio.stopAudio();
-      setCurrentState('idle');
-    } else if (currentState === 'speaking' && roseAudio.isPlaying) {
-      // Phase 7: Barge-in - interrupt Rose and start listening
-      console.log('👆 Screen tapped during speaking - BARGE-IN');
+    } else if (roseAudio.isPlaying) {
+      // Barge-in: interrupt Rose and start listening
       roseAudio.stopAudio();
-      
-      // Start listening immediately after interruption
-      if (voiceSession.state !== 'listening') {
-        voiceSession.startSession();
-      }
-      setCurrentState('listening');
+      voiceSession.startSession();
     }
     // Ignore taps during processing
-  }, [voiceSession, roseAudio, currentState]);
+  }, [voiceSession, roseAudio]);
 
-  // 🎨 Get cursor style based on state
-  // Phase 7: Speaking state is now interruptible (barge-in)
   const getCursorClass = (): string => {
-    switch (currentState) {
-      case 'idle':
-        return 'cursor-pointer'; // Clickable to start
-      case 'listening':
-        return 'cursor-pointer'; // Can tap to stop
-      case 'processing':
-        return 'cursor-wait'; // Processing - wait
-      case 'speaking':
-        return 'cursor-pointer'; // Phase 7: Can interrupt Rose (barge-in)
-      default:
-        return 'cursor-pointer';
-    }
+    return displayState === 'processing' ? 'cursor-wait' : 'cursor-pointer';
   };
 
-  // Sync state with voice session
+  // Auto-fade old transcript entries
   React.useEffect(() => {
-    if (voiceSession.state !== currentState && !roseAudio.isPlaying) {
-      setCurrentState(voiceSession.state);
-    }
-  }, [voiceSession.state, currentState, roseAudio.isPlaying]);
+    if (transcript.length === 0) return;
+    const timer = setTimeout(() => {
+      setTranscript((prev) =>
+        prev.filter((entry) => Date.now() - entry.timestamp < TRANSCRIPT_FADE_MS)
+      );
+    }, TRANSCRIPT_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [transcript]);
 
   return (
     <div
@@ -123,11 +119,11 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
       onClick={handleScreenTap}
       role="button"
       aria-label={
-        currentState === 'idle'
+        displayState === 'idle'
           ? 'Tap to talk to Rose'
-          : currentState === 'listening'
+          : displayState === 'listening'
           ? 'Tap to stop listening'
-          : currentState === 'speaking'
+          : displayState === 'speaking'
           ? 'Tap to interrupt Rose'
           : 'Processing'
       }
@@ -138,17 +134,35 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
         }
       }}
     >
-      {/* Shader background with audio reactivity */}
       <ShaderBackground
         userAmplitude={voiceSession.userAmplitude}
         roseAmplitude={roseAudio.roseAmplitude}
-        state={currentState}
+        state={displayState}
       />
 
-      {/* Phase 8: Voice status indicator with clear affordances */}
-      <VoiceStatusIndicator state={currentState} />
+      <VoiceStatusIndicator state={displayState} />
 
-      {/* Overlay children (error alerts, dev panel, etc.) */}
+      {/* Conversation transcript overlay */}
+      {transcript.length > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-10 pointer-events-none flex flex-col gap-2 max-w-lg">
+          {transcript.map((entry) => (
+            <div
+              key={entry.timestamp}
+              className={`text-sm px-3 py-2 rounded-lg backdrop-blur-sm ${
+                entry.role === 'rose'
+                  ? 'bg-white/10 text-white/90 self-start'
+                  : 'bg-white/5 text-white/70 self-end italic'
+              }`}
+            >
+              <span className="font-medium text-xs text-white/50 mr-2">
+                {entry.role === 'rose' ? 'Rose' : 'You'}
+              </span>
+              {entry.text}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="relative z-10 pointer-events-none">
         {children}
       </div>

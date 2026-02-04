@@ -17,7 +17,7 @@ import tempfile
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import AsyncGenerator, Generator, Optional
@@ -25,7 +25,6 @@ from typing import AsyncGenerator, Generator, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -50,7 +49,6 @@ from ai_companion.core.exceptions import SpeechToTextError, TextToSpeechError, W
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics, track_performance
 from ai_companion.core.resilience import CircuitBreakerError
-from ai_companion.graph.graph import create_workflow_graph
 from ai_companion.modules.speech.speech_to_text import SpeechToText
 from ai_companion.modules.speech.text_to_speech import TextToSpeech
 from ai_companion.settings import settings
@@ -66,6 +64,17 @@ limiter = Limiter(key_func=get_remote_address)
 AUDIO_SERVE_PATH = "/api/v1/voice/audio"  # 🔧 FIX: Added /v1 for API versioning consistency
 MAX_FILE_SAVE_RETRIES = 3
 MS_PER_SECOND = 1000  # Conversion factor for timing calculations
+
+# Silence handling: varied responses to avoid repetitive "I'm here" messages
+SILENCE_RESPONSES = [
+    "I'm here whenever you're ready.",
+    "Take your time. I'm not going anywhere.",
+    "No rush at all.",
+]
+MAX_SILENCE_RESPONSES = len(SILENCE_RESPONSES)
+
+# Per-session silence counters: {session_id: count}
+_silence_counts: dict[str, int] = {}
 
 
 @dataclass
@@ -153,26 +162,18 @@ def get_audio_dir() -> Path:
     return audio_dir
 
 
-async def get_checkpointer():
-    """Get or create async checkpointer instance.
+# Module-level constant for backwards compatibility with tests
+# Tests import this directly, so we need to provide it
+AUDIO_DIR = get_audio_dir()
 
-    Creates an async SQLite checkpointer for conversation memory persistence.
-    Uses AsyncSqliteSaver for compatibility with async LangGraph workflows.
 
-    Yields:
-        AsyncSqliteSaver: Initialized async checkpointer instance
+def get_compiled_graph(request: Request):
+    """Get the pre-compiled graph from app state.
 
-    Note:
-        This is an async generator dependency that properly enters the context manager.
-        FastAPI will call __aenter__ before injecting and __aexit__ after completion.
+    The graph and checkpointer are initialized once during app lifespan
+    (see app.py) and shared across all requests.
     """
-    # Create data directory if it doesn't exist
-    db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Enter the async context manager and yield the actual checkpointer instance
-    async with AsyncSqliteSaver.from_conn_string(str(db_path)) as checkpointer:
-        yield checkpointer
+    return request.app.state.compiled_graph
 
 
 # Helper functions and context managers
@@ -287,13 +288,14 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
             # 📝 Log transcription for debugging
             logger.info("transcription_complete", text=transcribed_text, session_id=session_id)
 
-            # 🛡️ Input Guard: Filter out hallucinations and empty segments
-            # Whisper sometimes outputs these phrases for silence
-            hallucinations = ["...", "thank you.", "thank you", "subtitles by", "copyright", "audio"]
+            # 🛡️ Input Guard: Filter out known Whisper hallucination artifacts
+            # Only exact matches — substring matching caused false positives
+            # (e.g. "thank you" is legitimate user speech, "audio" appears in real sentences)
+            whisper_artifacts = {"subtitles by", "copyright", "thanks for watching", "you"}
             cleaned = transcribed_text.strip().lower()
 
-            if not cleaned or any(h in cleaned for h in hallucinations):
-                logger.warning("input_guard_filtered", reason="hallucination_detected", text=transcribed_text, session_id=session_id)
+            if not cleaned or cleaned in whisper_artifacts:
+                logger.warning("input_guard_filtered", reason="whisper_artifact", text=transcribed_text, session_id=session_id)
                 return ""
 
             return transcribed_text
@@ -310,13 +312,13 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
         raise SpeechToTextError(ERROR_MSG_STT_FAILED)
 
 
-async def _process_workflow(transcribed_text: str, session_id: str, checkpointer: AsyncSqliteSaver) -> tuple[str, Optional[bytes]]:
+async def _process_workflow(transcribed_text: str, session_id: str, compiled_graph) -> tuple[str, Optional[bytes]]:
     """Process through LangGraph workflow with timeout and error handling.
 
     Args:
         transcribed_text: Text to process
         session_id: Session identifier
-        checkpointer: AsyncSqliteSaver instance for session persistence
+        compiled_graph: Pre-compiled LangGraph workflow from app state
 
     Returns:
         tuple[str, Optional[bytes]]: Response text and optional audio buffer from workflow
@@ -328,16 +330,13 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
     workflow_start = time.time()
 
     try:
-        # Compile graph with checkpointer
-        graph = create_workflow_graph().compile(checkpointer=checkpointer)
-
         # Create config with session thread
         config = {"configurable": {"thread_id": session_id}}
 
         # Invoke workflow with global timeout
         try:
             result = await asyncio.wait_for(
-                graph.ainvoke(
+                compiled_graph.ainvoke(
                     {"messages": [HumanMessage(content=transcribed_text)]},
                     config=config,
                 ),
@@ -361,9 +360,6 @@ async def _process_workflow(transcribed_text: str, session_id: str, checkpointer
         # Extract response text from the last AI message
         response_text = result["messages"][-1].content
         audio_buffer = result.get("audio_buffer")
-        # #region agent log
-        import json as _json; _log_path = "/app/src/debug.log"; _log_data = {"location": "voice.py:_process_workflow:result", "message": "Workflow result", "hypothesisId": "A,E", "data": {"session_id": session_id, "input_text": transcribed_text, "message_count_in_result": len(result.get("messages", [])), "all_messages": [{"type": m.type, "content": m.content[:150] if hasattr(m, "content") else str(m)[:150], "id": getattr(m, "id", None)} for m in result.get("messages", [])], "response_text": response_text[:200] if response_text else "(empty)", "memory_context": result.get("memory_context", "(not in result)")[:200], "has_audio": audio_buffer is not None}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(_json.dumps(_log_data) + "\n")
-        # #endregion
         workflow_duration_ms = (time.time() - workflow_start) * 1000
         metrics.record_workflow_execution(session_id, workflow_duration_ms, success=True)
         logger.info(
@@ -559,7 +555,7 @@ async def process_voice(
     stt: SpeechToText = Depends(get_stt),
     tts: TextToSpeech = Depends(get_tts),
     audio_dir: Path = Depends(get_audio_dir),
-    checkpointer: AsyncSqliteSaver = Depends(get_checkpointer),
+    compiled_graph=Depends(get_compiled_graph),
 ) -> VoiceProcessResponse:
     """Process voice input and generate audio response.
 
@@ -615,19 +611,31 @@ async def process_voice(
         async with timed_stage(timings, "stt_ms"):
             transcribed_text = await _transcribe_audio(audio_data, session_id, stt)
 
-        # 🛡️ Input Guard: Skip workflow if input is empty/garbage
+        # 🛡️ Input Guard: Handle silence with varied responses
         if not transcribed_text:
-            logger.info("🤫 [Silence Detected] Skipping workflow to prevent loops", session_id=session_id)
-            # Return empty response to keep connection alive but do nothing
-            return VoiceProcessResponse(
-                text="",
-                audio_url="",
-                session_id=session_id,
-            )
+            count = _silence_counts.get(session_id, 0)
+            _silence_counts[session_id] = count + 1
+            logger.info("🤫 silence_detected", session_id=session_id, silence_count=count + 1)
+
+            # After exhausting varied responses, return empty to avoid spamming
+            if count >= MAX_SILENCE_RESPONSES:
+                return VoiceProcessResponse(text="", audio_url="", session_id=session_id)
+
+            silence_text = SILENCE_RESPONSES[count]
+            try:
+                audio_bytes = await _generate_audio_response(silence_text, session_id, tts)
+                audio_url = await _save_audio_file(audio_bytes, session_id, audio_dir)
+            except Exception:
+                logger.warning("silence_tts_fallback", session_id=session_id)
+                return VoiceProcessResponse(text=silence_text, audio_url="", session_id=session_id)
+            return VoiceProcessResponse(text=silence_text, audio_url=audio_url, session_id=session_id)
+
+        # User spoke — reset silence counter for this session
+        _silence_counts.pop(session_id, None)
 
         # Stage 3: Process through LangGraph workflow
         async with timed_stage(timings, "workflow_ms"):
-            response_text, workflow_audio = await _process_workflow(transcribed_text, session_id, checkpointer)
+            response_text, workflow_audio = await _process_workflow(transcribed_text, session_id, compiled_graph)
 
         # Stage 4: Generate audio response (Text-to-Speech)
         async with timed_stage(timings, "tts_ms"):

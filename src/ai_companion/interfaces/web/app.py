@@ -1,8 +1,10 @@
 """FastAPI application for Rose the Healer Shaman web interface."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -52,6 +54,7 @@ from ai_companion.core.exceptions import AICompanionError
 from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
 from ai_companion.core.session_cleanup import cleanup_old_sessions
+from ai_companion.graph.graph import create_workflow_graph
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from ai_companion.interfaces.web.routes import admin, health, monitoring, session, voice, voice_websocket
 from ai_companion.interfaces.web.routes import metrics as metrics_route
@@ -145,14 +148,25 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"⚠️ TTS cache warming failed (non-critical): {e}", exc_info=True)
 
-    yield
+    # Initialize shared checkpointer and compiled graph (once, for app lifetime)
+    # This eliminates per-request SQLite connection creation and graph recompilation.
+    db_path = Path(settings.SHORT_TERM_MEMORY_DB_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(db_path)) as checkpointer:
+        compiled_graph = create_workflow_graph().compile(checkpointer=checkpointer)
+        app.state.checkpointer = checkpointer
+        app.state.compiled_graph = compiled_graph
+        logger.info("graph_and_checkpointer_initialized", emoji=LOG_EMOJI_SUCCESS)
 
-    # Shutdown monitoring scheduler
-    await monitoring_scheduler.stop()
-    logger.info("monitoring_scheduler_stopped", emoji=LOG_EMOJI_SUCCESS)
+        yield
 
-    # Shutdown scheduler
-    scheduler.shutdown()
+        # Shutdown monitoring scheduler
+        await monitoring_scheduler.stop()
+        logger.info("monitoring_scheduler_stopped", emoji=LOG_EMOJI_SUCCESS)
+
+        # Shutdown scheduler
+        scheduler.shutdown()
+
     logger.info("app_shutdown", emoji=LOG_EMOJI_SUCCESS, service="rose_web_interface")
 
 

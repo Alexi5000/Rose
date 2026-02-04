@@ -146,9 +146,13 @@ class TestRetryLogic:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep") as mock_sleep:  # Mock sleep to speed up test
@@ -172,9 +176,13 @@ class TestRetryLogic:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep") as mock_sleep:
@@ -199,9 +207,13 @@ class TestRetryLogic:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep") as mock_sleep:
@@ -233,9 +245,13 @@ class TestRetryLogic:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep"):  # Mock sleep to speed up test
@@ -257,9 +273,9 @@ class TestCircuitBreakerIntegration:
         """Test that open circuit breaker fails fast without retrying."""
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker in OPEN state
+                # Mock circuit breaker in OPEN state (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
+                mock_breaker.call_async.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
                 mock_cb.return_value = mock_breaker
 
                 stt = SpeechToText()
@@ -268,9 +284,9 @@ class TestCircuitBreakerIntegration:
                     await stt.transcribe(sample_wav_audio)
 
                 # Verify circuit breaker was called
-                mock_breaker.call.assert_called_once()
+                mock_breaker.call_async.assert_called_once()
                 # Verify no retries occurred (circuit breaker fails fast)
-                assert mock_breaker.call.call_count == 1
+                assert mock_breaker.call_async.call_count == 1
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_success_path(self, sample_wav_audio, mock_groq_client):
@@ -279,16 +295,20 @@ class TestCircuitBreakerIntegration:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker in CLOSED state (allows calls)
+                # Mock circuit breaker in CLOSED state (allows calls, use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 stt = SpeechToText()
                 result = await stt.transcribe(sample_wav_audio)
 
                 assert result == "Success through circuit breaker."
-                mock_breaker.call.assert_called_once()
+                mock_breaker.call_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_records_failures(self, sample_wav_audio, mock_groq_client):
@@ -297,9 +317,13 @@ class TestCircuitBreakerIntegration:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker that allows calls but records failures
+                # Mock circuit breaker that allows calls but records failures (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep"):  # Speed up test
@@ -309,7 +333,7 @@ class TestCircuitBreakerIntegration:
                         await stt.transcribe(sample_wav_audio)
 
                     # Verify circuit breaker was called for each retry
-                    assert mock_breaker.call.call_count == 3
+                    assert mock_breaker.call_async.call_count == 3
 
 
 @pytest.mark.unit
@@ -339,9 +363,13 @@ class TestErrorHandling:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 stt = SpeechToText()
@@ -357,9 +385,13 @@ class TestErrorHandling:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep"):
@@ -375,9 +407,13 @@ class TestErrorHandling:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("time.sleep"):
@@ -393,9 +429,13 @@ class TestErrorHandling:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("os.unlink") as mock_unlink:
@@ -412,9 +452,13 @@ class TestErrorHandling:
 
         with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
             with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
-                # Mock circuit breaker to allow calls through
+                # Mock circuit breaker to allow calls through (use call_async for async method)
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 with patch("os.unlink") as mock_unlink:

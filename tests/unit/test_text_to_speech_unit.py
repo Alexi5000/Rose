@@ -146,7 +146,11 @@ class TestCachingBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech(enable_cache=False)
@@ -170,7 +174,11 @@ class TestCachingBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech(enable_cache=True)

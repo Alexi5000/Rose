@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     QDRANT_MAX_BACKOFF: float = 5.0
 
     # Model configurations
-    TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
+    TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
     SMALL_TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
     STT_MODEL_NAME: str = "whisper-large-v3"
     STT_PROVIDER: str = "groq"  # Phase 4: STT provider ('groq' or 'deepgram')

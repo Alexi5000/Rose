@@ -42,7 +42,7 @@ class TestConversationWorkflow:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -126,7 +126,7 @@ class TestConversationWorkflow:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -209,7 +209,7 @@ class TestAudioWorkflow:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -292,7 +292,7 @@ class TestMemoryWorkflow:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -361,7 +361,7 @@ class TestMemoryWorkflow:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -448,7 +448,7 @@ class TestConversationSummarization:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",
@@ -530,7 +530,7 @@ class TestWorkflowTimeout:
             "summary": "",
             "workflow": "",
             "audio_buffer": b"",
-            "image_path": "",
+
             "current_activity": "",
             "apply_activity": False,
             "memory_context": "",

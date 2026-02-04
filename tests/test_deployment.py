@@ -69,7 +69,7 @@ class TestHealthCheckEndpoint:
         app = create_app()
         client = TestClient(app)
 
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
         assert response.status_code == 200
 
     def test_health_endpoint_format(self):
@@ -81,7 +81,7 @@ class TestHealthCheckEndpoint:
         app = create_app()
         client = TestClient(app)
 
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
         data = response.json()
 
         assert "status" in data
@@ -98,7 +98,7 @@ class TestHealthCheckEndpoint:
         app = create_app()
         client = TestClient(app)
 
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
         data = response.json()
 
         # Should check Groq, Qdrant, ElevenLabs
@@ -218,15 +218,15 @@ class TestAPIEndpoints:
         client = TestClient(app)
 
         # Health check
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
         assert response.status_code == 200
 
         # Session start
-        response = client.post("/api/session/start")
+        response = client.post("/api/v1/session/start")
         assert response.status_code == 200
 
         # Voice process endpoint exists (will fail without audio, but should not 404)
-        response = client.post("/api/voice/process")
+        response = client.post("/api/v1/voice/process")
         assert response.status_code != 404  # Should be 422 (validation error) not 404
 
 

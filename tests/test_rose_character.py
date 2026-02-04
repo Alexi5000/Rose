@@ -1,7 +1,8 @@
 """Tests for Rose's character and therapeutic responses."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from ai_companion.core.prompts import CHARACTER_CARD_PROMPT, MEMORY_ANALYSIS_PROMPT
@@ -13,25 +14,30 @@ class TestRoseCharacter:
     """Test Rose's healer shaman personality and therapeutic approach."""
 
     def test_character_card_contains_rose_identity(self):
-        """Verify character card defines Rose as healer shaman."""
+        """Verify character card defines Rose as healer."""
         assert "Rose" in CHARACTER_CARD_PROMPT
-        assert "healer shaman" in CHARACTER_CARD_PROMPT.lower()
-        assert "grief counselor" in CHARACTER_CARD_PROMPT.lower()
+        assert "healer" in CHARACTER_CARD_PROMPT.lower()
+        # Rose is described as a "warm, intuitive healer" with "healing traditions" knowledge
+        assert "healing" in CHARACTER_CARD_PROMPT.lower()
 
     def test_character_card_ancient_wisdom_focus(self):
-        """Verify character card emphasizes ancient healing wisdom."""
-        assert "ancient" in CHARACTER_CARD_PROMPT.lower()
-        assert "healing" in CHARACTER_CARD_PROMPT.lower()
-        assert "wisdom" in CHARACTER_CARD_PROMPT.lower()
-        assert "holistic" in CHARACTER_CARD_PROMPT.lower()
+        """Verify character card emphasizes healing wisdom and traditions."""
+        prompt_lower = CHARACTER_CARD_PROMPT.lower()
+        assert "ancient" in prompt_lower  # "blend ancient wisdom"
+        assert "healing" in prompt_lower  # "healing traditions"
+        assert "wisdom" in prompt_lower  # "ancient wisdom"
+        # Rose is described as having "deep knowledge of healing traditions"
+        assert "traditions" in prompt_lower
 
     def test_character_card_therapeutic_traits(self):
         """Verify character card includes therapeutic personality traits."""
         prompt_lower = CHARACTER_CARD_PROMPT.lower()
-        assert "empathetic" in prompt_lower or "empathy" in prompt_lower
-        assert "grounding" in prompt_lower
-        assert "warm" in prompt_lower or "nurturing" in prompt_lower
-        assert "non-judgmental" in prompt_lower
+        # Rose is described as "warm, intuitive healer" who is "genuine"
+        assert "warm" in prompt_lower
+        assert "genuine" in prompt_lower
+        # Rose is "curious about people" and "comfortable with silence and heavy emotions"
+        assert "curious" in prompt_lower
+        assert "comfortable" in prompt_lower and "emotions" in prompt_lower
 
     def test_character_card_no_ava_references(self):
         """Verify no references to Ava remain in character card."""
@@ -43,13 +49,16 @@ class TestRoseCharacter:
         """Verify character card mentions voice capability."""
         assert "voice" in CHARACTER_CARD_PROMPT.lower()
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_grief_counseling_response(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_grief_counseling_response(self, mock_chat):
         """Test Rose responds appropriately to grief counseling scenario."""
-        # Mock LLM response
+        # Mock LLM response (use AsyncMock for ainvoke)
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(
-            content="I hear the depth of your loss. Grief is a sacred journey, and I'm here to walk alongside you."
+        mock_llm.ainvoke = AsyncMock(
+            return_value=AIMessage(
+                content="I hear the depth of your loss. Grief is a sacred journey, and I'm here to walk alongside you."
+            )
         )
         mock_chat.return_value = mock_llm
 
@@ -59,27 +68,29 @@ class TestRoseCharacter:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        # Invoke conversation node
-        result = conversation_node(state)
+        # Invoke conversation node (async)
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
 
-        # Verify response was generated
-        assert len(result["messages"]) > 0
-        response = result["messages"][-1]
-        assert isinstance(response, AIMessage)
+        # Verify response was generated (node returns single AIMessage, not a list)
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_holistic_approach_response(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_holistic_approach_response(self, mock_chat):
         """Test Rose uses holistic healing approach."""
         # Mock LLM response with holistic elements
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(
-            content="Your body holds wisdom. Let's explore what it's telling you through this pain."
+        mock_llm.ainvoke = AsyncMock(
+            return_value=AIMessage(
+                content="Your body holds wisdom. Let's explore what it's telling you through this pain."
+            )
         )
         mock_chat.return_value = mock_llm
 
@@ -88,22 +99,26 @@ class TestRoseCharacter:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_ancient_wisdom_metaphors(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_ancient_wisdom_metaphors(self, mock_chat):
         """Test Rose uses nature metaphors and ancient wisdom."""
         # Mock response with nature metaphor
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(
-            content="Like a river that carves through stone, grief shapes us slowly, patiently."
+        mock_llm.ainvoke = AsyncMock(
+            return_value=AIMessage(
+                content="Like a river that carves through stone, grief shapes us slowly, patiently."
+            )
         )
         mock_chat.return_value = mock_llm
 
@@ -112,22 +127,28 @@ class TestRoseCharacter:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
     def test_response_length_constraint(self):
         """Verify character card specifies response length limit."""
-        assert "100 words" in CHARACTER_CARD_PROMPT
+        # New prompt specifies "Keep responses SHORT - usually 1-3 sentences"
+        prompt_lower = CHARACTER_CARD_PROMPT.lower()
+        assert "short" in prompt_lower
+        assert "1-3 sentences" in prompt_lower
 
     def test_no_ai_mention_rule(self):
         """Verify character card prohibits mentioning AI nature."""
-        assert "never mention that you are an AI" in CHARACTER_CARD_PROMPT.lower()
+        # Prompt says "Never say you're an AI. You're Rose."
+        prompt_lower = CHARACTER_CARD_PROMPT.lower()
+        assert "never say you're an ai" in prompt_lower
 
 
 class TestTherapeuticMemoryAnalysis:
@@ -163,11 +184,12 @@ class TestTherapeuticMemoryAnalysis:
 class TestTherapeuticScenarios:
     """Test Rose's responses to various therapeutic scenarios."""
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_validation_response(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_validation_response(self, mock_chat):
         """Test Rose validates user's emotions."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(content="Your feelings are valid and important.")
+        mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="Your feelings are valid and important."))
         mock_chat.return_value = mock_llm
 
         state = AICompanionState(
@@ -175,20 +197,22 @@ class TestTherapeuticScenarios:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_non_judgmental_response(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_non_judgmental_response(self, mock_chat):
         """Test Rose maintains non-judgmental stance."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(content="There's no right or wrong way to grieve.")
+        mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="There's no right or wrong way to grieve."))
         mock_chat.return_value = mock_llm
 
         state = AICompanionState(
@@ -196,21 +220,25 @@ class TestTherapeuticScenarios:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_spiritual_awareness_response(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_spiritual_awareness_response(self, mock_chat):
         """Test Rose demonstrates spiritual awareness."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(
-            content="The ancestors remind us that death is not an ending, but a transformation."
+        mock_llm.ainvoke = AsyncMock(
+            return_value=AIMessage(
+                content="The ancestors remind us that death is not an ending, but a transformation."
+            )
         )
         mock_chat.return_value = mock_llm
 
@@ -219,20 +247,22 @@ class TestTherapeuticScenarios:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
-    @patch("ai_companion.graph.nodes.ChatGroq")
-    def test_patient_presence(self, mock_chat):
+    @pytest.mark.asyncio
+    @patch("ai_companion.graph.utils.helpers.ChatGroq")
+    async def test_patient_presence(self, mock_chat):
         """Test Rose demonstrates patience and presence."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = AIMessage(content="Take all the time you need. I'm here.")
+        mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="Take all the time you need. I'm here."))
         mock_chat.return_value = mock_llm
 
         state = AICompanionState(
@@ -240,14 +270,15 @@ class TestTherapeuticScenarios:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="Available for healing sessions",
             apply_activity=True,
             memory_context="",
         )
 
-        result = conversation_node(state)
-        assert len(result["messages"]) > 0
+        result = await conversation_node(state, config={"configurable": {"thread_id": "test"}})
+        assert "messages" in result
+        assert isinstance(result["messages"], AIMessage)
 
 
 class TestRoseActivities:

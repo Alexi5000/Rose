@@ -26,7 +26,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -53,7 +53,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -78,7 +78,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -103,7 +103,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -128,7 +128,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -153,7 +153,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -176,7 +176,7 @@ class TestTherapeuticMemoryExtraction:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -206,7 +206,7 @@ class TestTherapeuticMemoryRetrieval:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -231,7 +231,7 @@ class TestTherapeuticMemoryRetrieval:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -250,7 +250,7 @@ class TestTherapeuticMemoryRetrieval:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -280,7 +280,7 @@ class TestMemorySessionContinuity:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -296,7 +296,7 @@ class TestMemorySessionContinuity:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -320,7 +320,7 @@ class TestMemorySessionContinuity:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -354,7 +354,7 @@ class TestMemorySystemIntegration:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",
@@ -368,7 +368,7 @@ class TestMemorySystemIntegration:
             summary="",
             workflow="conversation",
             audio_buffer=b"",
-            image_path="",
+
             current_activity="",
             apply_activity=False,
             memory_context="",

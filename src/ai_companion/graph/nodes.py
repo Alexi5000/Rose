@@ -132,9 +132,6 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig) -> 
     """
     current_activity = ScheduleContextGenerator.get_current_activity()
     memory_context = state.get("memory_context", "")
-    # #region agent log
-    import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:conversation_node", "message": "LLM input context", "hypothesisId": "A,C,D", "data": {"message_count": len(state.get("messages", [])), "messages_last_3": [{"type": m.type, "content": m.content[:100] if hasattr(m, "content") else str(m)[:100]} for m in state.get("messages", [])[-3:]], "memory_context_len": len(memory_context), "memory_context_preview": memory_context[:300] if memory_context else "(empty)", "session_id": config.get("configurable", {}).get("thread_id") if config else None, "summary": state.get("summary", "")[:200] if state.get("summary") else "(no summary)"}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-    # #endregion
 
     chain = get_character_response_chain(state.get("summary", ""))
 
@@ -153,9 +150,6 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig) -> 
         fallback_text = "I'm having trouble processing that right now. Could you try asking in a different way?"
         return {"messages": AIMessage(content=fallback_text)}
 
-    # #region agent log
-    import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:conversation_node:response", "message": "LLM response", "hypothesisId": "D", "data": {"response_length": len(response), "response_preview": response[:300] if response else "(empty)"}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-    # #endregion
     return {"messages": AIMessage(content=response)}
 
 
@@ -177,26 +171,20 @@ async def audio_node(state: AICompanionState, config: RunnableConfig) -> dict[st
     """
     current_activity = ScheduleContextGenerator.get_current_activity()
     memory_context = state.get("memory_context", "")
-    # #region agent log
-    import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:audio_node:input", "message": "Audio node LLM input", "hypothesisId": "A,C,D", "data": {"message_count": len(state.get("messages", [])), "messages_content": [{"type": m.type, "content": m.content if hasattr(m, "content") else str(m)} for m in state.get("messages", [])], "memory_context": memory_context if memory_context else "(empty)", "current_activity": current_activity, "session_id": config.get("configurable", {}).get("thread_id") if config else None, "summary": state.get("summary", "") if state.get("summary") else "(no summary)"}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-    # #endregion
 
     chain = get_character_response_chain(state.get("summary", ""))
     text_to_speech_module = get_text_to_speech_module()
 
     try:
         response = await chain.ainvoke(
-        {
-            "messages": state["messages"],
-            "current_activity": current_activity,
-            "memory_context": memory_context,
-        },
-        config,
-    )
-        # #region agent log
-        import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:audio_node:llm_response", "message": "Audio node LLM response", "hypothesisId": "D", "data": {"response_text": response, "response_len": len(response) if response else 0}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-        # #endregion
-    except Exception as e:
+            {
+                "messages": state["messages"],
+                "current_activity": current_activity,
+                "memory_context": memory_context,
+            },
+            config,
+        )
+    except Exception:
         logger.exception("❌ conversation chain invocation failed in audio_node")
         raise
 
@@ -336,9 +324,6 @@ def memory_injection_node(state: AICompanionState, config: RunnableConfig) -> di
 
     # Get relevant memories based on recent conversation
     recent_context = " ".join([m.content for m in state["messages"][-3:]])
-    # #region agent log
-    import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:memory_injection_node:query", "message": "Memory query context", "hypothesisId": "B,E", "data": {"session_id": session_id, "recent_context_len": len(recent_context), "recent_context_preview": recent_context[:300] if recent_context else "(empty)"}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-    # #endregion
     try:
         memories = memory_manager.get_relevant_memories(recent_context, session_id=session_id)
     except Exception as e:
@@ -347,8 +332,5 @@ def memory_injection_node(state: AICompanionState, config: RunnableConfig) -> di
 
     # Format memories for the character card
     memory_context = memory_manager.format_memories_for_prompt(memories)
-    # #region agent log
-    import json; _log_path = "/app/src/debug.log"; _log_data = {"location": "nodes.py:memory_injection_node:result", "message": "Memory injection result", "hypothesisId": "B", "data": {"memories_count": len(memories), "memories_preview": memories[:3] if memories else [], "formatted_context_len": len(memory_context)}, "timestamp": __import__("datetime").datetime.now().isoformat()}; open(_log_path, "a").write(json.dumps(_log_data) + "\n")
-    # #endregion
 
     return {"memory_context": memory_context}

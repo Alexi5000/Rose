@@ -165,7 +165,7 @@ def mock_langgraph_state() -> Dict[str, Any]:
         "messages": [{"role": "user", "content": "I'm feeling anxious today"}],
         "workflow_type": "conversation",
         "audio_buffer": None,
-        "image_path": None,
+
         "memory_context": [],
         "current_activity": None,
         "metadata": {},
