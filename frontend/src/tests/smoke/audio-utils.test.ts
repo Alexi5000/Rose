@@ -8,7 +8,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   calculateRms,
-  normalizeRms,
   getSupportedMimeType,
   checkAudioSupport,
 } from '@/lib/audio-utils';
@@ -56,28 +55,6 @@ describe('🔊 Audio Utilities', () => {
       const largeArray = new Float32Array(1024).fill(0.5);
       const result = calculateRms(largeArray);
       expect(result).toBeCloseTo(HALF_AMPLITUDE);
-    });
-  });
-
-  describe('normalizeRms', () => {
-    it('✅ returns 0 for zero RMS', () => {
-      console.log('  🔍 Testing zero RMS normalization');
-      const result = normalizeRms(0);
-      expect(result).toBe(0);
-    });
-
-    it('✅ normalizes RMS to 0-1 range', () => {
-      console.log('  🔍 Testing RMS normalization');
-      const result = normalizeRms(0.1);
-      expect(result).toBeGreaterThanOrEqual(0);
-      expect(result).toBeLessThanOrEqual(1);
-    });
-
-    it('✅ handles custom dB range', () => {
-      console.log('  🔍 Testing custom dB range');
-      const result = normalizeRms(0.5, -40, 0);
-      expect(result).toBeGreaterThanOrEqual(0);
-      expect(result).toBeLessThanOrEqual(1);
     });
   });
 

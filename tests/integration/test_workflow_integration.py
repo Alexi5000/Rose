@@ -2,8 +2,7 @@
 
 This module tests complete workflow execution with real LangGraph orchestration
 but mocked external API calls. Tests verify:
-- Complete conversation workflow (message → memory → router → response)
-- Audio workflow (audio input → STT → processing → TTS → audio output)
+- Complete voice-first workflow (message → memory → audio response)
 - Memory extraction and injection in workflow
 - Conversation summarization trigger
 - Workflow timeout handling
@@ -28,13 +27,12 @@ class TestConversationWorkflow:
         mock_groq_client,
         mock_qdrant_client,
     ):
-        """Test complete conversation workflow: message → memory → router → response.
+        """Test complete voice-first workflow: message → memory → audio response.
 
         Verifies:
         - Memory extraction from user message
-        - Router determines conversation workflow
         - Context and memory injection
-        - Conversation response generation
+        - Audio response generation via audio_node
         """
         # Arrange: Create initial state with user message
         initial_state = {
@@ -48,10 +46,6 @@ class TestConversationWorkflow:
             "memory_context": "",
         }
 
-        # Mock the LLM responses
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         mock_conversation_response = (
             "I hear you, dear one. Grief can feel overwhelming. Would you like to talk about what you're experiencing?"
         )
@@ -63,6 +57,7 @@ class TestConversationWorkflow:
         # Act: Execute workflow with mocked dependencies
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -71,37 +66,35 @@ class TestConversationWorkflow:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
-            # Mock router chain
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            # Mock TTS module
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
 
-                # Mock memory manager LLM
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            # Mock memory manager LLM
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                # Mock vector store
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = []
-                mock_get_vector_store.return_value = mock_vector_store
+            # Mock vector store
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = []
+            mock_get_vector_store.return_value = mock_vector_store
 
-                # Mock schedule context
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
+            # Mock schedule context
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                    # Compile and execute graph
-                    graph = create_workflow_graph().compile()
-                    result = await graph.ainvoke(initial_state)
+                # Compile and execute graph
+                graph = create_workflow_graph().compile()
+                result = await graph.ainvoke(initial_state)
 
         # Assert: Verify workflow execution
         assert result is not None
         assert "messages" in result
         assert len(result["messages"]) > 1  # Original message + AI response
-        assert result["workflow"] == "conversation"
 
         # Verify AI response was added
         ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
@@ -138,9 +131,6 @@ class TestConversationWorkflow:
             MagicMock(text="User finds comfort in nature walks.", score=0.87),
         ]
 
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         mock_conversation_response = "Of course. We talked about your mother and how you lost her in a car accident."
 
         mock_memory_analysis = MagicMock()
@@ -150,6 +140,7 @@ class TestConversationWorkflow:
         # Act: Execute workflow
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -157,26 +148,25 @@ class TestConversationWorkflow:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = mock_memories
-                mock_get_vector_store.return_value = mock_vector_store
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = mock_memories
+            mock_get_vector_store.return_value = mock_vector_store
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                    graph = create_workflow_graph().compile()
-                    result = await graph.ainvoke(initial_state)
+                graph = create_workflow_graph().compile()
+                result = await graph.ainvoke(initial_state)
 
         # Assert: Verify memory context was injected
         assert result is not None
@@ -195,11 +185,10 @@ class TestAudioWorkflow:
         mock_qdrant_client,
         sample_wav_bytes,
     ):
-        """Test audio workflow: audio input → STT → processing → TTS → audio output.
+        """Test audio workflow: message → memory → TTS → audio output.
 
         Verifies:
-        - Audio transcription via STT
-        - Text processing through conversation node
+        - Text processing through audio_node
         - Audio synthesis via TTS
         - Audio buffer in final state
         """
@@ -214,9 +203,6 @@ class TestAudioWorkflow:
             "apply_activity": False,
             "memory_context": "",
         }
-
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "audio"
 
         mock_conversation_response = "Let's do a breathing exercise together. Breathe in slowly for four counts."
         mock_audio_output = b"fake_audio_data_from_tts"
@@ -236,35 +222,29 @@ class TestAudioWorkflow:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = []
+            mock_get_vector_store.return_value = mock_vector_store
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = []
-                mock_get_vector_store.return_value = mock_vector_store
+            # Mock TTS module
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (mock_audio_output, mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
 
-                # Mock TTS module
-                mock_tts = AsyncMock()
-                mock_tts.synthesize.return_value = mock_audio_output
-                mock_get_tts.return_value = mock_tts
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
-
-                    graph = create_workflow_graph().compile()
-                    result = await graph.ainvoke(initial_state)
+                graph = create_workflow_graph().compile()
+                result = await graph.ainvoke(initial_state)
 
         # Assert: Verify audio workflow execution
         assert result is not None
-        assert result["workflow"] == "audio"
         assert result["audio_buffer"] == mock_audio_output
         assert len(result["audio_buffer"]) > 0
 
@@ -298,9 +278,6 @@ class TestMemoryWorkflow:
             "memory_context": "",
         }
 
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         mock_conversation_response = "I'm so sorry for your loss."
 
         mock_memory_analysis = MagicMock()
@@ -310,6 +287,7 @@ class TestMemoryWorkflow:
         # Act
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -317,31 +295,30 @@ class TestMemoryWorkflow:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = []
-                mock_get_vector_store.return_value = mock_vector_store
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = []
+            mock_get_vector_store.return_value = mock_vector_store
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                    graph = create_workflow_graph().compile()
-                    await graph.ainvoke(initial_state)
+                graph = create_workflow_graph().compile()
+                await graph.ainvoke(initial_state)
 
-                # Assert: Verify memory was stored
-                mock_vector_store.store_memory.assert_called_once()
-                call_args = mock_vector_store.store_memory.call_args
-                assert "mother passed away" in call_args[1]["text"].lower()
+            # Assert: Verify memory was stored
+            mock_vector_store.store_memory.assert_called_once()
+            call_args = mock_vector_store.store_memory.call_args
+            assert "mother passed away" in call_args[1]["text"].lower()
 
     async def test_memory_injection_retrieves_relevant_context(
         self,
@@ -372,9 +349,6 @@ class TestMemoryWorkflow:
             MagicMock(text="User practices daily gratitude journaling.", score=0.85),
         ]
 
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         mock_conversation_response = "We've discussed mindfulness meditation and gratitude journaling."
 
         mock_memory_analysis = MagicMock()
@@ -384,6 +358,7 @@ class TestMemoryWorkflow:
         # Act
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -391,26 +366,25 @@ class TestMemoryWorkflow:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = mock_memories
-                mock_get_vector_store.return_value = mock_vector_store
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = mock_memories
+            mock_get_vector_store.return_value = mock_vector_store
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                    graph = create_workflow_graph().compile()
-                    result = await graph.ainvoke(initial_state)
+                graph = create_workflow_graph().compile()
+                result = await graph.ainvoke(initial_state)
 
         # Assert: Verify memory context was injected
         assert result["memory_context"] != ""
@@ -454,9 +428,6 @@ class TestConversationSummarization:
             "memory_context": "",
         }
 
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         mock_conversation_response = "I'm here to help."
         mock_summary = "User and AI have been discussing various topics over multiple messages."
 
@@ -468,6 +439,7 @@ class TestConversationSummarization:
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
             patch("ai_companion.graph.nodes.get_chat_model") as mock_get_chat_model,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -476,31 +448,31 @@ class TestConversationSummarization:
             mock_response_chain.ainvoke.return_value = mock_conversation_response
             mock_get_response_chain.return_value = mock_response_chain
 
+            # Mock TTS module
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", mock_conversation_response)
+            mock_get_tts.return_value = mock_tts
+
             # Mock chat model for summarization
             mock_llm = AsyncMock()
             mock_llm.ainvoke.return_value = MagicMock(content=mock_summary)
             mock_get_chat_model.return_value = mock_llm
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = []
+            mock_get_vector_store.return_value = mock_vector_store
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = []
-                mock_get_vector_store.return_value = mock_vector_store
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
-
-                    graph = create_workflow_graph().compile()
-                    result = await graph.ainvoke(initial_state)
+                graph = create_workflow_graph().compile()
+                result = await graph.ainvoke(initial_state)
 
         # Assert: Verify summarization occurred
         assert result["summary"] == mock_summary
@@ -536,9 +508,6 @@ class TestWorkflowTimeout:
             "memory_context": "",
         }
 
-        mock_router_response = MagicMock()
-        mock_router_response.response_type = "conversation"
-
         # Create a slow async function that will timeout
         async def slow_llm_call(*args, **kwargs):
             await asyncio.sleep(5)  # Simulate slow operation
@@ -551,6 +520,7 @@ class TestWorkflowTimeout:
         # Act & Assert: Verify timeout is respected
         with (
             patch("ai_companion.graph.nodes.get_character_response_chain") as mock_get_response_chain,
+            patch("ai_companion.graph.nodes.get_text_to_speech_module") as mock_get_tts,
             patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_get_vector_store,
             patch("ai_companion.modules.memory.long_term.memory_manager.ChatGroq") as mock_memory_llm,
         ):
@@ -559,29 +529,29 @@ class TestWorkflowTimeout:
             mock_response_chain.ainvoke = slow_llm_call
             mock_get_response_chain.return_value = mock_response_chain
 
-            with patch("ai_companion.graph.nodes.get_router_chain") as mock_get_router_chain:
-                mock_router_chain = AsyncMock()
-                mock_router_chain.ainvoke.return_value = mock_router_response
-                mock_get_router_chain.return_value = mock_router_chain
+            # Mock TTS module
+            mock_tts = AsyncMock()
+            mock_tts.synthesize_with_fallback.return_value = (b"fake_audio", "Response")
+            mock_get_tts.return_value = mock_tts
 
-                mock_memory_llm_instance = AsyncMock()
-                mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
-                mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
+            mock_memory_llm_instance = AsyncMock()
+            mock_memory_llm_instance.ainvoke.return_value = mock_memory_analysis
+            mock_memory_llm.return_value.with_structured_output.return_value = mock_memory_llm_instance
 
-                mock_vector_store = MagicMock()
-                mock_vector_store.find_similar_memory.return_value = None
-                mock_vector_store.store_memory.return_value = None
-                mock_vector_store.search_memories.return_value = []
-                mock_get_vector_store.return_value = mock_vector_store
+            mock_vector_store = MagicMock()
+            mock_vector_store.find_similar_memory.return_value = None
+            mock_vector_store.store_memory.return_value = None
+            mock_vector_store.search_memories.return_value = []
+            mock_get_vector_store.return_value = mock_vector_store
 
-                with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
-                    mock_schedule.return_value = "Evening Reflection"
+            with patch("ai_companion.graph.nodes.ScheduleContextGenerator.get_current_activity") as mock_schedule:
+                mock_schedule.return_value = "Evening Reflection"
 
-                    graph = create_workflow_graph().compile()
+                graph = create_workflow_graph().compile()
 
-                    # Execute with timeout
-                    with pytest.raises(asyncio.TimeoutError):
-                        await asyncio.wait_for(
-                            graph.ainvoke(initial_state),
-                            timeout=2.0,  # 2 second timeout
-                        )
+                # Execute with timeout
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(
+                        graph.ainvoke(initial_state),
+                        timeout=2.0,  # 2 second timeout
+                    )

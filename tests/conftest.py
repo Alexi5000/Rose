@@ -15,7 +15,6 @@ import pytest
 os.environ.setdefault("GROQ_API_KEY", "test_groq_key")
 os.environ.setdefault("ELEVENLABS_API_KEY", "test_elevenlabs_key")
 os.environ.setdefault("ELEVENLABS_VOICE_ID", "test_voice_id")
-os.environ.setdefault("TOGETHER_API_KEY", "test_together_key")
 os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
 os.environ.setdefault("QDRANT_API_KEY", "test_qdrant_key")
 
@@ -55,7 +54,6 @@ def test_settings():
         "GROQ_API_KEY": "test_groq_key",
         "ELEVENLABS_API_KEY": "test_elevenlabs_key",
         "ELEVENLABS_VOICE_ID": "test_voice_id",
-        "TOGETHER_API_KEY": "test_together_key",
         "QDRANT_URL": "http://localhost:6333",
         "QDRANT_API_KEY": "test_qdrant_key",
         "TEXT_MODEL_NAME": "llama-3.3-70b-versatile",

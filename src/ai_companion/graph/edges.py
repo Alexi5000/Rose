@@ -14,16 +14,3 @@ def should_summarize_conversation(
         return "summarize_conversation_node"
 
     return END
-
-
-def select_workflow(
-    state: AICompanionState,
-) -> Literal["conversation_node", "audio_node"]:
-    """Route to conversation or audio node only. Image workflow disabled for Rose."""
-    workflow = state["workflow"]
-
-    if workflow == "audio":
-        return "audio_node"
-    else:
-        # Default to conversation for any other workflow type
-        return "conversation_node"

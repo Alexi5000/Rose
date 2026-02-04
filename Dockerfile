@@ -86,9 +86,9 @@ VOLUME ["/app/data"]
 # Expose the port
 EXPOSE 8000
 
-# Health check
+# Health check (uses PORT env var with 8000 fallback)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+    CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",\"8000\")}/api/v1/health')" || exit 1
 
-# Run the Rose web interface using uvicorn
-CMD uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port 8000
+# Run the Rose web interface using uvicorn (PORT set by Railway/platform, defaults to 8000)
+CMD ["sh", "-c", "uvicorn ai_companion.interfaces.web.app:app --host 0.0.0.0 --port ${PORT:-8000}"]

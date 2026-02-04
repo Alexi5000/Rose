@@ -331,6 +331,7 @@ short_term_memory/
 .langgraph_api/
 
 # Tool-specific directories (dev tools)
+.cursor/
 .kiro/
 .qodo/
 .chainlit/

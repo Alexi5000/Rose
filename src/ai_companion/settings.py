@@ -14,6 +14,10 @@ Example:
 
     >>> from ai_companion.settings import settings
     >>> print(settings.GROQ_API_KEY)
+
+Note:
+    Only MVP-active settings belong here. Frozen features (WhatsApp, image
+    generation, PostgreSQL, multi-region) have been removed per tree-shaking.
 """
 
 import sys
@@ -42,7 +46,6 @@ class Settings(BaseSettings):
         GROQ_API_KEY: API key for Groq services (LLM, STT)
         ELEVENLABS_API_KEY: API key for ElevenLabs TTS
         ELEVENLABS_VOICE_ID: Default voice ID for ElevenLabs
-        TOGETHER_API_KEY: API key for Together AI image generation
         QDRANT_API_KEY: Optional API key for Qdrant cloud
         QDRANT_URL: URL for Qdrant vector database
         TEXT_MODEL_NAME: Primary LLM model name
@@ -65,7 +68,6 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     ELEVENLABS_API_KEY: str
     ELEVENLABS_VOICE_ID: str
-    TOGETHER_API_KEY: str
 
     # Qdrant configuration
     QDRANT_API_KEY: str | None = None
@@ -81,23 +83,13 @@ class Settings(BaseSettings):
     TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
     SMALL_TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
     STT_MODEL_NAME: str = "whisper-large-v3"
-    STT_PROVIDER: str = "groq"  # Phase 4: STT provider ('groq' or 'deepgram')
-    DEEPGRAM_API_KEY: str | None = None  # Optional: Deepgram API key for streaming STT
     TTS_MODEL_NAME: str = "eleven_flash_v2_5"
-    TTI_MODEL_NAME: str = "black-forest-labs/FLUX.1-schnell-Free"
-    ITT_MODEL_NAME: str = "llama-3.2-90b-vision-preview"
 
     # Rose-specific configuration
     ROSE_VOICE_ID: str | None = None  # Optional: Override ELEVENLABS_VOICE_ID for Rose's specific voice
 
-    # WhatsApp integration (optional - frozen for future release)
-    WHATSAPP_PHONE_NUMBER_ID: str | None = None
-    WHATSAPP_TOKEN: str | None = None
-    WHATSAPP_VERIFY_TOKEN: str | None = None
-
     # Memory configuration
     MEMORY_TOP_K: int = 5
-    ROUTER_MESSAGES_TO_ANALYZE: int = 5
     TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 30
     TOTAL_MESSAGES_AFTER_SUMMARY: int = 10
 
@@ -111,7 +103,7 @@ class Settings(BaseSettings):
     HOST: str = WEB_SERVER_HOST
 
     # Security configuration
-    ALLOWED_ORIGINS: str = "*"  # Comma-separated list of allowed origins, or "*" for all
+    ALLOWED_ORIGINS: str = ""  # Comma-separated list of allowed origins; must be set explicitly
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_PER_MINUTE: int = RATE_LIMIT_REQUESTS_PER_MINUTE  # Requests per minute per IP
     ENABLE_SECURITY_HEADERS: bool = True
@@ -121,7 +113,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"  # json or console
 
     # API Documentation configuration
-    ENABLE_API_DOCS: bool = True  # Enable OpenAPI/Swagger documentation
+    ENABLE_API_DOCS: bool = False  # Enable OpenAPI/Swagger documentation (set True in dev .env)
 
     # Request size limits (in bytes)
     MAX_REQUEST_SIZE: int = MAX_REQUEST_SIZE_BYTES  # 10MB default
@@ -130,23 +122,8 @@ class Settings(BaseSettings):
     SESSION_RETENTION_DAYS: int = 7  # Delete sessions older than 7 days
 
     # Feature Flags
-    FEATURE_WHATSAPP_ENABLED: bool = False  # Enable WhatsApp integration (frozen for future release)
-    FEATURE_IMAGE_GENERATION_ENABLED: bool = False  # Enable image generation (frozen for future release)
     FEATURE_TTS_CACHE_ENABLED: bool = True  # Enable TTS response caching
-    FEATURE_DATABASE_TYPE: str = "sqlite"  # Database backend: "sqlite" or "postgresql"
-    FEATURE_SESSION_AFFINITY_ENABLED: bool = False  # Enable sticky sessions
-    FEATURE_READ_REPLICA_ENABLED: bool = False  # Use read replicas for queries
-    FEATURE_MULTI_REGION_ENABLED: bool = False  # Enable multi-region routing
     FEATURE_TIMING_METRICS_ENABLED: bool = True  # Include pipeline timing metrics in response
-
-    # Database configuration (for PostgreSQL)
-    DATABASE_URL: str | None = None  # PostgreSQL connection string
-    DATABASE_READ_REPLICA_URL: str | None = None  # Read replica connection string
-    DATABASE_POOL_SIZE: int = 10  # Connection pool size
-    DATABASE_MAX_OVERFLOW: int = 20  # Max overflow connections
-    DATABASE_URL_US: str | None = None  # US region database
-    DATABASE_URL_EU: str | None = None  # EU region database
-    DATABASE_URL_ASIA: str | None = None  # Asia region database
 
     # Speech-to-text configuration
     STT_MAX_RETRIES: int = 3  # Maximum retry attempts for STT
@@ -178,10 +155,7 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_SECONDS: float = 30.0  # Timeout for LLM API calls
     LLM_MAX_RETRIES: int = 3  # Maximum retry attempts for LLM calls
     LLM_TEMPERATURE_DEFAULT: float = 0.85  # Default temperature for LLM responses - higher for more natural variation
-    LLM_TEMPERATURE_ROUTER: float = 0.3  # Temperature for routing decisions
     LLM_TEMPERATURE_MEMORY: float = 0.1  # Temperature for memory extraction
-    LLM_TEMPERATURE_IMAGE_SCENARIO: float = 0.4  # Temperature for image scenario generation
-    LLM_TEMPERATURE_IMAGE_PROMPT: float = 0.25  # Temperature for image prompt generation
 
     # Monitoring and alerting configuration
     SENTRY_DSN: str | None = None  # Sentry DSN for error tracking
@@ -202,11 +176,7 @@ class Settings(BaseSettings):
     # Monitoring scheduler configuration
     MONITORING_EVALUATION_INTERVAL: int = 60  # Seconds between alert evaluations
 
-    # Image-to-text configuration
-    ITT_TIMEOUT_SECONDS: float = 60.0  # Timeout for image-to-text API calls
-    ITT_MAX_RETRIES: int = 3  # Maximum retry attempts for image-to-text
-
-    @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "TOGETHER_API_KEY", "QDRANT_URL")
+    @field_validator("GROQ_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "QDRANT_URL")
     @classmethod
     def validate_required_fields(cls, v: str, info: Any) -> str:
         """Validate that required fields are not empty.
@@ -223,24 +193,6 @@ class Settings(BaseSettings):
         """
         if not v or v.strip() == "":
             raise ValueError(f"{info.field_name} is required and cannot be empty")
-        return v
-
-    @field_validator("FEATURE_DATABASE_TYPE")
-    @classmethod
-    def validate_database_type(cls, v: str) -> str:
-        """Validate database type is either sqlite or postgresql.
-
-        Args:
-            v: Database type value
-
-        Returns:
-            Validated database type
-
-        Raises:
-            ValueError: If database type is not supported
-        """
-        if v not in ["sqlite", "postgresql"]:
-            raise ValueError("FEATURE_DATABASE_TYPE must be 'sqlite' or 'postgresql'")
         return v
 
     @field_validator("MEMORY_TOP_K")
@@ -287,10 +239,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "LLM_TEMPERATURE_DEFAULT",
-        "LLM_TEMPERATURE_ROUTER",
         "LLM_TEMPERATURE_MEMORY",
-        "LLM_TEMPERATURE_IMAGE_SCENARIO",
-        "LLM_TEMPERATURE_IMAGE_PROMPT",
         "TTS_VOICE_STABILITY",
         "TTS_VOICE_SIMILARITY",
         "SENTRY_TRACES_SAMPLE_RATE",
@@ -331,7 +280,6 @@ class Settings(BaseSettings):
         "STT_TIMEOUT",
         "CIRCUIT_BREAKER_RECOVERY_TIMEOUT",
         "LLM_TIMEOUT_SECONDS",
-        "ITT_TIMEOUT_SECONDS",
     )
     @classmethod
     def validate_timeout_values(cls, v: float | int, info: Any) -> float | int:
@@ -363,32 +311,6 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If related settings are inconsistent
         """
-        # Validate DATABASE_URL when using PostgreSQL
-        if self.FEATURE_DATABASE_TYPE == "postgresql" and not self.DATABASE_URL:
-            raise ValueError(
-                "DATABASE_URL is required when FEATURE_DATABASE_TYPE is 'postgresql'. "
-                "Please set DATABASE_URL in your .env file with a valid PostgreSQL connection string. "
-                "Example: postgresql://user:password@localhost:5432/dbname"
-            )
-
-        # Validate WhatsApp configuration when enabled
-        if self.FEATURE_WHATSAPP_ENABLED:
-            missing_fields = []
-            if not self.WHATSAPP_PHONE_NUMBER_ID:
-                missing_fields.append("WHATSAPP_PHONE_NUMBER_ID")
-            if not self.WHATSAPP_TOKEN:
-                missing_fields.append("WHATSAPP_TOKEN")
-            if not self.WHATSAPP_VERIFY_TOKEN:
-                missing_fields.append("WHATSAPP_VERIFY_TOKEN")
-
-            if missing_fields:
-                raise ValueError(
-                    f"WhatsApp integration is enabled but the following required fields are missing: "
-                    f"{', '.join(missing_fields)}. "
-                    "Please set these values in your .env file or disable WhatsApp by setting "
-                    "FEATURE_WHATSAPP_ENABLED=false"
-                )
-
         # Validate Sentry configuration when monitoring is enabled
         if self.ENVIRONMENT in ["staging", "production"] and not self.SENTRY_DSN:
             # This is a warning case - we log but don't fail
@@ -448,26 +370,7 @@ class Settings(BaseSettings):
                 f"Please verify QDRANT_URL ({self.QDRANT_URL}) is accessible and QDRANT_API_KEY is valid."
             )
 
-        # Validate database connectivity (PostgreSQL only)
-        if self.FEATURE_DATABASE_TYPE == "postgresql" and self.DATABASE_URL:
-            try:
-                from sqlalchemy import create_engine, text
-
-                engine = create_engine(self.DATABASE_URL, pool_pre_ping=True, connect_args={"connect_timeout": 5})
-                with engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
-                logger.info("✓ Database connectivity validated successfully")
-            except Exception as e:
-                logger.warning(
-                    f"⚠ Database connectivity check failed: {e}. "
-                    f"Persistence features may not work correctly. "
-                    f"Please verify DATABASE_URL is accessible and credentials are valid."
-                )
-        elif self.FEATURE_DATABASE_TYPE == "sqlite":
-            # SQLite doesn't need connectivity validation
-            logger.info("✓ Using SQLite database (no connectivity check needed)")
-        else:
-            logger.info("Database connectivity check skipped")
+        logger.info("✓ Using SQLite database (no connectivity check needed)")
 
 
 def load_settings() -> Settings:

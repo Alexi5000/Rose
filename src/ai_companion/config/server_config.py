@@ -88,8 +88,6 @@ DEV_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",  # Alternative localhost
 ]
 
-PROD_ALLOWED_ORIGINS = ["*"]  # Production: Allow all origins (or configure specific domains)
-
 # 🔌 API Configuration
 # ====================
 # API endpoint and proxy configuration

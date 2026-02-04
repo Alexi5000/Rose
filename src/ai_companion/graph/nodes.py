@@ -1,11 +1,10 @@
-"""LangGraph workflow nodes for the AI companion.
+"""LangGraph workflow nodes for the Rose AI companion.
 
-This module defines all the node functions used in the LangGraph workflow.
+This module defines all the node functions used in the voice-first LangGraph workflow.
 Each node represents a discrete processing step in the conversation flow:
 
-- router_node: Determines workflow type (conversation/audio)
 - context_injection_node: Injects current activity context
-- conversation_node: Generates text responses
+- conversation_node: Generates text responses (used for testing)
 - audio_node: Generates voice responses with TTS
 - summarize_conversation_node: Summarizes and trims conversation history
 - memory_extraction_node: Extracts and stores important information (fire-and-forget)
@@ -14,39 +13,13 @@ Each node represents a discrete processing step in the conversation flow:
 All nodes follow the LangGraph pattern of taking state and optional config,
 and returning a dictionary of state updates.
 
-Module Dependencies:
-- ai_companion.graph.state: AICompanionState type definition
-- ai_companion.graph.utils.chains: LLM chain construction (router, character response)
-- ai_companion.graph.utils.helpers: Module factories (chat model, TTS, image generation)
-- ai_companion.modules.memory.long_term.memory_manager: Memory operations
-- ai_companion.modules.schedules.context_generation: Activity scheduling
-- ai_companion.settings: Configuration for message limits, timeouts
-- langchain_core.messages: Message types (AIMessage, HumanMessage, RemoveMessage)
-- langchain_core.runnables: RunnableConfig for LangGraph
-- Standard library: asyncio, os, typing, uuid
-
-Dependents (modules that import this):
-- ai_companion.graph.graph: Graph construction and node registration
-- Test modules: tests/integration/test_workflow_integration.py
-
-Architecture:
-This module is part of the graph layer and orchestrates the conversation workflow
-by coordinating between modules (memory, speech, image) and core utilities. Each
-node is a pure function that takes state and returns state updates, following
-functional programming principles for testability.
-
-For detailed architecture documentation, see:
-- docs/ARCHITECTURE.md: LangGraph Workflow Architecture section
-- docs/PROJECT_STRUCTURE.md: Graph Architecture section
-
 Example:
-    Nodes are typically used within a LangGraph workflow:
+    Nodes are registered in the workflow graph:
 
     >>> from langgraph.graph import StateGraph
     >>> workflow = StateGraph(AICompanionState)
-    >>> workflow.add_node("router", router_node)
-    >>> workflow.add_node("conversation", conversation_node)
-    >>> # ... add more nodes and edges
+    >>> workflow.add_node("audio_node", audio_node)
+    >>> workflow.add_node("memory_extraction_node", memory_extraction_node)
 """
 
 import asyncio
@@ -57,10 +30,7 @@ from langchain_core.runnables import RunnableConfig
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.graph.state import AICompanionState
-from ai_companion.graph.utils.chains import (
-    get_character_response_chain,
-    get_router_chain,
-)
+from ai_companion.graph.utils.chains import get_character_response_chain
 from ai_companion.graph.utils.helpers import (
     get_chat_model,
     get_text_to_speech_module,
@@ -71,26 +41,6 @@ from ai_companion.modules.schedules.context_generation import ScheduleContextGen
 from ai_companion.settings import settings
 
 logger = get_logger(__name__)
-
-
-@node_wrapper
-async def router_node(state: AICompanionState) -> dict[str, str]:
-    """Route the conversation to the appropriate workflow type.
-
-    Analyzes recent messages to determine if the user wants:
-    - conversation: Regular text conversation
-    - image: Image generation request
-    - audio: Audio/voice interaction
-
-    Args:
-        state: Current conversation state
-
-    Returns:
-        Dictionary with workflow type: {"workflow": "conversation"|"image"|"audio"}
-    """
-    chain = get_router_chain()
-    response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
-    return {"workflow": response.response_type}
 
 
 def context_injection_node(state: AICompanionState) -> dict[str, bool | str]:

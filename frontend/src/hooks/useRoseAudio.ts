@@ -310,8 +310,6 @@ export function useRoseAudio({
       await audio.play();
     },
     [
-      ANALYSER_FFT_SIZE,
-      ANALYSER_SMOOTHING,
       onError,
       onPlaybackEnd,
       onPlaybackStart,
@@ -422,7 +420,6 @@ export function useRoseAudio({
       throw lastError instanceof Error ? lastError : new Error(errorMsg);
     },
     [
-      AUDIO_PLAYBACK_MAX_RETRIES,
       fetchAudioBlob,
       onError,
       playFromBlob,

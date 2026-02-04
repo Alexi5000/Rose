@@ -1,25 +1,14 @@
-"""STT Provider abstraction for multiple speech-to-text backends.
-
-file: src/ai_companion/modules/speech/stt_provider.py
-description: Phase 4 - Abstract interface for STT providers enabling streaming and batch transcription
-reference: src/ai_companion/modules/speech/speech_to_text.py, docs/BASELINE_METRICS.md
+"""STT Provider abstraction for speech-to-text backends.
 
 This module provides:
 - Protocol-based abstraction for STT providers
 - Support for both batch and streaming transcription
-- Factory function for selecting provider based on configuration
-- Provider implementations for Groq Whisper (batch) and Deepgram Nova (streaming)
-
-Key features:
-- Unified interface for all STT providers
-- Easy addition of new providers without changing consumer code
-- Streaming support for lower latency (first-word transcription)
-- Fallback mechanism when streaming is unavailable
+- Groq Whisper provider implementation (batch mode)
+- Factory function for provider instantiation
 """
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional, Protocol, runtime_checkable
 
 from ai_companion.core.exceptions import SpeechToTextError
@@ -219,92 +208,11 @@ class GroqWhisperProvider:
         yield result
 
 
-class DeepgramNovaProvider:
-    """Deepgram Nova STT provider with streaming support.
-    
-    Deepgram Nova-3 provides real-time streaming transcription with
-    first-word latency under 200ms. This enables overlapping audio
-    processing with LLM inference for lower perceived latency.
-    
-    Requires DEEPGRAM_API_KEY environment variable.
-    
-    Note: This is a placeholder implementation. Full Deepgram integration
-    requires the deepgram-sdk package and WebSocket handling.
-    """
-    
-    def __init__(self) -> None:
-        """Initialize Deepgram provider."""
-        self._api_key = settings.DEEPGRAM_API_KEY if hasattr(settings, 'DEEPGRAM_API_KEY') else None
-        if not self._api_key:
-            logger.warning("[Deepgram Nova] API key not configured - streaming STT unavailable")
-    
-    @property
-    def supports_streaming(self) -> bool:
-        """Deepgram supports real-time streaming transcription."""
-        return self._api_key is not None
-    
-    @property
-    def name(self) -> str:
-        return "Deepgram Nova"
-    
-    async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None) -> str:
-        """Transcribe audio using Deepgram (batch mode)."""
-        if not self._api_key:
-            raise SpeechToTextError("Deepgram API key not configured")
-        
-        # Placeholder - would use deepgram.listen.rest.v1.transcribe_file
-        logger.info(f"[{self.name}] Batch transcription: {len(audio_data)} bytes")
-        raise NotImplementedError(
-            "Deepgram batch transcription not yet implemented. "
-            "Add deepgram-sdk to dependencies and implement REST API call."
-        )
-    
-    async def transcribe_streaming(
-        self, audio_stream: AsyncIterator[bytes]
-    ) -> AsyncIterator[str]:
-        """Stream transcription using Deepgram WebSocket API."""
-        if not self._api_key:
-            raise SpeechToTextError("Deepgram API key not configured")
-        
-        # Placeholder - would use deepgram.listen.websocket.v1.transcribe_stream
-        logger.info(f"[{self.name}] Streaming transcription started")
-        raise NotImplementedError(
-            "Deepgram streaming transcription not yet implemented. "
-            "Add deepgram-sdk to dependencies and implement WebSocket streaming."
-        )
-        # Would yield partial transcription results as they arrive
-        yield ""  # type: ignore  # Placeholder to make this a generator
+def get_stt_provider() -> STTProvider:
+    """Factory function to get the STT provider instance.
 
-
-def get_stt_provider(provider_name: Optional[str] = None) -> STTProvider:
-    """Factory function to get an STT provider instance.
-    
-    Args:
-        provider_name: Optional provider name ('groq', 'deepgram'). 
-                       Defaults to settings.STT_PROVIDER or 'groq'.
-    
     Returns:
-        STTProvider: Configured STT provider instance
-        
-    Raises:
-        ValueError: If unknown provider name is specified
+        STTProvider: Configured Groq Whisper STT provider
     """
-    # Determine provider to use
-    name = provider_name or getattr(settings, 'STT_PROVIDER', 'groq')
-    name = name.lower()
-    
-    if name == 'groq':
-        logger.info("Using Groq Whisper STT provider (batch mode)")
-        return GroqWhisperProvider()
-    
-    elif name == 'deepgram':
-        provider = DeepgramNovaProvider()
-        if provider.supports_streaming:
-            logger.info("Using Deepgram Nova STT provider (streaming mode)")
-        else:
-            logger.warning("Deepgram not configured, falling back to Groq Whisper")
-            return GroqWhisperProvider()
-        return provider
-    
-    else:
-        raise ValueError(f"Unknown STT provider: {name}. Supported: groq, deepgram")
+    logger.info("Using Groq Whisper STT provider (batch mode)")
+    return GroqWhisperProvider()

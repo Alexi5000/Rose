@@ -23,9 +23,6 @@ class TestEnvironmentConfiguration:
         assert settings.ELEVENLABS_VOICE_ID is not None
         assert len(settings.ELEVENLABS_VOICE_ID) > 0
 
-        assert settings.TOGETHER_API_KEY is not None
-        assert len(settings.TOGETHER_API_KEY) > 0
-
         # Qdrant configuration
         assert settings.QDRANT_URL is not None
         assert len(settings.QDRANT_URL) > 0
@@ -34,11 +31,10 @@ class TestEnvironmentConfiguration:
         """Test that optional environment variables are handled correctly."""
         from ai_companion.settings import settings
 
-        # WhatsApp variables are optional
-        # Should not raise error if not set
-        assert hasattr(settings, "WHATSAPP_PHONE_NUMBER_ID")
-        assert hasattr(settings, "WHATSAPP_TOKEN")
-        assert hasattr(settings, "WHATSAPP_VERIFY_TOKEN")
+        # Optional settings should have defaults
+        assert hasattr(settings, "QDRANT_API_KEY")
+        assert hasattr(settings, "ROSE_VOICE_ID")
+        assert hasattr(settings, "SENTRY_DSN")
 
     def test_model_configurations(self):
         """Test that model configurations are set correctly."""
