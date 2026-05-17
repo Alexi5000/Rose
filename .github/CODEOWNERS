@@ -1,0 +1,46 @@
+# Code Owners for Rose AI Companion
+# 
+# These owners will be requested for review when someone opens a pull request
+# that modifies code in the specified paths.
+#
+# Learn more about CODEOWNERS: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+# This will be requested for review unless a later match takes precedence
+* @OWNER_USERNAME
+
+# Core application code
+/src/ai_companion/ @OWNER_USERNAME
+
+# Graph workflow and state management
+/src/ai_companion/graph/ @OWNER_USERNAME
+
+# Memory systems
+/src/ai_companion/modules/memory/ @OWNER_USERNAME
+
+# API interfaces
+/src/ai_companion/interfaces/ @OWNER_USERNAME
+
+# Configuration and settings
+/src/ai_companion/settings.py @OWNER_USERNAME
+/pyproject.toml @OWNER_USERNAME
+/uv.lock @OWNER_USERNAME
+
+# CI/CD workflows
+/.github/workflows/ @OWNER_USERNAME
+
+# Documentation
+/docs/ @OWNER_USERNAME
+/README.md @OWNER_USERNAME
+/CONTRIBUTING.md @OWNER_USERNAME
+
+# Docker and deployment
+/Dockerfile @OWNER_USERNAME
+/docker-compose.yml @OWNER_USERNAME
+/docker/ @OWNER_USERNAME
+
+# Tests
+/tests/ @OWNER_USERNAME
+
+# Frontend
+/frontend/ @OWNER_USERNAME

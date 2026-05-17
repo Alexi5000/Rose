@@ -1,0 +1,32 @@
+# Development Dockerfile for Backend
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY pyproject.toml uv.lock README.md /app/
+
+# Install dependencies
+RUN uv sync
+
+# The source code will be mounted via volume in docker-compose
+# But we need to install the package in editable mode initially
+# We'll assume the volume mount overlays this, but we need the egg-info/metadata
+# So we might need to run the install command at runtime or ensure the volume mount works.
+# Actually, `uv sync` installs the project if it's in the toml.
+# Let's just set the python path or rely on uv run.
+
+ENV PYTHONPATH=/app/src
+
+# Expose port
+EXPOSE 8000
+
+# Command to run the application without hot reload (for stability)
+CMD ["uv", "run", "uvicorn", "ai_companion.interfaces.web.app:app", "--host", "0.0.0.0", "--port", "8000"]

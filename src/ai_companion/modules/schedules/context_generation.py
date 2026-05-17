@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import Dict, Optional
 
 from ai_companion.core.schedules import (
@@ -13,7 +13,7 @@ from ai_companion.core.schedules import (
 
 
 class ScheduleContextGenerator:
-    """Class to generate context about Ava's current activity based on schedules."""
+    """Class to generate context about Rose's current activity based on schedules."""
 
     SCHEDULES = {
         0: MONDAY_SCHEDULE,  # Monday
@@ -26,7 +26,7 @@ class ScheduleContextGenerator:
     }
 
     @staticmethod
-    def _parse_time_range(time_range: str) -> tuple[datetime.time, datetime.time]:
+    def _parse_time_range(time_range: str) -> tuple[time, time]:
         """Parse a time range string (e.g., '06:00-07:00') into start and end times."""
         start_str, end_str = time_range.split("-")
         start_time = datetime.strptime(start_str, "%H:%M").time()
@@ -35,7 +35,7 @@ class ScheduleContextGenerator:
 
     @classmethod
     def get_current_activity(cls) -> Optional[str]:
-        """Get Ava's current activity based on the current time and day of the week.
+        """Get Rose's current activity based on the current time and day of the week.
 
         Returns:
             str: Description of current activity, or None if no matching time slot is found

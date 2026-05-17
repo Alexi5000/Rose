@@ -1,0 +1,57 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6335:6333"
+    volumes:
+      - ./long_term_memory:/qdrant/storage
+    restart: unless-stopped
+    environment:
+      - QDRANT_ALLOW_RECOVERY_MODE=true
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend.dev
+    ports:
+      - "8005:8000"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+      - ./short_term_memory:/app/data
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=development
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_URL=http://qdrant:6333
+      - PORT=8000
+    depends_on:
+      - qdrant
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: rebuild
+          path: ./pyproject.toml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend.dev
+    ports:
+      - "3005:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_TARGET=http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  long_term_memory:
+  short_term_memory:
