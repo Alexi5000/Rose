@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # 🎯 Rose Voice Interface - Comprehensive Test Report
 
 **Date:** 2025-11-10

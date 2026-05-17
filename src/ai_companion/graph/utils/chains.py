@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Chain construction utilities for LangGraph workflow.
 
 This module provides the character response chain for generating

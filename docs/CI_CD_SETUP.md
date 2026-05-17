@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # CI/CD Pipeline Setup
 
 This document describes the CI/CD pipeline configuration for the Rose the Healer Shaman application.

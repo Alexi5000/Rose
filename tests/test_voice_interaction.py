@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Tests for complete voice interaction flow."""
 
 import io

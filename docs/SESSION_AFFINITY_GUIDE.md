@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Session Affinity Configuration Guide
 
 ## Overview
@@ -80,7 +81,7 @@ If self-hosting with Nginx:
 upstream rose_backend {
     # IP hash: Route same IP to same instance
     ip_hash;
-    
+
     server instance1.internal:8080;
     server instance2.internal:8080;
     server instance3.internal:8080;
@@ -89,7 +90,7 @@ upstream rose_backend {
 server {
     listen 80;
     server_name rose.example.com;
-    
+
     location / {
         proxy_pass http://rose_backend;
         proxy_set_header Host $host;
@@ -123,7 +124,7 @@ Resources:
       Port: 8080
       VpcId: !Ref VPC
       HealthCheckPath: /api/health
-      
+
       # Enable sticky sessions
       TargetGroupAttributes:
         - Key: stickiness.enabled
@@ -187,20 +188,20 @@ async def session_affinity_middleware(request: Request, call_next):
     session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
-    
+
     # Calculate target instance
     session_hash = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
     target_instance = session_hash % TOTAL_INSTANCES
     current_instance = int(INSTANCE_ID.split("-")[1]) - 1
-    
+
     # If request should go to different instance, redirect
     if target_instance != current_instance:
         target_url = f"https://instance-{target_instance + 1}.rose.com{request.url.path}"
         return RedirectResponse(url=target_url)
-    
+
     # Process request
     response = await call_next(request)
-    
+
     # Set session cookie
     response.set_cookie(
         key="session_id",
@@ -209,7 +210,7 @@ async def session_affinity_middleware(request: Request, call_next):
         httponly=True,
         samesite="lax"
     )
-    
+
     return response
 ```
 
@@ -245,13 +246,13 @@ import requests
 def test_affinity():
     session = requests.Session()
     base_url = "https://your-app.railway.app"
-    
+
     # Make multiple requests
     for i in range(10):
         response = session.get(f"{base_url}/api/health")
         instance_id = response.headers.get("X-Instance-ID", "unknown")
         print(f"Request {i+1}: Instance {instance_id}")
-    
+
     # All requests should go to same instance
 
 if __name__ == "__main__":
@@ -283,20 +284,20 @@ from collections import Counter
 def monitor_distribution(num_requests=100):
     base_url = "https://your-app.railway.app"
     instances = []
-    
+
     for _ in range(num_requests):
         response = requests.get(f"{base_url}/api/health")
         instance_id = response.headers.get("X-Instance-ID", "unknown")
         instances.append(instance_id)
-    
+
     # Count distribution
     distribution = Counter(instances)
-    
+
     print("Load Distribution:")
     for instance, count in distribution.items():
         percentage = (count / num_requests) * 100
         print(f"  {instance}: {count} requests ({percentage:.1f}%)")
-    
+
     # Check if evenly distributed
     expected = num_requests / len(distribution)
     variance = sum((count - expected) ** 2 for count in distribution.values()) / len(distribution)

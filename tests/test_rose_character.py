@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Tests for Rose's character and therapeutic responses."""
 
 from unittest.mock import AsyncMock, MagicMock, patch

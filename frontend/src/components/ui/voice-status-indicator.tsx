@@ -1,6 +1,7 @@
+/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎙️ Voice Status Indicator
- * 
+ *
  * Phase 8: Visual feedback component showing current voice state.
  * Follows "Don't Make Me Think" UX principles:
  * - Clear affordances for each state

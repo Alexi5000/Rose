@@ -1,11 +1,12 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Type Checking Status
 
 ## Overview
 
 This document tracks the current state of type checking in the AI Companion codebase using mypy. It documents known type errors, type: ignore comments, and the rationale for each.
 
-**Last Updated**: 2025-10-22  
-**Mypy Version**: 1.13.0  
+**Last Updated**: 2025-10-22
+**Mypy Version**: 1.13.0
 **Python Version**: 3.12+
 
 ## Summary
@@ -30,7 +31,7 @@ Type checking is configured in `pyproject.toml` with the following key settings:
 Many errors stem from incompatibilities between our code and third-party library type stubs, particularly LangChain/LangGraph.
 
 #### ChatGroq API Key Type Mismatch
-**Files Affected**: 
+**Files Affected**:
 - `src/ai_companion/modules/image/text_to_image.py`
 - `src/ai_companion/modules/memory/long_term/memory_manager.py`
 - `src/ai_companion/graph/utils/helpers.py`

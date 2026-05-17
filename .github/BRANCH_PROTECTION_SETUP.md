@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Branch Protection Rules Setup Guide
 
 This guide provides step-by-step instructions for configuring branch protection rules for the Rose AI Companion repository.

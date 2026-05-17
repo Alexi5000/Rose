@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 #!/bin/bash
 # Test runner script for Rose the Healer Shaman
 

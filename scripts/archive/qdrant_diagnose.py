@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Rose full repository refresh 2026-05-17
 """Non-destructive Qdrant diagnostic script for Rose.
 
 This script performs comprehensive diagnostics on the Qdrant collection:

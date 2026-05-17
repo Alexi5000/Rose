@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Test Infrastructure Setup
 
 This document describes the test infrastructure for the AI Companion application.
@@ -146,10 +147,10 @@ def test_memory_extraction(mock_groq_client):
     """Test memory extraction from user message."""
     # Arrange
     message = "I'm feeling anxious about work"
-    
+
     # Act
     result = extract_memory(message, mock_groq_client)
-    
+
     # Assert
     assert result is not None
     assert "anxious" in result.lower()
@@ -166,10 +167,10 @@ async def test_conversation_workflow(mock_groq_client, mock_qdrant_client):
     """Test complete conversation workflow."""
     # Arrange
     state = {"messages": [{"role": "user", "content": "Hello"}]}
-    
+
     # Act
     result = await run_workflow(state)
-    
+
     # Assert
     assert result["messages"][-1]["role"] == "assistant"
 ```

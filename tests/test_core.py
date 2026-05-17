@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 import unittest
 
 from ai_companion.core.exceptions import (

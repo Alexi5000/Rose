@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Resource Management
 
 This document describes the resource management optimizations implemented in the Rose application to ensure efficient operation and prevent resource exhaustion in production environments.

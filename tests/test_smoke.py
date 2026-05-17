@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """
 Smoke tests for pre-deployment validation.
 

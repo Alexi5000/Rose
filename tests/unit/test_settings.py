@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Unit tests for settings validation."""
 
 import pytest

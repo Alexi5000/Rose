@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # API Design and Documentation Verification
 
 ## Task 7: Enhance API Design and Documentation
@@ -314,7 +315,7 @@ WORKFLOW_TIMEOUT_SECONDS=60
    ```bash
    # V1 endpoint (current)
    curl http://localhost:8080/api/v1/health
-   
+
    # Deprecated endpoint (backward compatibility)
    curl http://localhost:8080/api/health
    ```
@@ -330,7 +331,7 @@ WORKFLOW_TIMEOUT_SECONDS=60
    curl -X POST http://localhost:8080/api/v1/voice/process \
      -F "audio=@large_file.mp3" \
      -F "session_id=test-session"
-   
+
    # Expected: 413 Payload Too Large
    ```
 

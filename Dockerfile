@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 # Multi-stage build for Rose the Healer Shaman
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend-builder

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Feature Flags System
 
 ## Overview
@@ -202,7 +203,7 @@ from ai_companion.settings import settings
 def new_capability_function():
     if not settings.FEATURE_NEW_CAPABILITY_ENABLED:
         raise ValueError("New capability is not enabled")
-    
+
     # Implementation
     pass
 ```
@@ -404,15 +405,15 @@ def is_feature_enabled(flag_name: str, user_id: str) -> bool:
     flag = db.query(FeatureFlag).filter_by(name=flag_name).first()
     if not flag:
         return False
-    
+
     # Check whitelist
     if user_id in flag.user_whitelist:
         return True
-    
+
     # Check rollout percentage
     if flag.rollout_percentage == 100:
         return flag.enabled
-    
+
     # Consistent hashing for gradual rollout
     user_hash = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
     return (user_hash % 100) < flag.rollout_percentage
@@ -451,7 +452,7 @@ except Exception as e:
 
 ```sql
 -- Feature usage over time
-SELECT 
+SELECT
     date_trunc('hour', timestamp) as hour,
     COUNT(*) as usage_count
 FROM metrics
@@ -460,8 +461,8 @@ GROUP BY hour
 ORDER BY hour DESC;
 
 -- Feature error rate
-SELECT 
-    COUNT(CASE WHEN metric_name = 'feature.new_capability.error' THEN 1 END) * 100.0 / 
+SELECT
+    COUNT(CASE WHEN metric_name = 'feature.new_capability.error' THEN 1 END) * 100.0 /
     COUNT(CASE WHEN metric_name = 'feature.new_capability.used' THEN 1 END) as error_rate
 FROM metrics
 WHERE timestamp > NOW() - INTERVAL '1 hour';
@@ -476,13 +477,13 @@ from ai_companion.settings import Settings
 
 def test_feature_disabled():
     settings = Settings(FEATURE_NEW_CAPABILITY_ENABLED=False)
-    
+
     with pytest.raises(ValueError, match="not enabled"):
         new_capability_function()
 
 def test_feature_enabled():
     settings = Settings(FEATURE_NEW_CAPABILITY_ENABLED=True)
-    
+
     result = new_capability_function()
     assert result is not None
 ```
@@ -493,7 +494,7 @@ def test_feature_enabled():
 def test_api_with_feature_flag(flag_value):
     with patch.object(settings, 'FEATURE_NEW_CAPABILITY_ENABLED', flag_value):
         response = client.post("/api/new-capability")
-        
+
         if flag_value:
             assert response.status_code == 200
         else:
@@ -529,7 +530,7 @@ async def update_feature_flag(
 ):
     if admin_token != settings.ADMIN_TOKEN:
         raise HTTPException(403, "Unauthorized")
-    
+
     # Update flag
     pass
 ```

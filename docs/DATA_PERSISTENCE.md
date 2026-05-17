@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Data Persistence and Backup Guide
 
 This document explains how to configure data persistence for Rose the Healer Shaman application, including Railway volume setup, automatic backups, and disaster recovery procedures.

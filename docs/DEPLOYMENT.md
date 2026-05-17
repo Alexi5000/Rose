@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Deployment Guide: Rose the Healer Shaman
 
 This guide covers deploying Rose the Healer Shaman to various cloud platforms.
@@ -195,7 +196,7 @@ Fly.io offers global deployment with edge computing capabilities.
    ```
 
 3. **Configure fly.toml**
-   
+
    The `fly launch` command will create a `fly.toml` file. Update it:
 
    ```toml

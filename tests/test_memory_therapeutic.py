@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Tests for memory system with therapeutic context."""
 
 from unittest.mock import MagicMock, patch

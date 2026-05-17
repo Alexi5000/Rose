@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rose Architecture Patterns
 
 Rose follows the voice-first, stateful companion architecture represented in the provided Ava reference while adapting the implementation to the current Python, LangGraph, Chainlit, React, and provider-gateway stack.

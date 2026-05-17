@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """STT Provider abstraction for speech-to-text backends.
 
 This module provides:

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Automated tests for frontend functionality (to be run with Playwright or Selenium)."""
 
 import pytest

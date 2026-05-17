@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """FastAPI application for Rose the Healer Shaman web interface."""
 
 from contextlib import asynccontextmanager

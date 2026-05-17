@@ -1,3 +1,4 @@
+REM Rose full repository refresh 2026-05-17
 @echo off
 REM Batch script to replace Makefile functionality for Windows Command Prompt
 REM Usage: run.bat <command>
@@ -54,22 +55,22 @@ if /i "%1"=="ava-stop" (
 
 if /i "%1"=="ava-delete" (
     echo Cleaning up and stopping containers...
-    
+
     if exist "long_term_memory" (
         rmdir /s /q "long_term_memory"
         echo Removed long_term_memory directory
     )
-    
+
     if exist "short_term_memory" (
         rmdir /s /q "short_term_memory"
         echo Removed short_term_memory directory
     )
-    
+
     if exist "generated_images" (
         rmdir /s /q "generated_images"
         echo Removed generated_images directory
     )
-    
+
     docker compose down
     goto :eof
 )
@@ -113,4 +114,4 @@ echo   lint-fix      - Fix linting issues
 echo   format-check  - Check code formatting
 echo   lint-check    - Check linting
 echo.
-echo Usage: run.bat ^<command^> 
+echo Usage: run.bat ^<command^>

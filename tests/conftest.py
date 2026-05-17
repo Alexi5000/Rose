@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Pytest configuration and shared fixtures.
 
 This module configures pytest and imports all fixtures from the fixtures directory

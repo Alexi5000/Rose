@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Rose full repository refresh 2026-05-17
 """
 Voice API Automated Test Script
 Tests the complete voice pipeline end-to-end

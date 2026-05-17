@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Monitoring and Observability Implementation
 
 This document describes the monitoring and observability features implemented for Rose the Healer Shaman application.

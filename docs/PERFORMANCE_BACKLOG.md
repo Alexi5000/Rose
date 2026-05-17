@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Performance Optimization Backlog
 
 This document tracks performance optimization tasks identified through profiling and analysis. Tasks are prioritized based on impact and effort.
@@ -29,10 +30,10 @@ Low Impact, Low Effort (Nice to Have)
 ## Quick Wins (High Impact, Low Effort)
 
 ### PERF-001: TTS Cache Warming
-**Status:** Not Started  
-**Priority:** High  
-**Impact:** High (eliminates cold-start latency)  
-**Effort:** Low (1-2 days)  
+**Status:** Not Started
+**Priority:** High
+**Impact:** High (eliminates cold-start latency)
+**Effort:** Low (1-2 days)
 **Owner:** Unassigned
 
 **Description:**
@@ -61,10 +62,10 @@ async def warm_cache_background(self):
 ---
 
 ### PERF-002: Memory Search Result Caching
-**Status:** Not Started  
-**Priority:** High  
-**Impact:** Medium (reduces vector search calls)  
-**Effort:** Low (2-3 days)  
+**Status:** Not Started
+**Priority:** High
+**Impact:** Medium (reduces vector search calls)
+**Effort:** Low (2-3 days)
 **Owner:** Unassigned
 
 **Description:**
@@ -76,7 +77,7 @@ class MemoryManager:
     def __init__(self):
         self._search_cache: Dict[str, Tuple[List[str], float]] = {}
         self._cache_ttl = 300  # 5 minutes
-    
+
     def get_relevant_memories(self, context: str) -> List[str]:
         cache_key = hashlib.md5(context.encode()).hexdigest()
         if cache_key in self._search_cache:
@@ -97,10 +98,10 @@ class MemoryManager:
 ---
 
 ### PERF-003: Audio Format Optimization
-**Status:** Not Started  
-**Priority:** Medium  
-**Impact:** Low (reduces bandwidth)  
-**Effort:** Low (1 day)  
+**Status:** Not Started
+**Priority:** Medium
+**Impact:** Low (reduces bandwidth)
+**Effort:** Low (1 day)
 **Owner:** Unassigned
 
 **Description:**
@@ -128,10 +129,10 @@ audio_bytes = await self.synthesize(
 ## Strategic Initiatives (High Impact, High Effort)
 
 ### PERF-004: Streaming Audio Synthesis
-**Status:** Not Started  
-**Priority:** High  
-**Impact:** High (reduces perceived latency)  
-**Effort:** High (2-3 weeks)  
+**Status:** Not Started
+**Priority:** High
+**Impact:** High (reduces perceived latency)
+**Effort:** High (2-3 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -158,10 +159,10 @@ async def synthesize_streaming(self, text: str) -> AsyncIterator[bytes]:
 ---
 
 ### PERF-005: LLM Response Streaming
-**Status:** Not Started  
-**Priority:** High  
-**Impact:** High (reduces perceived latency)  
-**Effort:** High (2-3 weeks)  
+**Status:** Not Started
+**Priority:** High
+**Impact:** High (reduces perceived latency)
+**Effort:** High (2-3 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -188,10 +189,10 @@ async def conversation_node_streaming(state: AICompanionState):
 ---
 
 ### PERF-006: Parallel Node Execution
-**Status:** Not Started  
-**Priority:** High  
-**Impact:** High (reduces workflow time)  
-**Effort:** High (3-4 weeks)  
+**Status:** Not Started
+**Priority:** High
+**Impact:** High (reduces workflow time)
+**Effort:** High (3-4 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -222,10 +223,10 @@ graph.add_node("parallel_group", [
 ## Incremental Improvements (Medium Impact, Medium Effort)
 
 ### PERF-007: Parallel Memory Operations
-**Status:** Not Started  
-**Priority:** Medium  
-**Impact:** Medium (reduces workflow time)  
-**Effort:** Medium (1-2 weeks)  
+**Status:** Not Started
+**Priority:** Medium
+**Impact:** Medium (reduces workflow time)
+**Effort:** Medium (1-2 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -253,10 +254,10 @@ memories, _ = await asyncio.gather(retrieval_task, extraction_task)
 ---
 
 ### PERF-008: Batch Memory Extraction
-**Status:** Not Started  
-**Priority:** Medium  
-**Impact:** High (for multi-turn conversations)  
-**Effort:** Medium (1-2 weeks)  
+**Status:** Not Started
+**Priority:** Medium
+**Impact:** High (for multi-turn conversations)
+**Effort:** Medium (1-2 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -287,10 +288,10 @@ async def extract_and_store_memories_batch(
 ---
 
 ### PERF-009: Conditional Node Skipping
-**Status:** Not Started  
-**Priority:** Medium  
-**Impact:** Medium (for simple queries)  
-**Effort:** Medium (1-2 weeks)  
+**Status:** Not Started
+**Priority:** Medium
+**Impact:** Medium (for simple queries)
+**Effort:** Medium (1-2 weeks)
 **Owner:** Unassigned
 
 **Description:**
@@ -323,10 +324,10 @@ def should_extract_memory(state: AICompanionState) -> bool:
 ## Nice to Have (Low Impact, Low Effort)
 
 ### PERF-010: Adaptive Circuit Breaker Thresholds
-**Status:** Not Started  
-**Priority:** Low  
-**Impact:** Low (better resilience)  
-**Effort:** Medium (1 week)  
+**Status:** Not Started
+**Priority:** Low
+**Impact:** Low (better resilience)
+**Effort:** Medium (1 week)
 **Owner:** Unassigned
 
 **Description:**

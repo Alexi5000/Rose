@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Security Hardening Documentation
 
 This document describes the security features implemented in the Rose the Healer Shaman application.

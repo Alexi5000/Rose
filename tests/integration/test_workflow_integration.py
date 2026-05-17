@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Integration tests for LangGraph workflow end-to-end execution.
 
 This module tests complete workflow execution with real LangGraph orchestration

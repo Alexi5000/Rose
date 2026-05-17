@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Validation tests for test fixtures and infrastructure."""
 
 import pytest

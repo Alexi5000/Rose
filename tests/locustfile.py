@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Locust load testing configuration for Rose the Healer Shaman.
 
 To run:

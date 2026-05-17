@@ -1,7 +1,8 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Dependency Refactoring Summary
 
-**Task**: 17.2 Refactor problematic dependencies  
-**Date**: 2025-10-21  
+**Task**: 17.2 Refactor problematic dependencies
+**Date**: 2025-10-21
 **Status**: Completed
 
 ## Overview
@@ -57,26 +58,26 @@ Documented and justified the direct module imports in interface layers:
 ## Analysis Results
 
 ### Circular Dependencies
-✅ **Status**: PASSED  
+✅ **Status**: PASSED
 **Finding**: No circular dependencies detected in the codebase
 
 ### Core Module Independence
-✅ **Status**: PASSED  
+✅ **Status**: PASSED
 **Finding**: Core modules don't depend on interface or graph implementations
 
 ### Dependency Flow
-✅ **Status**: PASSED  
+✅ **Status**: PASSED
 **Finding**: Dependencies generally flow correctly: Interfaces -> Graph -> Modules -> Core -> Settings
 
 ### Interface-to-Core Dependencies
-⚠️ **Status**: ACCEPTABLE  
+⚠️ **Status**: ACCEPTABLE
 **Finding**: 27 interface-to-core dependencies identified, but most are acceptable infrastructure concerns:
 - Logging, metrics, exceptions: Cross-cutting concerns ✓
 - Resilience patterns: Circuit breakers for external calls ✓
 - Error responses: Standardized error handling ✓
 
 ### Interface-to-Module Dependencies
-⚠️ **Status**: ACCEPTABLE WITH DOCUMENTATION  
+⚠️ **Status**: ACCEPTABLE WITH DOCUMENTATION
 **Finding**: 2 instances of direct module imports from interfaces:
 - `interfaces.chainlit.app` -> `modules.speech`, `modules.image`
 - `interfaces.whatsapp.whatsapp_response` -> `modules.speech`, `modules.image`

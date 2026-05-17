@@ -1,8 +1,9 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # End-to-End Testing Results: Voice-First Consistency
 
-**Test Date:** October 22, 2025  
-**Tester:** Automated Testing Agent  
-**Environment:** Docker containers (Chainlit + Qdrant)  
+**Test Date:** October 22, 2025
+**Tester:** Automated Testing Agent
+**Environment:** Docker containers (Chainlit + Qdrant)
 **Application URL:** http://localhost:8000
 
 ---

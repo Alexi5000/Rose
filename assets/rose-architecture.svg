@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 <svg width="1200" height="620" viewBox="0 0 1200 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">Rose architecture diagram</title>
   <desc id="desc">Voice input flows through FastAPI, LangGraph, memory retrieval, multimodal routing, and provider outputs</desc>

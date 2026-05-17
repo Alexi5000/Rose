@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Check System Health
 
 Verify all services and components are healthy and properly configured.

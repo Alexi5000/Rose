@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # API Enhancements Verification Checklist
 
 Use this checklist to verify the API enhancements are working correctly.

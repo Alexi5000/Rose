@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """
 End-to-end tests using Playwright for critical user flows.
 

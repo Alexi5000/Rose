@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 codecov:
   require_ci_to_pass: yes
   notify:
@@ -7,14 +8,14 @@ coverage:
   precision: 2
   round: down
   range: "70...100"
-  
+
   status:
     project:
       default:
         target: 70%
         threshold: 2%
         if_ci_failed: error
-    
+
     patch:
       default:
         target: 70%

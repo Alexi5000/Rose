@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Voice processing endpoints.
 
 This module provides the core voice processing API for Rose, including:

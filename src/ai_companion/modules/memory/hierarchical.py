@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Hierarchical memory system for the AI companion.
 
 file: src/ai_companion/modules/memory/hierarchical.py

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rose Voice Agent Baseline Metrics
 
 > **Document Purpose**: Track baseline performance metrics before optimization.

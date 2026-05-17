@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # API Quick Reference
 
 Quick reference guide for Rose the Healer Shaman API.

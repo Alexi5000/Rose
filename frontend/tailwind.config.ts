@@ -1,3 +1,4 @@
+/* Rose full repository refresh 2026-05-17 */
 import type { Config } from 'tailwindcss';
 
 const config: Config = {

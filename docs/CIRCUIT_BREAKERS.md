@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Circuit Breakers and Resilience Patterns
 
 This document describes the circuit breaker implementation and resilience patterns used in the Rose application to handle external service failures gracefully.

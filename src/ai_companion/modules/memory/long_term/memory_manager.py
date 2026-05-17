@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Long-term memory management for the AI companion.
 
 This module provides the MemoryManager class which handles extraction, storage,

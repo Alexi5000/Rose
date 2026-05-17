@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """LangGraph workflow nodes for the Rose AI companion.
 
 This module defines all the node functions used in the voice-first LangGraph workflow.

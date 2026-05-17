@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # 🚀 Rose the Healer Shaman - Deployment & Development Plan
 
 This document outlines the standardized procedures for local development, testing, and production deployment of the Rose application.

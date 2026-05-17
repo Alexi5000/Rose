@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Frontend Manual Testing Checklist
 
 This document provides a comprehensive manual testing checklist for the Rose voice interface frontend across multiple devices and browsers.

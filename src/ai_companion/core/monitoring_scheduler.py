@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Background scheduler for monitoring tasks.
 
 This module provides a background scheduler that periodically evaluates

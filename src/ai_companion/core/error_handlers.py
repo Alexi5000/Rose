@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Standardized error handling decorators for AI Companion application.
 
 This module provides decorators for consistent error handling across the application,

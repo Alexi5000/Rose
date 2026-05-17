@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Application settings and configuration management.
 
 This module defines all configuration settings for the Rose the Healer Shaman

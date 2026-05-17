@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Unit tests for Vector Store operations.
 
 Tests storing memories in Qdrant, searching with similarity scores,

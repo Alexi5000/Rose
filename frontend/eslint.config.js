@@ -1,3 +1,4 @@
+/* Rose full repository refresh 2026-05-17 */
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

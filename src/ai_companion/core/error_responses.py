@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Standardized error response models and handlers.
 
 This module provides consistent error response formats across all API endpoints,

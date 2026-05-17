@@ -1,3 +1,4 @@
+/* Rose full repository refresh 2026-05-17 */
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';

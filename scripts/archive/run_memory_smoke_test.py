@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Rose full repository refresh 2026-05-17
 """
 Standalone Smoke Test: 10 Concurrent 5-Minute Conversations
 

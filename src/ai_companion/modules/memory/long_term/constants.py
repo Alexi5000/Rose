@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Memory system constants and configuration values.
 
 This module defines all magic numbers and configuration constants for the

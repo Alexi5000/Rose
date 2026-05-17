@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Retry utilities for API calls with exponential backoff."""
 
 import logging

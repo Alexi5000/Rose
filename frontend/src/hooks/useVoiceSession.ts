@@ -1,3 +1,4 @@
+/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎤 Voice Session Hook with Voice Activity Detection (VAD)
  *

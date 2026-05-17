@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Changelog
 
 All notable changes to Rose are documented in this file.

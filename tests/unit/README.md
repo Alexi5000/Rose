@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Unit Tests
 
 Unit tests for individual modules and components of the AI Companion application.

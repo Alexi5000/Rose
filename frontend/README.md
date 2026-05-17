@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # 🌹 Rose Frontend
 
 Voice-first AI grief counselor with WebGL shader background and real-time audio reactivity.

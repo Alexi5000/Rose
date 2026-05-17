@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Deployment validation tests for Railway platform."""
 
 import os

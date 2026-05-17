@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Rose full repository refresh 2026-05-17
 """Non-destructive Qdrant reindex script for Rose.
 
 This script performs a safe reindexing of the Qdrant collection:

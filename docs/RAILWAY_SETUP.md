@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Railway Deployment Setup Guide
 
 This guide provides step-by-step instructions for deploying Rose the Healer Shaman to Railway with proper configuration for production readiness.
@@ -89,7 +90,7 @@ The `/app/data` directory contains:
 
 1. **Monitor Usage**: Check volume usage regularly in Railway dashboard
 2. **Backup Strategy**: Backups are stored in `/app/data/backups/` (7-day retention)
-3. **Size Planning**: 
+3. **Size Planning**:
    - 1GB: ~10,000 conversations
    - 5GB: ~50,000 conversations
    - Scale based on usage patterns

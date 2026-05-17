@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Security Policy
 
 Rose is a voice-first AI companion that may process sensitive conversational, audio, and memory data. Security reports should be handled privately and with care.

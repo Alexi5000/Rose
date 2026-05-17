@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # PostgreSQL Migration Guide
 
 ## Overview
@@ -105,13 +106,13 @@ def test_connection():
     try:
         conn = psycopg.connect(settings.DATABASE_URL)
         print("✅ PostgreSQL connection successful")
-        
+
         # Test query
         with conn.cursor() as cur:
             cur.execute("SELECT version();")
             version = cur.fetchone()
             print(f"PostgreSQL version: {version[0]}")
-        
+
         conn.close()
         return True
     except Exception as e:
@@ -178,13 +179,13 @@ from ai_companion.graph.graph import create_workflow_graph
 
 def init_schema():
     print("Initializing PostgreSQL schema...")
-    
+
     # Create checkpointer (this creates tables)
     checkpointer = get_checkpointer()
-    
+
     # Compile graph (this verifies schema)
     graph = create_workflow_graph().compile(checkpointer=checkpointer)
-    
+
     print("✅ Schema initialized successfully")
 
 if __name__ == "__main__":
@@ -249,13 +250,13 @@ def migrate_data():
     # Connect to both databases
     sqlite_conn = sqlite3.connect(settings.SHORT_TERM_MEMORY_DB_PATH)
     pg_conn = psycopg.connect(settings.DATABASE_URL)
-    
+
     try:
         # Get SQLite data
         sqlite_cur = sqlite_conn.cursor()
         sqlite_cur.execute("SELECT * FROM checkpoints")
         checkpoints = sqlite_cur.fetchall()
-        
+
         # Insert into PostgreSQL
         pg_cur = pg_conn.cursor()
         for checkpoint in checkpoints:
@@ -264,10 +265,10 @@ def migrate_data():
                 "INSERT INTO checkpoints VALUES (%s, %s, %s, %s, %s)",
                 checkpoint
             )
-        
+
         pg_conn.commit()
         print(f"✅ Migrated {len(checkpoints)} checkpoints")
-        
+
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         pg_conn.rollback()
@@ -518,12 +519,12 @@ LangGraph creates indexes automatically, but you can verify:
 
 ```sql
 -- Check indexes
-SELECT indexname, indexdef 
-FROM pg_indexes 
+SELECT indexname, indexdef
+FROM pg_indexes
 WHERE tablename IN ('checkpoints', 'checkpoint_writes');
 
 -- Add custom index if needed (example)
-CREATE INDEX idx_checkpoints_thread_id 
+CREATE INDEX idx_checkpoints_thread_id
 ON checkpoints(thread_id);
 ```
 
@@ -534,9 +535,9 @@ ON checkpoints(thread_id);
 SELECT count(*) FROM pg_stat_activity;
 
 -- Slow queries
-SELECT pid, now() - query_start as duration, query 
-FROM pg_stat_activity 
-WHERE state = 'active' 
+SELECT pid, now() - query_start as duration, query
+FROM pg_stat_activity
+WHERE state = 'active'
 ORDER BY duration DESC;
 
 -- Database size

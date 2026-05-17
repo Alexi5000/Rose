@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Deployment Checklist
 
 Use this checklist before deploying Rose to production.
@@ -297,6 +298,6 @@ Deployment is successful when:
 
 ---
 
-**Last Updated**: After root folder cleanup and code quality improvements  
-**Version**: 1.0  
+**Last Updated**: After root folder cleanup and code quality improvements
+**Version**: 1.0
 **Status**: Production Ready ✅

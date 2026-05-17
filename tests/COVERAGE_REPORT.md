@@ -1,7 +1,8 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Test Coverage Report
 
-**Generated:** 2025-10-22  
-**Overall Coverage:** 37.48%  
+**Generated:** 2025-10-22
+**Overall Coverage:** 37.48%
 **Target Coverage:** 70% overall, 80% for core modules
 
 ## Test Execution Summary

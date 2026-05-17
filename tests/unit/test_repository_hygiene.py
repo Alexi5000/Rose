@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Repository hygiene checks ported from upstream PR intent.
 
 These tests preserve the security and message-role intent of the referenced

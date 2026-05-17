@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """LangGraph workflow graph construction.
 
 This module defines the voice-first conversation workflow graph for Rose,

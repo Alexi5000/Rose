@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Architecture Documentation: Rose the Healer Shaman
 
 This document provides comprehensive architecture diagrams and explanations for the Rose application.
@@ -1128,12 +1129,12 @@ Stateful resources like vector stores and circuit breakers use the singleton pat
 class VectorStore:
     _instance: Optional["VectorStore"] = None
     _initialized: bool = False
-    
+
     def __new__(cls) -> "VectorStore":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self) -> None:
         if not self._initialized:
             # Initialize Qdrant client, embedding model
@@ -1210,7 +1211,7 @@ class SpeechToText:
     def __init__(self) -> None:
         self._client: Optional[Groq] = None
         self._circuit_breaker: CircuitBreaker = get_groq_circuit_breaker()
-    
+
     @property
     def client(self) -> Groq:
         """Get or create Groq client instance using singleton pattern."""

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 #!/bin/bash
 # Script to remove secret from git history
 

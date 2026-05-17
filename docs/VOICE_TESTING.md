@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # 🎤 Voice Interface Smoke Test Guide
 
 ## Purpose

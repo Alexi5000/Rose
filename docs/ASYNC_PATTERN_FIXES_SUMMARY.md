@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Async Pattern Fixes Summary
 
 ## Overview
@@ -12,7 +13,7 @@ This document summarizes the async/await pattern improvements made to the AI Com
 - **Impact**: Prevents event loop blocking during retry backoff
 
 ### 2. Fixed Circuit Breaker Usage in Async Functions
-**Files**: 
+**Files**:
 - `src/ai_companion/modules/speech/speech_to_text.py`
 - `src/ai_companion/modules/speech/text_to_speech.py`
 

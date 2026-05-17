@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Verify Project Specs Alignment
 
 Check that the current implementation aligns with .kiro specification requirements.

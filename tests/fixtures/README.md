@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Test Fixtures
 
 This directory contains reusable test fixtures for the AI Companion test suite.

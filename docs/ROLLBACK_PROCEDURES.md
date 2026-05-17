@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rollback Procedures
 
 ## Overview
@@ -82,7 +83,7 @@ Before initiating rollback:
    ```bash
    # Test health endpoint
    curl https://your-app.railway.app/api/health
-   
+
    # Test voice processing
    curl -X POST https://your-app.railway.app/api/session/start
    ```
@@ -100,7 +101,7 @@ Before initiating rollback:
    ```bash
    # Revert specific commit
    git revert <commit-hash>
-   
+
    # Or revert to specific commit
    git reset --hard <last-good-commit>
    git push --force origin main
@@ -218,7 +219,7 @@ docker logs rose-api
    # Create snapshot of current state first
    curl -X POST "$QDRANT_URL/collections/rose_memories/snapshots" \
      -H "api-key: $QDRANT_API_KEY"
-   
+
    # Restore from previous snapshot
    curl -X PUT "$QDRANT_URL/collections/rose_memories/snapshots/<snapshot-name>/recover" \
      -H "api-key: $QDRANT_API_KEY"
@@ -229,7 +230,7 @@ docker logs rose-api
    # Delete corrupted collection
    curl -X DELETE "$QDRANT_URL/collections/rose_memories" \
      -H "api-key: $QDRANT_API_KEY"
-   
+
    # Recreate with proper schema
    # Run initialization script
    python -m ai_companion.modules.memory.initialize
@@ -327,8 +328,8 @@ Current Status: [In progress/Complete]
 ### User Communication (if needed)
 
 ```
-We're currently experiencing technical difficulties with Rose. 
-We've identified the issue and are working to restore service. 
+We're currently experiencing technical difficulties with Rose.
+We've identified the issue and are working to restore service.
 We expect to be back online within [timeframe].
 
 We apologize for the inconvenience.
@@ -344,7 +345,7 @@ Environment: Production
 Duration: [Total time]
 Impact: [Number of users/requests affected]
 
-Service is now stable. We're investigating the root cause 
+Service is now stable. We're investigating the root cause
 and will deploy a fix after thorough testing.
 
 Incident Report: [Link]
@@ -409,5 +410,5 @@ Track and review:
 
 ---
 
-**Last Updated:** October 21, 2025  
+**Last Updated:** October 21, 2025
 **Next Review:** January 21, 2026

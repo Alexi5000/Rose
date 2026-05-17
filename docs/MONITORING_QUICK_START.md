@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Monitoring Quick Start Guide
 
 This guide provides a quick reference for setting up and using the Rose monitoring and alerting system.

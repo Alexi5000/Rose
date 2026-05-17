@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Shared Pydantic models for API requests and responses."""
 
 from typing import Any, Dict, Optional

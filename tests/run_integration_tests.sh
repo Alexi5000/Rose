@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 #!/bin/bash
 # Script to run integration and E2E tests
 # Usage: ./tests/run_integration_tests.sh [test_type]
@@ -29,10 +30,10 @@ fi
 run_tests() {
     local marker=$1
     local description=$2
-    
+
     echo "Running $description..."
     echo "----------------------------------------"
-    
+
     if [ "$marker" == "e2e" ]; then
         # E2E tests require server to be running
         echo "⚠️  Note: E2E tests require the server to be running on http://localhost:8080"
@@ -42,7 +43,7 @@ run_tests() {
     else
         pytest tests/ -v -m "$marker" --tb=short
     fi
-    
+
     echo ""
 }
 
@@ -60,7 +61,7 @@ case $TEST_TYPE in
     all)
         echo "Running all integration and E2E tests..."
         echo ""
-        
+
         # Integration tests
         if [ -n "$GROQ_API_KEY" ] && [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$QDRANT_URL" ]; then
             run_tests "integration" "Integration Tests"
@@ -68,10 +69,10 @@ case $TEST_TYPE in
             echo "⚠️  Skipping integration tests (API keys not set)"
             echo ""
         fi
-        
+
         # Smoke tests
         run_tests "smoke" "Smoke Tests"
-        
+
         # E2E tests (optional)
         echo "⚠️  E2E tests require manual server startup"
         echo "To run E2E tests:"

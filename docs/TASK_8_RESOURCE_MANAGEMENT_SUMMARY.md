@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Task 8: Resource Management Optimization - Implementation Summary
 
 ## Overview
@@ -130,7 +131,7 @@ async def limit_request_size(request: Request, call_next):
 async def add_cache_headers(request: Request, call_next):
     """Add cache headers for static assets."""
     response = await call_next(request)
-    
+
     # Cache static assets (JS, CSS, images) for 1 year
     if request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -140,7 +141,7 @@ async def add_cache_headers(request: Request, call_next):
     # Cache index.html for 5 minutes
     elif request.url.path == "/" or request.url.path.endswith(".html"):
         response.headers["Cache-Control"] = "public, max-age=300"
-    
+
     return response
 ```
 

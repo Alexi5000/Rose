@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Error Handler Usage Guide
 
 ## Overview
@@ -135,7 +136,7 @@ async def process_audio(audio_data: bytes) -> str:
     # Validation happens first
     if not audio_data:
         raise ValueError("Audio data is required")
-    
+
     # Then API call with error handling
     return await groq_client.transcribe(audio_data)
 ```

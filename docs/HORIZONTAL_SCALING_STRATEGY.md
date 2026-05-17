@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Horizontal Scaling Strategy
 
 ## Overview
@@ -146,10 +147,10 @@ import psycopg
 def migrate_sessions():
     # Read from SQLite
     sqlite_conn = sqlite3.connect(settings.SHORT_TERM_MEMORY_DB_PATH)
-    
+
     # Write to PostgreSQL
     pg_conn = psycopg.connect(settings.DATABASE_URL)
-    
+
     # Copy checkpoint data
     # (Implementation depends on LangGraph schema)
 ```
@@ -317,7 +318,7 @@ def get_database_url(user_region: str) -> str:
 #### 3. Qdrant Vector Database
 
 **Current**: Single Qdrant Cloud cluster
-**Multi-Region**: 
+**Multi-Region**:
 - Option A: Single cluster (acceptable latency for memory retrieval)
 - Option B: Regional clusters with data sync
 - **Recommendation**: Start with single cluster, monitor latency

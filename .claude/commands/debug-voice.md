@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Debug Voice Interaction Issues
 
 Diagnose and troubleshoot voice button and audio processing problems.

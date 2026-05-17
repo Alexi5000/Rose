@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Optimize Docker Image Size
 
 Remove 2.5GB CUDA/PyTorch dependencies to reduce image from ~3GB to ~300MB (90% reduction).

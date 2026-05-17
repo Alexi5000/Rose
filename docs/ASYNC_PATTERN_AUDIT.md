@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Async Pattern Audit Report
 
 ## Overview
@@ -64,10 +65,10 @@ async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None
     with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temp_file:  # Blocking I/O
         temp_file.write(audio_data)
         temp_file_path = temp_file.name
-    
+
     with open(temp_file_path, "rb") as audio_file:  # Blocking I/O
         # ...
-    
+
     os.unlink(temp_file_path)  # Blocking I/O
 ```
 **Impact**: Multiple blocking I/O operations in async function
@@ -83,7 +84,7 @@ async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None
     # ...
     def _call_groq_api() -> str:
         return self.client.audio.transcriptions.create(...)
-    
+
     transcription: str = self._circuit_breaker.call(_call_groq_api)  # Sync call in async function
 ```
 **Impact**: Blocks event loop during API call
@@ -98,7 +99,7 @@ async def synthesize(self, text: str, ...) -> bytes:
     def _call_elevenlabs_api() -> bytes:
         audio_generator = self.client.generate(...)
         return b"".join(audio_generator)
-    
+
     audio_bytes: bytes = self._circuit_breaker.call(_call_elevenlabs_api)  # Sync call in async function
 ```
 **Impact**: Blocks event loop during API call

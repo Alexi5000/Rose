@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Rose full repository refresh 2026-05-17
 """
 Master A-Z Smoke Test
 Unifies frontend and backend verification into a single robust suite.

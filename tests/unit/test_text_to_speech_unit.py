@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Unit tests for Text-to-Speech module.
 
 Tests text-to-speech synthesis with caching, fallback behavior, circuit breaker

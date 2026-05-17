@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Unit tests for Speech-to-Text module.
 
 Tests audio transcription with various formats, retry logic, circuit breaker

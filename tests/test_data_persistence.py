@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Tests for data persistence and backup functionality."""
 
 import tempfile

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Test Voice Interaction End-to-End
 
 Run comprehensive voice interaction testing to verify the entire flow from recording to response playback.

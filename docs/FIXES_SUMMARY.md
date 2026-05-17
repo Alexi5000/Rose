@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rose Memory System Fixes - Summary
 
 **Date:** 2025-11-24

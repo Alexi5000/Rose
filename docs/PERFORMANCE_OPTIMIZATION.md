@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Performance Optimization Opportunities
 
 This document identifies performance optimization opportunities discovered through profiling and analysis of critical code paths in the AI Companion application.
@@ -30,8 +31,8 @@ However, several optimization opportunities exist that could improve performance
 **Optimization Opportunities:**
 
 #### 1.1 Batch Memory Extraction
-**Priority:** Medium  
-**Impact:** High for multi-turn conversations  
+**Priority:** Medium
+**Impact:** High for multi-turn conversations
 **Effort:** Medium
 
 Currently, memory extraction happens for each message individually. For conversations with multiple messages, we could batch the extraction:
@@ -48,8 +49,8 @@ await memory_manager.extract_and_store_memories_batch(messages)
 **Expected Improvement:** 30-40% reduction in LLM API calls for multi-message scenarios
 
 #### 1.2 Memory Search Result Caching
-**Priority:** Low  
-**Impact:** Medium for repeated queries  
+**Priority:** Low
+**Impact:** Medium for repeated queries
 **Effort:** Low
 
 Cache memory search results for identical or similar queries within a session:
@@ -59,7 +60,7 @@ class MemoryManager:
     def __init__(self):
         self._search_cache = {}  # query_hash -> (results, timestamp)
         self._cache_ttl = 300  # 5 minutes
-    
+
     def get_relevant_memories(self, context: str) -> List[str]:
         cache_key = hashlib.md5(context.encode()).hexdigest()
         if cache_key in self._search_cache:
@@ -72,8 +73,8 @@ class MemoryManager:
 **Expected Improvement:** 50-70% reduction in vector search calls for repeated contexts
 
 #### 1.3 Parallel Memory Operations
-**Priority:** Medium  
-**Impact:** High for workflow optimization  
+**Priority:** Medium
+**Impact:** High for workflow optimization
 **Effort:** Medium
 
 Memory extraction and retrieval can happen in parallel during workflow execution:
@@ -110,8 +111,8 @@ memories, _ = await asyncio.gather(retrieval_task, extraction_task)
 **Optimization Opportunities:**
 
 #### 2.1 Streaming Audio Synthesis
-**Priority:** High  
-**Impact:** High for user experience  
+**Priority:** High
+**Impact:** High for user experience
 **Effort:** High
 
 Currently, TTS waits for complete audio generation before returning. Streaming would allow playback to start immediately:
@@ -126,8 +127,8 @@ async def synthesize_streaming(self, text: str) -> AsyncIterator[bytes]:
 **Expected Improvement:** 50-70% reduction in perceived latency for long responses
 
 #### 2.2 Preemptive TTS Cache Warming
-**Priority:** Medium  
-**Impact:** Medium for first-time users  
+**Priority:** Medium
+**Impact:** Medium for first-time users
 **Effort:** Low
 
 Warm the TTS cache during application startup or idle time:
@@ -145,8 +146,8 @@ async def warm_cache_background(self):
 **Expected Improvement:** Eliminate cold-start latency for common phrases
 
 #### 2.3 Audio Format Optimization
-**Priority:** Low  
-**Impact:** Low  
+**Priority:** Low
+**Impact:** Low
 **Effort:** Low
 
 Use more efficient audio formats (Opus instead of MP3) to reduce file size and transfer time:
@@ -176,8 +177,8 @@ audio_bytes = await self.synthesize(
 **Optimization Opportunities:**
 
 #### 3.1 Parallel Node Execution
-**Priority:** High  
-**Impact:** High for complex workflows  
+**Priority:** High
+**Impact:** High for complex workflows
 **Effort:** High
 
 Some nodes can execute in parallel (e.g., memory retrieval and context preparation):
@@ -194,8 +195,8 @@ graph.add_node("parallel_group", [
 **Expected Improvement:** 30-50% reduction in workflow time for multi-node paths
 
 #### 3.2 Conditional Node Skipping
-**Priority:** Medium  
-**Impact:** Medium for simple queries  
+**Priority:** Medium
+**Impact:** Medium for simple queries
 **Effort:** Medium
 
 Skip expensive nodes when not needed (e.g., skip memory extraction for simple greetings):
@@ -216,8 +217,8 @@ def should_extract_memory(state: AICompanionState) -> bool:
 **Expected Improvement:** 40-60% reduction in workflow time for simple queries
 
 #### 3.3 LLM Response Streaming
-**Priority:** High  
-**Impact:** High for user experience  
+**Priority:** High
+**Impact:** High for user experience
 **Effort:** Medium
 
 Stream LLM responses to reduce perceived latency:
@@ -245,8 +246,8 @@ async def conversation_node_streaming(state: AICompanionState):
 **Optimization Opportunities:**
 
 #### 4.1 Adaptive Failure Thresholds
-**Priority:** Low  
-**Impact:** Low  
+**Priority:** Low
+**Impact:** Low
 **Effort:** Medium
 
 Adjust failure thresholds based on historical success rates:

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """WebSocket endpoint for real-time voice streaming.
 
 file: src/ai_companion/interfaces/web/routes/voice_websocket.py

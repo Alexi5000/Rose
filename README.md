@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 <p align="center">
   <a href="https://github.com/Alexi5000/Rose">
     <img src="assets/rose-header.svg" alt="Rose" width="100%" />
@@ -75,16 +76,25 @@ Open `http://localhost:5173` and start a voice session.
 | [Release notes](docs/RELEASE_NOTES_v2.md) | What changed in the v2.0.0 buildout. |
 | [Deployment guide](docs/DEPLOYMENT.md) | How to run Rose outside a local development setup. |
 | [Memory system](docs/MEMORY_SYSTEM.md) | How long-term context and recall are organized. |
+| [Ava full course reference](img/video_thumbnails/ava_full_course.png) | The full Ava course visual reference that helped shape the Rose companion lineage. |
 | [Contributing](CONTRIBUTING.md) | How to propose changes without breaking the companion model. |
 
 ## Community
 
-Rose includes integrated work and guidance from community pull requests in the original Ava course repository. Those contributions are credited in [CONTRIBUTORS.md](CONTRIBUTORS.md) and documented in [the integration notes](docs/UPSTREAM_PR_INTEGRATION.md).
+Rose is inspired by the original [Ava WhatsApp Agent Course](https://github.com/neural-maze/ava-whatsapp-agent-course) from [neural-maze](https://github.com/neural-maze). Alex gives warm source credit to [Miguel Otero Pedrido](https://github.com/MichaelisTrofficus) for the original Ava repository and full course video reference, and to [Jesús Copado](https://github.com/copadoje) for the Ava course lineage that helped inspire Rose. This is inspiration credit, not a direct Rose contribution claim.
+
+<p align="center">
+  <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">
+    <img src="img/video_thumbnails/ava_full_course.png" alt="Ava full course reference by Miguel Otero Pedrido" width="70%" />
+  </a>
+</p>
+
+The image above links to the full Ava course repository so the original course lineage remains visible from the Rose README. Rose also includes integrated guidance from community pull requests in the original Ava course repository. Those contributions are credited in [CONTRIBUTORS.md](CONTRIBUTORS.md) and documented in [the integration notes](docs/UPSTREAM_PR_INTEGRATION.md).
 
 ## License
 
 Rose is released under the [MIT License](LICENSE).
 
 <p align="center">
-  <sub>Maintained by <a href="https://github.com/Alexi5000">Alexi5000</a>. Originally created from the Ava companion course lineage by <a href="https://github.com/neural-maze">neural-maze</a>.</sub>
+  <sub>Maintained by <a href="https://github.com/Alexi5000">Alexi5000</a>. Inspired by the original <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">Ava course</a> and its source authors.</sub>
 </p>

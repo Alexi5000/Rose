@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Monitoring and metrics API endpoints.
 
 This module provides endpoints for accessing monitoring data, metrics,

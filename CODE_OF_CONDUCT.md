@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Code of Conduct
 
 Rose welcomes contributors who want to build safe, thoughtful, and high-quality AI companion software. We expect every participant to communicate with respect and care.

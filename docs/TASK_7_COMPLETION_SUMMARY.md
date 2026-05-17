@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Task 7 Completion Summary: API Design and Documentation
 
 ## Overview
@@ -207,7 +208,7 @@ WORKFLOW_TIMEOUT_SECONDS=60
    ```bash
    # Start the server
    uv run fastapi run src/ai_companion/interfaces/web/app.py
-   
+
    # Open in browser:
    # - http://localhost:8080/api/v1/docs (Swagger UI)
    # - http://localhost:8080/api/v1/redoc (ReDoc)
@@ -217,7 +218,7 @@ WORKFLOW_TIMEOUT_SECONDS=60
    ```bash
    # V1 endpoint
    curl http://localhost:8080/api/v1/health
-   
+
    # Deprecated endpoint (should still work)
    curl http://localhost:8080/api/health
    ```

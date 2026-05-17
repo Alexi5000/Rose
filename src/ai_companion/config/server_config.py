@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Server configuration constants for Rose the Healer Shaman.
 
 This module centralizes all magic numbers and configuration values used by the

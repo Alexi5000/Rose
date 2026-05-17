@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Mock API response fixtures for testing.
 
 This module provides sample API responses from external services

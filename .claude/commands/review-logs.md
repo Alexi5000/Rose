@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Review Application Logs
 
 Analyze recent application logs for errors, warnings, and performance insights.

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Upstream Pull Request Integration
 
 Rose manually ports the useful intent of five open upstream pull requests without applying stale patches to the evolved codebase. This preserves contributor value while avoiding unsafe lockfile rewrites and obsolete file paths.

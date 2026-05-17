@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Google Cloud Platform Setup
 
 While you can run Ava locally, this course also provides the option to deploy the LangGraph application to the cloud.
@@ -18,7 +19,7 @@ gcloud auth login
 
 ```bash
 gcloud config set project <PROJECT_ID>
-``` 
+```
 
 3. Add the necessary permissions:
 
@@ -34,7 +35,7 @@ gcloud services enable secretmanager.googleapis.com
 
 ```bash
 gcloud config set compute/region <LOCATION>
-gcloud auth configure-docker <LOCATION>-docker.pkg.dev -q 
+gcloud auth configure-docker <LOCATION>-docker.pkg.dev -q
 ```
 
 Location is the region where you want your project to be deployed. In my case, I'm using 'europe-west1'.

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Docker Configuration
 
 This directory contains Docker-related configuration files for building and deploying Rose.

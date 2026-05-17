@@ -1,3 +1,4 @@
+REM Rose full repository refresh 2026-05-17
 @echo off
 REM Test runner script for Rose the Healer Shaman (Windows)
 

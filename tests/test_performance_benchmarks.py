@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Performance benchmarks for critical code paths.
 
 This module contains performance benchmarks to ensure critical operations

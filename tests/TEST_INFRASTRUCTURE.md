@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Test Infrastructure Setup
 
 This document describes the test infrastructure for the AI Companion application.

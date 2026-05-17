@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Custom exceptions for AI Companion application.
 
 This module defines the exception hierarchy for the application,

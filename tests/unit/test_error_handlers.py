@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Unit tests for error handler decorators.
 
 This module tests the refactored error handling decorators to ensure they work

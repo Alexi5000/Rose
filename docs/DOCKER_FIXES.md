@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Docker Configuration Analysis & Fixes
 
 **Generated:** 2025-11-24

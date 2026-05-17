@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # API Design and Documentation Enhancements - Implementation Summary
 
 ## Overview
@@ -92,7 +93,7 @@ this.client = axios.create({
 ```python
 class VoiceProcessResponse(BaseModel):
     """Response model for voice processing.
-    
+
     Attributes:
         text: The transcribed and processed text response from Rose
         audio_url: URL to download the generated audio response (MP3 format)
@@ -281,7 +282,7 @@ baseURL: '/api/v1'
    ```bash
    # Start server
    uv run fastapi run src/ai_companion/interfaces/web/app.py
-   
+
    # Access documentation
    open http://localhost:8080/api/v1/docs
    open http://localhost:8080/api/v1/redoc
@@ -291,7 +292,7 @@ baseURL: '/api/v1'
    ```bash
    # Test v1 endpoint
    curl http://localhost:8080/api/v1/health
-   
+
    # Test deprecated endpoint (should still work)
    curl http://localhost:8080/api/health
    ```

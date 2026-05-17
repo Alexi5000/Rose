@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Monitoring and Alerting System
 
 This document describes the comprehensive monitoring and alerting system implemented for Rose the Healer Shaman application.

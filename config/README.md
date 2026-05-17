@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Configuration Files
 
 This directory contains environment-specific configuration files for deploying Rose the Healer Shaman to different environments.

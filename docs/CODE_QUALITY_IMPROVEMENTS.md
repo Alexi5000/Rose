@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Code Quality and Maintainability Improvements
 
 This document summarizes the code quality improvements implemented as part of Task 12 from the deployment readiness review.

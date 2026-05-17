@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Guard to disable Qdrant memory searches temporarily when repeated internal errors are detected.
 
 This module implements a lightweight in-memory guard to track the count of Qdrant

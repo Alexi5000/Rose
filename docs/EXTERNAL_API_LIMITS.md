@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # External API Rate Limits and Quotas
 
 ## Overview
@@ -530,8 +531,8 @@ This document details the rate limits, quotas, and usage constraints for all ext
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Next Review:** January 21, 2026  
+**Last Updated:** October 21, 2025
+**Next Review:** January 21, 2026
 **Owner:** Engineering Team
 
 ## References

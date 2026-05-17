@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Scripts Directory
 
 This directory contains utility scripts for development, testing, and maintenance.

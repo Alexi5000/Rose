@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Integration and E2E Testing Guide
 
 This guide covers the integration tests, end-to-end tests, and post-deployment smoke tests added to the Rose application.

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Resilience patterns including circuit breakers for external service calls.
 
 This module provides circuit breaker implementations to protect against cascading

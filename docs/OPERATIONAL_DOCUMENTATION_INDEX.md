@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Operational Documentation Index
 
 ## Overview
@@ -421,6 +422,6 @@ This index provides a comprehensive guide to all operational documentation for t
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Maintained By:** Engineering Team  
+**Last Updated:** October 21, 2025
+**Maintained By:** Engineering Team
 **Questions?** Contact the on-call engineer or post in `#engineering`

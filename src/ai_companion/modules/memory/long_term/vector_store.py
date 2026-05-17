@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Vector storage operations for long-term memory using Qdrant.
 
 This module provides the VectorStore class which handles all interactions with

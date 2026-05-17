@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Contributing to Rose
 
 Thank you for improving Rose. This project values careful changes that preserve the voice-first experience, LangGraph orchestration, memory retrieval, multimodal routing, and provider boundaries.

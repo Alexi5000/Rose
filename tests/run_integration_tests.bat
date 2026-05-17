@@ -1,3 +1,4 @@
+REM Rose full repository refresh 2026-05-17
 @echo off
 REM Script to run integration and E2E tests on Windows
 REM Usage: tests\run_integration_tests.bat [test_type]
@@ -60,7 +61,7 @@ if "%TEST_TYPE%"=="smoke" (
 if "%TEST_TYPE%"=="all" (
     echo Running all integration and E2E tests...
     echo.
-    
+
     REM Integration tests
     if not "%GROQ_API_KEY%"=="" if not "%ELEVENLABS_API_KEY%"=="" if not "%QDRANT_URL%"=="" (
         echo Running Integration Tests...
@@ -71,13 +72,13 @@ if "%TEST_TYPE%"=="all" (
         echo Skipping integration tests ^(API keys not set^)
         echo.
     )
-    
+
     REM Smoke tests
     echo Running Smoke Tests...
     echo ----------------------------------------
     pytest tests/ -v -m smoke --tb=short
     echo.
-    
+
     REM E2E tests info
     echo Note: E2E tests require manual server startup
     echo To run E2E tests:

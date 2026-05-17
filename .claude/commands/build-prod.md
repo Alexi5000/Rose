@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Build Production Docker Image
 
 Build an optimized production Docker image for Rose.

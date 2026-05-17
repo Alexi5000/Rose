@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # 1. Clone the repository
 
 First thing first, clone the repository.
@@ -9,9 +10,9 @@ cd ava-whatsapp-agent-course
 
 # 2. Install uv
 
-Instead of `pip` or `poetry`, we are using `uv` as the Python package manager. 
+Instead of `pip` or `poetry`, we are using `uv` as the Python package manager.
 
-To install uv, simply follow these [instructions](https://docs.astral.sh/uv/getting-started/installation/). 
+To install uv, simply follow these [instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
 # 3. Install the project dependencies
 
@@ -64,7 +65,7 @@ WHATSAPP_TOKEN = ""
 WHATSAPP_VERIFY_TOKEN = ""
 ```
 
-In this doc, we will show you how to get the values for all of these variables, except for the WhatsApp ones. 
+In this doc, we will show you how to get the values for all of these variables, except for the WhatsApp ones.
 That's something we will cover in a dedicated lesson, so don't worry about it for now, **you can leave the WhatsApp variables empty**.
 
 ### Groq

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Speech-to-text conversion using Groq's Whisper model.
 
 This module provides the SpeechToText class for converting audio to text using

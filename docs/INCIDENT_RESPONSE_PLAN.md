@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Incident Response Plan
 
 ## Overview
@@ -17,8 +18,8 @@ This document defines the incident response process for the Rose the Healer Sham
 - All voice processing failing
 - Error rate > 50%
 
-**Response Time:** Immediate (< 15 minutes)  
-**Communication:** Immediate notification to all stakeholders  
+**Response Time:** Immediate (< 15 minutes)
+**Communication:** Immediate notification to all stakeholders
 **Escalation:** Automatic to engineering manager and CTO
 
 ### SEV-2: High
@@ -32,8 +33,8 @@ This document defines the incident response process for the Rose the Healer Sham
 - External API integration failures
 - Repeated service restarts
 
-**Response Time:** < 30 minutes  
-**Communication:** Notify team and stakeholders within 15 minutes  
+**Response Time:** < 30 minutes
+**Communication:** Notify team and stakeholders within 15 minutes
 **Escalation:** To engineering manager if not resolved in 1 hour
 
 ### SEV-3: Medium
@@ -47,8 +48,8 @@ This document defines the incident response process for the Rose the Healer Sham
 - Intermittent failures
 - Single external service degraded
 
-**Response Time:** < 1 hour  
-**Communication:** Notify team within 30 minutes  
+**Response Time:** < 1 hour
+**Communication:** Notify team within 30 minutes
 **Escalation:** To engineering manager if not resolved in 4 hours
 
 ### SEV-4: Low
@@ -62,8 +63,8 @@ This document defines the incident response process for the Rose the Healer Sham
 - Documentation issues
 - Minor performance degradation
 
-**Response Time:** < 4 hours  
-**Communication:** Log in incident tracker  
+**Response Time:** < 4 hours
+**Communication:** Log in incident tracker
 **Escalation:** None unless pattern emerges
 
 ## Incident Response Phases
@@ -114,13 +115,13 @@ This document defines the incident response process for the Rose the Healer Sham
    ```bash
    # Check error logs
    grep "ERROR" /app/logs/app.log | tail -100
-   
+
    # Check system resources
    docker stats
-   
+
    # Check database
    sqlite3 /app/data/short_term_memory.db "SELECT COUNT(*) FROM checkpoints;"
-   
+
    # Test external APIs
    curl https://api.groq.com/health
    curl https://api.elevenlabs.io/health
@@ -309,10 +310,10 @@ Thank you to: @[Team members]
 
 **Status Page Update:**
 ```
-We're currently investigating reports of [issue description]. 
-Some users may experience [specific impact]. 
+We're currently investigating reports of [issue description].
+Some users may experience [specific impact].
 
-We're actively working on a resolution and will provide 
+We're actively working on a resolution and will provide
 updates every 30 minutes.
 
 Last updated: [Timestamp]
@@ -322,7 +323,7 @@ Last updated: [Timestamp]
 ```
 Subject: Service Disruption - [Date]
 
-We experienced a service disruption today from [start time] 
+We experienced a service disruption today from [start time]
 to [end time] that affected [description of impact].
 
 What happened:
@@ -611,6 +612,6 @@ We sincerely apologize for the inconvenience.
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Next Review:** January 21, 2026  
+**Last Updated:** October 21, 2025
+**Next Review:** January 21, 2026
 **Owner:** Engineering Team

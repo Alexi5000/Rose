@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rose the Healer Shaman - Testing Documentation
 
 This directory contains comprehensive tests for the Rose transformation project, covering voice interaction, character responses, memory system, frontend, performance, and deployment validation.

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Archived Scripts
 
 This directory contains deprecated scripts that are no longer actively used but kept for reference.

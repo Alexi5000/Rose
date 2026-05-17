@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Rose full repository refresh 2026-05-17
 """Utility to inspect Qdrant collection and segment information.
 
 This script queries the Qdrant HTTP API to return:

@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Startup initialization for the long-term memory system.
 
 This module provides functions to initialize and verify the Qdrant vector

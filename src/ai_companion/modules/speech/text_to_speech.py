@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Text-to-speech conversion using ElevenLabs with Rose's therapeutic voice.
 
 This module provides the TextToSpeech class for converting text to speech using

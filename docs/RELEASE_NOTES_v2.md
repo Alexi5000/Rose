@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Rose v2.0.0 Release Notes
 
 Rose v2.0.0 is a major repository polish and architecture-alignment release. It positions Rose as a voice-first AI companion with clear LangGraph orchestration, memory extraction and retrieval, multimodal routing, audio buffering, and provider boundaries.

@@ -1,3 +1,4 @@
+<!-- Rose full repository refresh 2026-05-17 -->
 # Integration Tests
 
 Integration tests for workflows and multi-component interactions in the AI Companion application.
@@ -52,7 +53,7 @@ async def test_conversation_workflow(
     """Test complete conversation workflow."""
     graph = create_graph()
     result = await graph.ainvoke(sample_conversation_state)
-    
+
     assert result["messages"]
     assert result["workflow_type"] == "conversation"
 ```

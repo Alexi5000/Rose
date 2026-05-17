@@ -1,3 +1,4 @@
+# Rose full repository refresh 2026-05-17
 """Helper functions for graph utilities.
 
 This module provides utility functions for creating and configuring
