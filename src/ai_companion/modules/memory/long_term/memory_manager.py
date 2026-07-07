@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Long-term memory management for the AI companion.
 
 This module provides the MemoryManager class which handles extraction, storage,
@@ -7,14 +6,14 @@ analyze messages for importance and formats them for storage in a vector databas
 
 The memory system enables the AI companion to remember user preferences, past
 conversations, and important context across sessions, creating a more personalized
-and therapeutic experience.
+and supportive experience.
 
 Module Dependencies:
 - ai_companion.core.prompts: MEMORY_ANALYSIS_PROMPT for LLM-based memory extraction
 - ai_companion.modules.memory.long_term.vector_store: VectorStore for memory persistence
 - ai_companion.settings: Configuration for LLM model, temperature, timeouts
 - langchain_core.messages: BaseMessage types for message handling
-- langchain_groq: ChatGroq for LLM inference
+- ai_companion.modules.providers: provider-routed LLM inference
 - pydantic: BaseModel for structured output (MemoryAnalysis)
 - Standard library: logging, uuid, datetime, typing
 
@@ -24,7 +23,7 @@ Dependents (modules that import this):
 
 Architecture:
 This module is part of the modules layer and orchestrates memory operations by
-combining LLM analysis (via Groq) with vector storage (via Qdrant). It follows
+combining provider-routed LLM analysis with vector storage (via Qdrant). It follows
 the factory pattern for instantiation (get_memory_manager) to support dependency
 injection and testing.
 
@@ -51,19 +50,47 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from langchain_core.messages import BaseMessage
-from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 
+from ai_companion.core.privacy_logging import sensitive_text_for_log
 from ai_companion.core.prompts import MEMORY_ANALYSIS_PROMPT
 from ai_companion.modules.memory.long_term.vector_store import VectorStore, get_vector_store
+from ai_companion.modules.memory.privacy import sanitize_exported_memories
+from ai_companion.modules.providers import get_structured_chat_model
 from ai_companion.settings import settings
 
 # Phase 3: Memory search cache configuration
 MEMORY_CACHE_TTL_SECONDS = 60  # Cache search results for 1 minute
 MEMORY_CACHE_MAX_SIZE = 100  # Maximum number of cached search results
+
+
+MemoryType = Literal[
+    "user_profile",
+    "cultural_preference",
+    "emotional_note",
+    "health_note",
+    "coping_practice",
+    "healing_goal",
+    "support_system",
+    "trigger",
+    "general_fact",
+]
+MemorySensitivity = Literal["standard", "sensitive"]
+
+MEMORY_TYPE_LABELS: dict[str, str] = {
+    "user_profile": "User profile",
+    "cultural_preference": "Cultural and spiritual preferences",
+    "emotional_note": "Emotional notes",
+    "health_note": "Health and wellbeing notes",
+    "coping_practice": "Coping practices",
+    "healing_goal": "Healing goals",
+    "support_system": "Support system",
+    "trigger": "Triggers",
+    "general_fact": "General facts",
+}
 
 
 class MemoryAnalysis(BaseModel):
@@ -74,6 +101,14 @@ class MemoryAnalysis(BaseModel):
         description="Whether the message is important enough to be stored as a memory",
     )
     formatted_memory: Optional[str] = Field(..., description="The formatted memory to be stored")
+    memory_type: MemoryType = Field(
+        default="general_fact",
+        description="The privacy category for the memory",
+    )
+    sensitivity: MemorySensitivity = Field(
+        default="standard",
+        description="Whether the memory contains sensitive emotional, health, grief, or trauma context",
+    )
 
 
 class MemoryManager:
@@ -112,13 +147,11 @@ class MemoryManager:
         """
         self.vector_store: VectorStore = get_vector_store()
         self.logger: logging.Logger = logging.getLogger(__name__)
-        self.llm: Any = ChatGroq(  # type: ignore[call-arg]  # ChatGroq API accepts api_key as string, type stubs may be outdated
-            model=settings.SMALL_TEXT_MODEL_NAME,
-            api_key=settings.GROQ_API_KEY,
+        self.llm: Any = get_structured_chat_model(
+            MemoryAnalysis,
             temperature=settings.LLM_TEMPERATURE_MEMORY,
-            timeout=settings.LLM_TIMEOUT_SECONDS,
-            max_retries=settings.LLM_MAX_RETRIES,
-        ).with_structured_output(MemoryAnalysis)
+            model_name=settings.SMALL_TEXT_MODEL_NAME,
+        )
 
         # Phase 3: Search result caching for reduced Qdrant query latency
         # Cache key: hash of (context, session_id), value: (memories, timestamp)
@@ -168,31 +201,42 @@ class MemoryManager:
         Example:
             >>> message = HumanMessage(content="I'm allergic to peanuts")
             >>> await manager.extract_and_store_memories(message, session_id="user_123")
-            # Logs: "💾 Storing new memory: 'User has peanut allergy'"
+            # Logs memory metadata only by default; set LOG_SENSITIVE_CONTENT=true locally for previews.
         """
         if message.type != "human":
             return
 
-        # 🧠 Analyze the message for importance and formatting
+        # Analyze the message for importance and formatting.
         # The LLM determines if the message contains information worth remembering
         # and formats it in a concise, searchable form (e.g., "User prefers tea")
         analysis = await self._analyze_memory(message.content)
         if analysis.is_important and analysis.formatted_memory:
-            # ♻️ Check if similar memory exists (within the same session)
+            # Check if similar memory exists within the same session.
             # This prevents duplicate storage of the same information
             similar = self.vector_store.find_similar_memory(analysis.formatted_memory, session_id=session_id)
             if similar:
                 # Skip storage if we already have a similar memory
-                self.logger.info(f"♻️ Similar memory exists, skipping: '{analysis.formatted_memory}'")
+                self.logger.info(
+                    "Similar memory exists, skipping: "
+                    f"length={len(analysis.formatted_memory)} "
+                    f"preview={sensitive_text_for_log(analysis.formatted_memory)}"
+                )
                 return
 
-            # 💾 Store new memory with unique ID, timestamp, and session_id
-            self.logger.info(f"💾 Storing new memory: '{analysis.formatted_memory}'")
+            # Store new memory with unique ID, timestamp, and session_id.
+            self.logger.info(
+                "Storing new memory: "
+                f"type={analysis.memory_type} sensitivity={analysis.sensitivity} "
+                f"length={len(analysis.formatted_memory)} "
+                f"preview={sensitive_text_for_log(analysis.formatted_memory)}"
+            )
             self.vector_store.store_memory(
                 text=analysis.formatted_memory,
                 metadata={
                     "id": str(uuid.uuid4()),
                     "timestamp": datetime.now().isoformat(),
+                    "memory_type": analysis.memory_type,
+                    "sensitivity": analysis.sensitivity,
                 },
                 session_id=session_id,
             )
@@ -226,12 +270,12 @@ class MemoryManager:
             memories, timestamp = self._search_cache[cache_key]
             age = datetime.now() - timestamp
             if age < timedelta(seconds=MEMORY_CACHE_TTL_SECONDS):
-                self.logger.debug(f"📦 Memory cache hit: {cache_key[:16]}... (age: {age.total_seconds():.1f}s)")
+                self.logger.debug(f"CACHE Memory cache hit: {cache_key[:16]}... (age: {age.total_seconds():.1f}s)")
                 return memories
             else:
                 # Expired - remove from cache
                 del self._search_cache[cache_key]
-                self.logger.debug(f"📦 Memory cache expired: {cache_key[:16]}...")
+                self.logger.debug(f"CACHE Memory cache expired: {cache_key[:16]}...")
         return None
 
     def _add_to_cache(self, cache_key: str, memories: List[str]) -> None:
@@ -246,10 +290,10 @@ class MemoryManager:
             # Find and remove the oldest entry
             oldest_key = min(self._search_cache.keys(), key=lambda k: self._search_cache[k][1])
             del self._search_cache[oldest_key]
-            self.logger.debug(f"📦 Memory cache evicted: {oldest_key[:16]}...")
+            self.logger.debug(f"CACHE Memory cache evicted: {oldest_key[:16]}...")
 
         self._search_cache[cache_key] = (memories, datetime.now())
-        self.logger.debug(f"📦 Memory cached: {cache_key[:16]}... ({len(memories)} memories)")
+        self.logger.debug(f"CACHE Memory cached: {cache_key[:16]}... ({len(memories)} memories)")
 
     def invalidate_cache(self, session_id: Optional[str] = None) -> None:
         """Invalidate cache entries, optionally filtered by session.
@@ -262,13 +306,13 @@ class MemoryManager:
         if session_id is None:
             count = len(self._search_cache)
             self._search_cache.clear()
-            self.logger.debug(f"📦 Memory cache cleared: {count} entries")
+            self.logger.debug(f"CACHE Memory cache cleared: {count} entries")
         else:
             # Invalidate entries that might be affected by this session
             # Since we hash the key, we can't easily filter - clear all for safety
             count = len(self._search_cache)
             self._search_cache.clear()
-            self.logger.debug(f"📦 Memory cache cleared for session update: {count} entries")
+            self.logger.debug(f"CACHE Memory cache cleared for session update: {count} entries")
 
     def get_relevant_memories(self, context: str, session_id: Optional[str] = None) -> List[str]:
         """Retrieve relevant memories based on the current context.
@@ -311,10 +355,15 @@ class MemoryManager:
 
         # Log temporal scoring for debugging
         if memories_sorted:
-            self.logger.debug(
-                f"⏱️ Temporal scoring applied: "
-                f"{[f'{m.text[:30]}... (age: {m.age_days:.1f}d, score: {m.temporal_score:.2f})' for m in memories_sorted[:3]]}"
-            )
+            scoring_preview = [
+                (
+                    f"length={len(memory.text)} "
+                    f"preview={sensitive_text_for_log(memory.text, max_chars=30)} "
+                    f"(age: {memory.age_days:.1f}d, score: {memory.temporal_score:.2f})"
+                )
+                for memory in memories_sorted[:3]
+            ]
+            self.logger.debug(f"Temporal scoring applied: {scoring_preview}")
 
         memory_texts = [memory.text for memory in memories_sorted]
 
@@ -322,6 +371,36 @@ class MemoryManager:
         self._add_to_cache(cache_key, memory_texts)
 
         return memory_texts
+
+    def get_relevant_memory_records(self, context: str, session_id: Optional[str] = None) -> list[dict[str, Any]]:
+        """Retrieve relevant memories with privacy category metadata preserved."""
+
+        memories = self.vector_store.search_memories(context, k=settings.MEMORY_TOP_K, session_id=session_id)
+        memories_sorted = sorted(memories, key=lambda m: m.temporal_score, reverse=True)
+        return [
+            {
+                "text": memory.text,
+                "metadata": {
+                    "memory_type": memory.metadata.get("memory_type", "general_fact"),
+                    "sensitivity": memory.metadata.get("sensitivity", "standard"),
+                },
+            }
+            for memory in memories_sorted
+        ]
+
+    def export_memories_for_session(self, session_id: str) -> list[dict[str, Any]]:
+        """Export session memories without embeddings or raw vector data."""
+
+        memories = self.vector_store.export_memories_for_session(session_id=session_id)
+        return sanitize_exported_memories([{"text": memory.text, "metadata": memory.metadata} for memory in memories])
+
+    def delete_memories_for_session(self, session_id: str) -> bool:
+        """Delete long-term memories for a session and clear cached retrievals."""
+
+        deleted = self.vector_store.delete_memories_for_session(session_id=session_id)
+        if deleted:
+            self.invalidate_cache(session_id=session_id)
+        return deleted
 
     def format_memories_for_prompt(self, memories: List[str]) -> str:
         """Format retrieved memories as bullet points for inclusion in prompts.
@@ -345,6 +424,47 @@ class MemoryManager:
         if not memories:
             return ""
         return "\n".join(f"- {memory}" for memory in memories)
+
+    def format_memory_records_for_prompt(self, memories: list[dict[str, Any]]) -> str:
+        """Format typed memories in separated sections for safer prompt use."""
+
+        if not memories:
+            return ""
+
+        grouped: dict[str, list[tuple[str, str]]] = {}
+        for memory in memories:
+            text = str(memory.get("text", "")).strip()
+            if not text:
+                continue
+            metadata = memory.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            memory_type = str(metadata.get("memory_type", "general_fact"))
+            sensitivity = str(metadata.get("sensitivity", "standard"))
+            grouped.setdefault(memory_type, []).append((text, sensitivity))
+
+        sections: list[str] = []
+        for memory_type in MEMORY_TYPE_LABELS:
+            entries = grouped.get(memory_type, [])
+            if not entries:
+                continue
+            label = MEMORY_TYPE_LABELS[memory_type]
+            lines = [f"{label}:"]
+            for text, sensitivity in entries:
+                suffix = " (sensitive)" if sensitivity == "sensitive" else ""
+                lines.append(f"- {text}{suffix}")
+            sections.append("\n".join(lines))
+
+        for memory_type, entries in grouped.items():
+            if memory_type in MEMORY_TYPE_LABELS:
+                continue
+            lines = [f"{memory_type.replace('_', ' ').title()}:"]
+            for text, sensitivity in entries:
+                suffix = " (sensitive)" if sensitivity == "sensitive" else ""
+                lines.append(f"- {text}{suffix}")
+            sections.append("\n".join(lines))
+
+        return "\n\n".join(sections)
 
 
 @lru_cache(maxsize=1)

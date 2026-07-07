@@ -34,16 +34,16 @@ class TestEnvironmentConfiguration:
 
         # Optional settings should have defaults
         assert hasattr(settings, "QDRANT_API_KEY")
-        assert hasattr(settings, "ROSE_VOICE_ID")
+        assert hasattr(settings, "ELEVENLABS_VOICE_ID")
         assert hasattr(settings, "SENTRY_DSN")
 
     def test_model_configurations(self):
         """Test that model configurations are set correctly."""
         from ai_companion.settings import settings
 
-        assert settings.TEXT_MODEL_NAME == "llama-3.3-70b-versatile"
-        assert settings.SMALL_TEXT_MODEL_NAME == "llama-3.1-8b-instant"
-        assert settings.STT_MODEL_NAME == "whisper-large-v3"
+        assert settings.TEXT_MODEL_NAME == "openai/gpt-oss-120b"
+        assert settings.SMALL_TEXT_MODEL_NAME == "openai/gpt-oss-20b"
+        assert settings.STT_MODEL_NAME == "whisper-large-v3-turbo"
 
     def test_server_configuration(self):
         """Test server configuration for deployment."""
@@ -170,7 +170,7 @@ class TestProductionReadiness:
         client = TestClient(app)
 
         # Test 404 handling
-        response = client.get("/nonexistent-endpoint")
+        response = client.get("/api/v1/nonexistent-endpoint")
         assert response.status_code == 404
 
     def test_static_file_serving(self):
@@ -213,6 +213,7 @@ class TestAPIEndpoints:
 
         app = create_app()
         client = TestClient(app)
+        route_paths = {route.path for route in app.routes}
 
         # Health check
         response = client.get("/api/v1/health")
@@ -222,9 +223,8 @@ class TestAPIEndpoints:
         response = client.post("/api/v1/session/start")
         assert response.status_code == 200
 
-        # Voice process endpoint exists (will fail without audio, but should not 404)
-        response = client.post("/api/v1/voice/process")
-        assert response.status_code != 404  # Should be 422 (validation error) not 404
+        # Voice process endpoint is registered without requiring startup graph state.
+        assert "/api/v1/voice/process" in route_paths
 
 
 # Integration tests for deployed environment

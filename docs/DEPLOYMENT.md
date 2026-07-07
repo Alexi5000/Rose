@@ -559,7 +559,7 @@ If you encounter issues not covered here:
 2. **Test Locally**: Run `python scripts/build_and_serve.py` to reproduce issues
 3. **Verify Environment**: Double-check all environment variables
 4. **API Status**: Check status pages for Groq, ElevenLabs, Qdrant
-5. **Development Guide**: See [DEVELOPMENT.md](../DEVELOPMENT.md) for detailed troubleshooting
+5. **Development Guide**: See [Getting Started](GETTING_STARTED.md) for detailed troubleshooting
 6. **Community**: Open an issue on GitHub with logs and error details
 
 ---

@@ -1,10 +1,11 @@
-# Rose full repository refresh 2026-05-17
 """Retry utilities for API calls with exponential backoff."""
 
 import logging
 import time
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
+
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -47,27 +48,42 @@ def retry_with_exponential_backoff(
 
                 except skip_exceptions as e:
                     # Don't retry validation errors
-                    logger.debug(f"Skipping retry for {type(e).__name__}: {str(e)}")
+                    logger.debug(
+                        "retry_skipped function=%s error_type=%s error=%s",
+                        func.__name__,
+                        type(e).__name__,
+                        exception_message_for_log(e),
+                    )
                     raise
 
                 except exceptions as e:
                     last_exception = e
                     logger.warning(
-                        f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {str(e)}",
-                        exc_info=attempt == max_retries - 1,  # Full traceback on last attempt
+                        "retry_attempt_failed function=%s attempt=%s max_retries=%s error_type=%s error=%s",
+                        func.__name__,
+                        attempt + 1,
+                        max_retries,
+                        type(e).__name__,
+                        exception_message_for_log(e),
+                        exc_info=exc_info_for_log() and attempt == max_retries - 1,
                     )
 
                     # If not the last attempt, wait with exponential backoff
                     if attempt < max_retries - 1:
                         backoff_time = min(initial_backoff * (2**attempt), max_backoff)
-                        logger.info(f"Retrying {func.__name__} in {backoff_time:.1f} seconds...")
+                        logger.info("retry_wait function=%s backoff_seconds=%.1f", func.__name__, backoff_time)
                         time.sleep(backoff_time)
 
             # All retries exhausted
             if last_exception is None:
                 raise RuntimeError(f"{func.__name__} failed after {max_retries} attempts with no exception captured")
-            error_msg = f"{func.__name__} failed after {max_retries} attempts: {str(last_exception)}"
-            logger.error(error_msg)
+            logger.error(
+                "retry_exhausted function=%s max_retries=%s error_type=%s error=%s",
+                func.__name__,
+                max_retries,
+                type(last_exception).__name__,
+                exception_message_for_log(last_exception),
+            )
             raise last_exception
 
         return cast(Callable[..., T], wrapper)
@@ -120,25 +136,40 @@ async def async_retry_with_exponential_backoff(
 
         except skip_exceptions as e:
             # Don't retry validation errors
-            logger.debug(f"Skipping retry for {type(e).__name__}: {str(e)}")
+            logger.debug(
+                "retry_skipped function=%s error_type=%s error=%s",
+                func.__name__,
+                type(e).__name__,
+                exception_message_for_log(e),
+            )
             raise
 
         except exceptions as e:
             last_exception = e
             logger.warning(
-                f"{func.__name__} attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {str(e)}",
-                exc_info=attempt == max_retries - 1,  # Full traceback on last attempt
+                "retry_attempt_failed function=%s attempt=%s max_retries=%s error_type=%s error=%s",
+                func.__name__,
+                attempt + 1,
+                max_retries,
+                type(e).__name__,
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log() and attempt == max_retries - 1,
             )
 
             # If not the last attempt, wait with exponential backoff
             if attempt < max_retries - 1:
                 backoff_time = min(initial_backoff * (2**attempt), max_backoff)
-                logger.info(f"Retrying {func.__name__} in {backoff_time:.1f} seconds...")
+                logger.info("retry_wait function=%s backoff_seconds=%.1f", func.__name__, backoff_time)
                 await asyncio.sleep(backoff_time)
 
     # All retries exhausted
     if last_exception is None:
         raise RuntimeError(f"{func.__name__} failed after {max_retries} attempts with no exception captured")
-    error_msg = f"{func.__name__} failed after {max_retries} attempts: {str(last_exception)}"
-    logger.error(error_msg)
+    logger.error(
+        "retry_exhausted function=%s max_retries=%s error_type=%s error=%s",
+        func.__name__,
+        max_retries,
+        type(last_exception).__name__,
+        exception_message_for_log(last_exception),
+    )
     raise last_exception

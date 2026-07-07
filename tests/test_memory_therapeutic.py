@@ -3,10 +3,15 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from langchain_core.messages import HumanMessage
 
 from ai_companion.graph.nodes import memory_extraction_node, memory_injection_node
 from ai_companion.graph.state import AICompanionState
+
+pytestmark = pytest.mark.skip(
+    reason="Legacy therapeutic-memory tests preserve pre-v2 clinical positioning and are kept as reference only."
+)
 
 
 class TestTherapeuticMemoryExtraction:

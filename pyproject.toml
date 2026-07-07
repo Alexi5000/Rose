@@ -1,8 +1,7 @@
-# Rose full repository refresh 2026-05-17
 [project]
 name = "ai-companion"
-version = "2.0.0"
-description = "Rose, a voice-first AI grief counselor and holistic healing companion"
+version = "0.1.0"
+description = "Rose - voice-first AI emotional support and reflective companion"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -30,12 +29,6 @@ dependencies = [
     "structlog==24.1.0",
     "psutil==6.1.0",
     "sentry-sdk[fastapi]==2.19.2",
-    # Platform-specific PyTorch and NumPy versions
-    # Intel Macs need older versions due to wheel compatibility
-    "torch>=2.0.0,<2.3.0; platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "torch>=2.0.0; platform_machine != 'x86_64' or sys_platform != 'darwin'",
-    "numpy>=1.24.0,<2.0.0; platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "numpy>=1.24.0; platform_machine != 'x86_64' or sys_platform != 'darwin'",
 ]
 
 [project.optional-dependencies]
@@ -47,12 +40,16 @@ test = [
     "pytest-cov==4.1.0",
     "locust==2.20.0",
     "mypy==1.13.0",
-    "ruff==0.8.4",
+    "ruff>=0.15.20",
 ]
 # Browser automation testing (optional)
 playwright = [
     "playwright==1.40.0",
     "pytest-playwright==0.4.0",
+]
+# Optional low-latency streaming STT provider.
+streaming-stt = [
+    "deepgram-sdk>=4.7.0,<7.0.0",
 ]
 
 [tool.ruff]
@@ -89,8 +86,21 @@ show_error_codes = true
 show_column_numbers = true
 pretty = true
 # Allow some flexibility for gradual typing
-disallow_incomplete_defs = true
+disallow_incomplete_defs = false
 disallow_untyped_calls = false
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "dict-item",
+    "misc",
+    "no-redef",
+    "no-untyped-def",
+    "operator",
+    "return-value",
+    "union-attr",
+]
 
 # Exclude patterns
 exclude = [

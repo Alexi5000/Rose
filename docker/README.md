@@ -3,7 +3,7 @@
 
 This directory contains Docker-related configuration files for building and deploying Rose.
 
-> **Note:** Rose now includes a modern voice-first web interface served through FastAPI. For local development, we recommend using `python scripts/run_dev_server.py` instead of Docker Compose. See [DEVELOPMENT.md](../DEVELOPMENT.md) for details.
+> **Note:** Rose now includes a modern voice-first web interface served through FastAPI. For local development, we recommend using `python scripts/run_dev_server.py` instead of Docker Compose. See the [getting started guide](../docs/GETTING_STARTED.md) for details.
 
 ## Files
 

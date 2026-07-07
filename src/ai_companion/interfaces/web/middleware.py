@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Security middleware for FastAPI application."""
 
 import logging
@@ -10,6 +9,8 @@ from uuid import uuid4
 import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +104,13 @@ def set_secure_file_permissions(file_path: str) -> None:
     try:
         # Set permissions to 0o600 (owner read/write only)
         os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR)
-        logger.debug(f"Set secure permissions on {file_path}")
+        logger.debug("Set secure permissions on file")
     except Exception as e:
-        logger.error(f"Failed to set secure permissions on {file_path}: {e}")
+        logger.error(
+            "Failed to set secure permissions on file: %s",
+            exception_message_for_log(e),
+            exc_info=exc_info_for_log(),
+        )
 
 
 def create_secure_temp_file(directory: str, filename: str) -> str:
@@ -125,5 +130,5 @@ def create_secure_temp_file(directory: str, filename: str) -> str:
     fd = os.open(file_path, os.O_CREAT | os.O_WRONLY | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
     os.close(fd)
 
-    logger.debug(f"Created secure temp file: {file_path}")
+    logger.debug("Created secure temp file")
     return file_path

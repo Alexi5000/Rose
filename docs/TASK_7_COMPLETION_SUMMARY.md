@@ -16,7 +16,7 @@ The API documentation is fully configured with environment-based control:
 ```python
 app = FastAPI(
     title="Rose the Healer Shaman API",
-    description="Voice-first AI grief counselor and holistic healing companion...",
+    description="Voice-first AI emotional support companion...",
     version="1.0.0",
     docs_url="/api/v1/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,

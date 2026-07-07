@@ -1,4 +1,3 @@
-<!-- Rose full repository refresh 2026-05-17 -->
 # Operational Documentation Index
 
 ## Overview
@@ -10,9 +9,10 @@ This index provides a comprehensive guide to all operational documentation for t
 ## Quick Start
 
 **New to the project?** Start here:
-1. [Architecture Documentation](ARCHITECTURE.md) - Understand the system
-2. [Deployment Guide](DEPLOYMENT.md) - Deploy to production
-3. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Day-to-day operations
+1. [Voice Architecture](VOICE_ARCHITECTURE.md) - Understand the current voice pipeline
+2. [Provider Guide](PROVIDERS.md) - Understand active AI, speech, safety, memory, and fallback providers
+3. [Deployment Guide](DEPLOYMENT.md) - Deploy to production
+4. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Day-to-day operations
 
 **Experiencing an issue?** Go here:
 1. [Operations Runbook](OPERATIONS_RUNBOOK.md) - Common issues and solutions
@@ -29,7 +29,10 @@ This index provides a comprehensive guide to all operational documentation for t
 
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Architecture Documentation](ARCHITECTURE.md) | System architecture, components, data flow, deployment architecture | All engineers |
+| [Voice Architecture](VOICE_ARCHITECTURE.md) | Current WebSocket voice flow, provider boundaries, latency and barge-in design rules | All engineers |
+| [Provider Guide](PROVIDERS.md) | Active provider matrix and extension rules for LLM, STT, TTS, embeddings, safety, and memory | Backend, Voice |
+| [Upstream Lineage Research](UPSTREAM_LINEAGE_RESEARCH.md) | Ava upstream contributors, open PRs, provider deprecation signals, and Rose porting policy | Maintainers |
+| [Architecture Documentation](ARCHITECTURE.md) | Historical architecture detail and frozen lineage references | All engineers |
 | [Project Structure](PROJECT_STRUCTURE.md) | Code organization and conventions | Developers |
 | [Data Persistence](DATA_PERSISTENCE.md) | Memory system, databases, backups | Backend engineers |
 
@@ -203,7 +206,7 @@ This index provides a comprehensive guide to all operational documentation for t
 
 **Key Topics:**
 - Horizontal scaling architecture
-- Database migration (SQLite -> PostgreSQL)
+- Database migration (SQLite → PostgreSQL)
 - Multi-instance deployment
 - Session affinity configuration
 - Multi-region deployment planning
@@ -238,10 +241,11 @@ This index provides a comprehensive guide to all operational documentation for t
 
 **Reading Order:**
 1. [Getting Started](GETTING_STARTED.md) - Set up local environment
-2. [Architecture Documentation](ARCHITECTURE.md) - Understand the system
-3. [Project Structure](PROJECT_STRUCTURE.md) - Navigate the codebase
-4. [API Documentation](API_DOCUMENTATION.md) - Learn the API
-5. [Testing Documentation](../tests/README.md) - Run tests
+2. [Voice Architecture](VOICE_ARCHITECTURE.md) - Understand the current voice pipeline
+3. [Provider Guide](PROVIDERS.md) - Understand provider boundaries and fallback rules
+4. [Project Structure](PROJECT_STRUCTURE.md) - Navigate the codebase
+5. [API Documentation](API_DOCUMENTATION.md) - Learn the API
+6. [Testing Documentation](../tests/README.md) - Run tests
 
 **Estimated Time:** 4-6 hours
 
@@ -298,11 +302,12 @@ This index provides a comprehensive guide to all operational documentation for t
 **Goal:** Develop and deploy a new feature
 
 **Reading Order:**
-1. [Architecture Documentation](ARCHITECTURE.md) - Understand integration points
-2. [Project Structure](PROJECT_STRUCTURE.md) - Find where to add code
-3. [API Documentation](API_DOCUMENTATION.md) - Design API changes
-4. [Testing Documentation](../tests/README.md) - Write tests
-5. [Deployment Guide](DEPLOYMENT.md) - Deploy changes
+1. [Voice Architecture](VOICE_ARCHITECTURE.md) - Understand current voice integration points
+2. [Provider Guide](PROVIDERS.md) - Reuse provider boundaries before adding conditionals
+3. [Project Structure](PROJECT_STRUCTURE.md) - Find where to add code
+4. [API Documentation](API_DOCUMENTATION.md) - Design API changes
+5. [Testing Documentation](../tests/README.md) - Write tests
+6. [Deployment Guide](DEPLOYMENT.md) - Deploy changes
 
 **Estimated Time:** Varies by feature complexity
 

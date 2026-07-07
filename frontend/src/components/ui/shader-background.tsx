@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🌊 WebGL Shader Background Component
  *
@@ -26,6 +25,17 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({
   state = 'idle',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Refs so the render loop always reads the latest values without
+  // triggering a WebGL context teardown/rebuild on every prop change.
+  const userAmpRef = useRef(userAmplitude);
+  const roseAmpRef = useRef(roseAmplitude);
+  const stateRef = useRef(state);
+
+  // Keep refs in sync with incoming props (cheap , no WebGL work).
+  useEffect(() => { userAmpRef.current = userAmplitude; }, [userAmplitude]);
+  useEffect(() => { roseAmpRef.current = roseAmplitude; }, [roseAmplitude]);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   // Vertex shader source code
   const vsSource = `
@@ -206,6 +216,9 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({
     return shaderProgram;
   };
 
+  // Single-mount effect: WebGL context is created ONCE and never torn down
+  // due to amplitude changes. The render loop reads live values from refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -253,11 +266,12 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({
     const render = () => {
       const currentTime = (Date.now() - startTime) / 1000;
 
-      // Calculate state blend for smooth color transitions
+      // Read latest values from refs , no closure stale-capture.
+      const curState = stateRef.current;
       let stateBlend = 0;
-      if (state === 'listening' || state === 'processing') {
+      if (curState === 'listening' || curState === 'processing') {
         stateBlend = 0.5; // Purple-ish
-      } else if (state === 'speaking') {
+      } else if (curState === 'speaking') {
         stateBlend = 1.0; // Pink-ish
       }
 
@@ -268,8 +282,8 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({
 
       gl.uniform2f(programInfo.uniformLocations.resolution, canvas.width, canvas.height);
       gl.uniform1f(programInfo.uniformLocations.time, currentTime);
-      gl.uniform1f(programInfo.uniformLocations.userAmplitude, userAmplitude);
-      gl.uniform1f(programInfo.uniformLocations.roseAmplitude, roseAmplitude);
+      gl.uniform1f(programInfo.uniformLocations.userAmplitude, userAmpRef.current);
+      gl.uniform1f(programInfo.uniformLocations.roseAmplitude, roseAmpRef.current);
       gl.uniform1f(programInfo.uniformLocations.stateBlend, stateBlend);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -293,7 +307,7 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({
       window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationId);
     };
-  }, [userAmplitude, roseAmplitude, state]);
+  }, []); // intentionally empty , GL context lives for the full component lifetime
 
   return <canvas ref={canvasRef} className="fixed top-0 left-0 w-full h-full -z-10" />;
 };

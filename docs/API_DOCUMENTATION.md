@@ -1,9 +1,12 @@
-<!-- Rose full repository refresh 2026-05-17 -->
 # Rose the Healer Shaman - API Documentation
 
 ## Overview
 
-The Rose API provides a RESTful interface for voice-first therapeutic AI interactions. The API supports session management, voice processing with speech-to-text and text-to-speech, and health monitoring.
+The Rose API provides a RESTful interface for voice-first AI emotional support interactions. The API supports session
+management, voice processing with speech-to-text and text-to-speech, memory privacy controls, and health monitoring.
+
+Rose is not a therapist, doctor, emergency service, or clinical product. Client experiences should present her as an AI
+emotional support companion and route crisis or medical needs to appropriate human help.
 
 **Base URL:** `/api/v1`
 
@@ -75,7 +78,7 @@ Check system health and external service connectivity.
 
 ### Start Session
 
-Initialize a new healing session with Rose.
+Initialize a new emotional-support session with Rose.
 
 **Endpoint:** `POST /api/v1/session/start`
 
@@ -87,7 +90,7 @@ Initialize a new healing session with Rose.
 ```json
 {
   "session_id": "123e4567-e89b-12d3-a456-426614174000",
-  "message": "Session initialized. Ready to begin your healing journey with Rose."
+  "message": "Session initialized. Rose is ready for emotional support when you are."
 }
 ```
 
@@ -100,7 +103,7 @@ Initialize a new healing session with Rose.
 - Unique UUID v4 identifier
 - Conversation history tracking
 - Short-term memory (recent messages)
-- Long-term memory (emotional context in Qdrant)
+- Long-term memory (consented emotional-support context in Qdrant)
 - Automatic summarization after 20 messages
 - Persists across server restarts
 
@@ -129,7 +132,7 @@ Process voice input and generate audio response.
 **Response:**
 ```json
 {
-  "text": "I hear the pain in your words. It's okay to feel this way. Tell me more about what you're experiencing.",
+  "text": "That sounds heavy. Take one slow breath with me, and then tell me what part feels loudest right now.",
   "audio_url": "/api/v1/voice/audio/550e8400-e29b-41d4-a716-446655440000",
   "session_id": "123e4567-e89b-12d3-a456-426614174000"
 }
@@ -146,10 +149,10 @@ Process voice input and generate audio response.
 
 **Processing Flow:**
 1. Validate audio file size and format
-2. Transcribe audio using Groq Whisper
-3. Process through LangGraph workflow with memory
-4. Generate empathetic response using Rose's character
-5. Synthesize audio using ElevenLabs TTS
+2. Transcribe audio using the configured STT provider
+3. Process through LangGraph workflow with safety and memory controls
+4. Generate a short, voice-native emotional-support response
+5. Synthesize audio using the configured TTS provider
 6. Return text and audio URL
 
 ---

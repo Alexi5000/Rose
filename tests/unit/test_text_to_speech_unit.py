@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for Text-to-Speech module.
 
 Tests text-to-speech synthesis with caching, fallback behavior, circuit breaker
@@ -43,7 +42,7 @@ class TestBasicSynthesis:
             assert result == b"custom_voice_audio"
             # Verify custom voice was used
             call_args = mock_elevenlabs_client.generate.call_args
-            assert call_args[1]["voice"].voice_id == "custom_voice_123"
+            assert call_args[1]["voice_id"] == "custom_voice_123"
 
     @pytest.mark.asyncio
     async def test_synthesize_with_custom_stability(self, mock_elevenlabs_client):
@@ -57,7 +56,7 @@ class TestBasicSynthesis:
             assert result == b"stable_audio"
             # Verify stability was set
             call_args = mock_elevenlabs_client.generate.call_args
-            assert call_args[1]["voice"].settings.stability == 0.9
+            assert call_args[1]["voice_settings"].stability == 0.9
 
     @pytest.mark.asyncio
     async def test_synthesize_with_custom_similarity(self, mock_elevenlabs_client):
@@ -71,7 +70,7 @@ class TestBasicSynthesis:
             assert result == b"similar_audio"
             # Verify similarity was set
             call_args = mock_elevenlabs_client.generate.call_args
-            assert call_args[1]["voice"].settings.similarity_boost == 0.8
+            assert call_args[1]["voice_settings"].similarity_boost == 0.8
 
 
 @pytest.mark.unit
@@ -236,7 +235,7 @@ class TestFallbackBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -252,7 +251,7 @@ class TestFallbackBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
+                mock_breaker.call_async.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -280,7 +279,7 @@ class TestFallbackBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -298,7 +297,7 @@ class TestFallbackBehavior:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -319,7 +318,7 @@ class TestCircuitBreakerIntegration:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
+                mock_breaker.call_async.side_effect = CircuitBreakerError("Circuit breaker is OPEN")
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -327,7 +326,7 @@ class TestCircuitBreakerIntegration:
                 with pytest.raises(TextToSpeechError, match="temporarily unavailable"):
                     await tts.synthesize("Test message")
 
-                mock_breaker.call.assert_called_once()
+                mock_breaker.call_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_success_path(self, mock_elevenlabs_client):
@@ -337,14 +336,14 @@ class TestCircuitBreakerIntegration:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
                 result = await tts.synthesize("Test message")
 
                 assert result == b"success_audio"
-                mock_breaker.call.assert_called_once()
+                mock_breaker.call_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_records_failures(self, mock_elevenlabs_client):
@@ -354,7 +353,7 @@ class TestCircuitBreakerIntegration:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -362,7 +361,7 @@ class TestCircuitBreakerIntegration:
                 with pytest.raises(TextToSpeechError):
                     await tts.synthesize("Test message")
 
-                mock_breaker.call.assert_called_once()
+                mock_breaker.call_async.assert_called_once()
 
 
 @pytest.mark.unit
@@ -404,7 +403,7 @@ class TestErrorHandling:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -420,7 +419,7 @@ class TestErrorHandling:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -436,7 +435,7 @@ class TestErrorHandling:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -457,7 +456,7 @@ class TestCacheWarming:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech(enable_cache=True)
@@ -496,7 +495,7 @@ class TestCacheWarming:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech(enable_cache=True)
@@ -513,7 +512,7 @@ class TestCacheWarming:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech(enable_cache=True)
@@ -598,7 +597,7 @@ class TestAvailabilityTracking:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()
@@ -618,7 +617,7 @@ class TestAvailabilityTracking:
         with patch("ai_companion.modules.speech.text_to_speech.ElevenLabs", return_value=mock_elevenlabs_client):
             with patch("ai_companion.modules.speech.text_to_speech.get_elevenlabs_circuit_breaker") as mock_cb:
                 mock_breaker = MagicMock()
-                mock_breaker.call.side_effect = lambda func: func()
+                mock_breaker.call_async.side_effect = lambda func: func()
                 mock_cb.return_value = mock_breaker
 
                 tts = TextToSpeech()

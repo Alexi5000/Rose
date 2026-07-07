@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Memory system constants and configuration values.
 
 This module defines all magic numbers and configuration constants for the
@@ -40,8 +39,8 @@ How this works:
 - 0.7 = Related but distinct memories
 
 Current value (0.90) means:
-✅ "User loves coffee" and "User prefers coffee" -> Duplicate (don't store)
-❌ "User loves coffee" and "User drinks tea sometimes" -> Different (store both)
+OK "User loves coffee" and "User prefers coffee" -> Duplicate (don't store)
+ERROR "User loves coffee" and "User drinks tea sometimes" -> Different (store both)
 
 Impact:
 - Higher values -> More duplicates stored (memory bloat)
@@ -98,10 +97,10 @@ Model specs:
 - Size: ~80MB (fast download and loading)
 
 Why this model?
-✅ Great balance of speed, size, and accuracy
-✅ No GPU required (CPU-friendly for Docker deployments)
-✅ Well-tested for semantic search applications
-✅ Widely used and maintained by Hugging Face
+OK Great balance of speed, size, and accuracy
+OK No GPU required (CPU-friendly for Docker deployments)
+OK Well-tested for semantic search applications
+OK Widely used and maintained by Hugging Face
 
 Alternatives considered:
 - all-mpnet-base-v2: Better accuracy, 768 dims, slower (overkill for this use case)
@@ -109,9 +108,9 @@ Alternatives considered:
 - text-embedding-ada-002: OpenAI, requires API calls, cost overhead (YAGNI)
 
 Change impact:
-⚠️ Changing this model INVALIDATES all existing embeddings
-⚠️ Requires full re-indexing of memory collection
-⚠️ Different dimension size requires collection recreation
+WARNING Changing this model INVALIDATES all existing embeddings
+WARNING Requires full re-indexing of memory collection
+WARNING Different dimension size requires collection recreation
 """
 
 EMBEDDING_VECTOR_DIMENSIONS = 384
@@ -127,20 +126,20 @@ Do NOT change this value unless changing the embedding model.
 # USER ISOLATION CONFIGURATION
 # ==============================================================================
 
-ENABLE_SESSION_ISOLATION = False
+ENABLE_SESSION_ISOLATION = True
 """Enable session-based isolation for multi-user deployments.
 
 When enabled:
-✅ Each user's memories are tagged with session_id
-✅ Search queries filter by session_id (no cross-user leaks)
-✅ Data privacy is enforced at the database level
+OK Each user's memories are tagged with session_id
+OK Search queries filter by session_id (no cross-user leaks)
+OK Data privacy is enforced at the database level
 
 When disabled:
-⚠️ All memories are global (ONLY safe for single-user deployments)
-⚠️ Multi-user scenarios WILL leak data between users
+WARNING All memories are global (ONLY safe for single-user deployments)
+WARNING Multi-user scenarios WILL leak data between users
 
-Current: False (single-user demo mode - Rose remembers everything across sessions)
-Recommendation: Set to True for multi-user deployments
+Current: True (safe default for multi-user and open-source deployments)
+Recommendation: Keep True unless running an explicitly single-user local demo with no shared users
 """
 
 SESSION_ID_METADATA_KEY = "session_id"
@@ -165,7 +164,7 @@ Used in single-user deployments or during migration from non-isolated system.
 If you see this in production logs with ENABLE_SESSION_ISOLATION=True,
 it means session_id is not being passed correctly from the application layer.
 
-⚠️ Warning: Multiple users using DEFAULT_SESSION_ID will share memories
+WARNING Warning: Multiple users using DEFAULT_SESSION_ID will share memories
 """
 
 # ==============================================================================
@@ -221,13 +220,13 @@ LOG_MEMORY_SEARCH_SCORES = True
 """Enable detailed logging of memory search similarity scores.
 
 When enabled, logs each retrieved memory with its similarity score:
-🔍 Memory: 'User enjoys hiking' (score: 0.92)
-🔍 Memory: 'User prefers mountains over beach' (score: 0.87)
+SEARCH Memory: 'User enjoys hiking' (score: 0.92)
+SEARCH Memory: 'User prefers mountains over beach' (score: 0.87)
 
 Useful for:
-✅ Debugging retrieval relevance
-✅ Tuning DUPLICATE_DETECTION_SIMILARITY_THRESHOLD
-✅ Understanding semantic search behavior
+OK Debugging retrieval relevance
+OK Tuning DUPLICATE_DETECTION_SIMILARITY_THRESHOLD
+OK Understanding semantic search behavior
 
 Disable in production to reduce log volume.
 """
@@ -236,12 +235,12 @@ LOG_DUPLICATE_DETECTION = True
 """Log when duplicate memories are detected and skipped.
 
 When enabled, logs:
-♻️ Duplicate detected: 'User loves coffee' (similarity: 0.94 >= 0.90)
+DUPLICATE Duplicate detected: 'User loves coffee' (similarity: 0.94 >= 0.90)
 
 Useful for:
-✅ Verifying deduplication is working
-✅ Tuning similarity threshold
-✅ Debugging why memories aren't being stored
+OK Verifying deduplication is working
+OK Tuning similarity threshold
+OK Debugging why memories aren't being stored
 
 Disable in production if log volume is a concern.
 """
@@ -250,14 +249,14 @@ LOG_CIRCUIT_BREAKER_EVENTS = True
 """Log circuit breaker state changes (CLOSED -> OPEN -> HALF_OPEN).
 
 When enabled, logs:
-⚡ Circuit breaker OPEN: Qdrant (10 failures)
-⚡ Circuit breaker HALF_OPEN: Qdrant (testing recovery)
-✅ Circuit breaker CLOSED: Qdrant (recovered)
+CIRCUIT Circuit breaker OPEN: Qdrant (10 failures)
+CIRCUIT Circuit breaker HALF_OPEN: Qdrant (testing recovery)
+OK Circuit breaker CLOSED: Qdrant (recovered)
 
 Critical for:
-✅ Detecting service outages
-✅ Monitoring system health
-✅ Alerting on degraded performance
+OK Detecting service outages
+OK Monitoring system health
+OK Alerting on degraded performance
 
 Recommendation: Always keep enabled
 """

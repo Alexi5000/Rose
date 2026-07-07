@@ -1,9 +1,8 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎤 Voice Session Hook with Voice Activity Detection (VAD)
  *
  * Manages the complete voice interaction lifecycle:
- * 1. Tap to start -> Initialize mic stream
+ * 1. Tap to start → Initialize mic stream
  * 2. Auto-detect speech via VAD
  * 3. Auto-record when user speaks
  * 4. Auto-stop when silence detected
@@ -33,13 +32,28 @@ import {
   getSupportedMimeType,
   createAudioAnalyzer,
 } from '@/lib/audio-utils';
-import { processVoice, createSession } from '@/lib/api';
-import type { VoiceState, VoiceResponse } from '@/types/voice';
+import { processVoice, createSession, sanitizeApiUrlForLog } from '@/lib/api';
+import { WebSocketAudioJitterBuffer } from '@/lib/ws-audio-jitter-buffer';
+import type { VoiceState, VoiceResponse, WebSocketVoiceTimings } from '@/types/voice';
 
 const STATUS_LOG_FRAME_INTERVAL = Math.max(
   1,
   Math.round(1000 / VAD_LOOP_INTERVAL_MS)
 );
+
+const createBufferedAudioUrl = (chunks: Uint8Array[]): string => {
+  const totalLen = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const audioBytes = new Uint8Array(combined.byteLength);
+  audioBytes.set(combined);
+  const blob = new Blob([audioBytes.buffer], { type: 'audio/mpeg' });
+  return URL.createObjectURL(blob);
+};
 
 interface UseVoiceSessionReturn {
   /** Current state of voice session */
@@ -52,6 +66,17 @@ interface UseVoiceSessionReturn {
   startSession: () => Promise<void>;
   /** Stop listening session */
   stopSession: () => void;
+  /**
+   * Resume listening immediately after barge-in.
+   * Unlike startSession(), this does NOT re-initialize the mic/session ,
+   * it simply resets VAD state and moves to 'listening' when a stream is
+   * already active. Safe to call while state === 'speaking'.
+   */
+  resumeListening: () => void;
+  /** Inform the hook that Rose started speaking (pause VAD) */
+  notifyPlaybackStart: () => void;
+  /** Inform the hook that Rose finished speaking (resume VAD) */
+  notifyPlaybackEnd: () => void;
   /** Current session ID */
   sessionId: string | null;
   /** Current error message */
@@ -75,7 +100,10 @@ export function useVoiceSession({
   const [state, setState] = useState<VoiceState>('idle');
   const [userAmplitude, setUserAmplitude] = useState(0);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  // P5: Initialise from localStorage so conversation context survives page reloads
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    try { return localStorage.getItem('rose_session_id'); } catch { return null; }
+  });
   const [error, setError] = useState<string | null>(null);
 
   // Ref to always have current sessionId in callbacks
@@ -102,11 +130,24 @@ export function useVoiceSession({
   const stateRef = useRef<VoiceState>(state); // Ref for animation frame loop
   const vadStatusRef = useRef<'idle' | 'active' | 'paused'>('idle');
 
+  // 🔌 P4: WebSocket transport refs
+  const wsRef = useRef<WebSocket | null>(null);
+  const wsAudioChunksRef = useRef<Uint8Array[]>([]);
+  const wsAudioBufferRef = useRef<WebSocketAudioJitterBuffer | null>(null);
+  const wsResponseTextRef = useRef<string>('');
+  const wsUserTextRef = useRef<string>('');
+  const wsBlobUrlRef = useRef<string | null>(null);
+  const wsAudioUnavailableRef = useRef<boolean>(false);
+  const wsTurnIncompleteReasonRef = useRef<string | undefined>(undefined);
+  // Stable callback refs to avoid stale closures in the WS message handler
+  const onResponseRef = useRef(onResponse);
+  const onErrorRef = useRef(onError);
+
   const setVoiceState = useCallback((next: VoiceState) => {
     if (stateRef.current === next) {
       return;
     }
-    console.info(`🧠 State transition: ${stateRef.current} -> ${next}`);
+    console.info(`🧠 State transition: ${stateRef.current} → ${next}`);
     stateRef.current = next;
     setState(next);
   }, []);
@@ -134,6 +175,12 @@ export function useVoiceSession({
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  // Keep callback refs current so the WS message handler always calls the latest version
+  useEffect(() => {
+    onResponseRef.current = onResponse;
+    onErrorRef.current = onError;
+  }, [onResponse, onError]);
 
   /**
    * 🔁 Retry helper with exponential backoff
@@ -229,27 +276,53 @@ export function useVoiceSession({
       // Send to backend (use ref to get current sessionId)
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {
-        console.error('❌ No session ID - this should never happen!');
-        console.error(`   sessionId state: ${sessionId}, sessionIdRef: ${sessionIdRef.current}`);
+        console.error('No session ID available for voice turn');
         onError('Session error. Please refresh and try again.');
         setVoiceState('listening');
         return;
       }
 
       setVoiceState('processing');
-      try {
-        console.log(`📤 Sending to backend with session: ${currentSessionId.slice(0, 8)}...`);
-        const response = await processVoice(audioBlob, currentSessionId);
-        console.log(`✅ Response received from Rose`);
-        onResponse(response);
-      } catch (err) {
-        console.error('❌ Voice processing error:', err);
-        onError('Failed to process your voice. Please try again.');
-      } finally {
-        if (stateRef.current !== 'idle') {
-          setVoiceState('listening');
-        } else {
-          console.info('🧠 Skipping listening resume - session already idle');
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // 🔌 WebSocket path , streaming TTS (P4)
+        try {
+          wsAudioChunksRef.current = [];
+          wsAudioBufferRef.current?.reset();
+          wsAudioBufferRef.current = new WebSocketAudioJitterBuffer();
+          wsAudioBufferRef.current.start();
+          wsAudioUnavailableRef.current = false;
+          wsTurnIncompleteReasonRef.current = undefined;
+          wsResponseTextRef.current = '';
+          wsUserTextRef.current = '';
+          console.log(`Sending audio via WebSocket (${audioBlob.size} bytes)`);
+          const audioBytes = await audioBlob.arrayBuffer();
+          ws.send(JSON.stringify({ type: 'start_listening' }));
+          ws.send(audioBytes);
+          ws.send(JSON.stringify({ type: 'stop_listening' }));
+          // Response arrives asynchronously via ws.onmessage , no await here
+        } catch (wsErr) {
+          console.warn('⚠️ WebSocket send failed, trying HTTP fallback:', wsErr);
+          try {
+            const response = await processVoice(audioBlob, currentSessionId);
+            onResponse(response);
+          } catch (httpErr) {
+            console.error('❌ HTTP fallback error:', httpErr);
+            onError('Failed to process your voice. Please try again.');
+            if (stateRef.current !== 'idle') setVoiceState('listening');
+          }
+        }
+      } else {
+        // 🌐 HTTP path , batch request (WS not ready)
+        try {
+          console.log('Sending audio via HTTP fallback');
+          const response = await processVoice(audioBlob, currentSessionId);
+          console.log(`✅ Response received from Rose`);
+          onResponse(response);
+        } catch (err) {
+          console.error('❌ Voice processing error:', err);
+          onError('Failed to process your voice. Please try again.');
+          if (stateRef.current !== 'idle') setVoiceState('listening');
         }
       }
     };
@@ -424,27 +497,34 @@ export function useVoiceSession({
     setError(null);
 
     try {
-      // Step 1: Create session with retry logic (if not already exists)
-      if (!sessionId) {
+      // Step 1: Create or reuse session (P5: activeSessionId may be pre-loaded from localStorage)
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
         console.log('🎫 No existing session - creating new one...');
         try {
           const sessionResponse = await retryWithBackoff(() => createSession());
-          const newSessionId = sessionResponse.session_id;
-          setSessionId(newSessionId);
-          console.log(`✅ Session established: ${newSessionId.slice(0, 8)}...`);
-          console.log(`   sessionIdRef will be: ${newSessionId.slice(0, 8)}...`);
+          activeSessionId = sessionResponse.session_id;
+          setSessionId(activeSessionId);
+          localStorage.setItem('rose_session_id', activeSessionId); // P5: persist across reloads
+          console.log('Session established');
         } catch (sessionError) {
           console.error('❌ Failed to create session after retries:', sessionError);
           onError('Unable to connect to Rose. Please check your connection and try again.');
           return;
         }
       } else {
-        console.log(`♻️ Reusing existing session: ${sessionId.slice(0, 8)}...`);
+        console.log('Reusing existing session');
       }
 
       // Step 2: Request microphone access
       console.log('🎙️ Requesting microphone access...');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        },
+      });
       streamRef.current = stream;
       console.log('✅ Microphone access granted');
 
@@ -468,9 +548,131 @@ export function useVoiceSession({
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
+      // Step 4: Connect WebSocket for streaming TTS (P4)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/api/v1/voice/ws?session_id=${activeSessionId}`;
+      console.log(`Connecting WebSocket: ${sanitizeApiUrlForLog(wsUrl)}`);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => console.log('🔌 WebSocket connected');
+      ws.onerror = () => console.warn('⚠️ WebSocket error , falling back to HTTP');
+      ws.onclose = (ev) => console.log(`🔌 WebSocket closed (code=${ev.code})`);
+      ws.onmessage = async (event) => {
+        const data = event.data;
+        // Binary audio chunk
+        if (data instanceof ArrayBuffer) {
+          const chunk = new Uint8Array(data);
+          wsAudioChunksRef.current.push(chunk);
+          wsAudioBufferRef.current?.push(chunk);
+          return;
+        }
+        if (data instanceof Blob) {
+          data.arrayBuffer().then((buf) => {
+            const chunk = new Uint8Array(buf);
+            wsAudioChunksRef.current.push(chunk);
+            wsAudioBufferRef.current?.push(chunk);
+          });
+          return;
+        }
+        // JSON control message
+        let msg: {
+          type: string;
+          text?: string;
+          reason?: string;
+          interrupted?: boolean;
+          timings?: WebSocketVoiceTimings;
+        };
+        try { msg = JSON.parse(data as string); } catch { return; }
+        switch (msg.type) {
+          case 'transcription':
+            wsUserTextRef.current = msg.text || '';
+            break;
+          case 'turn_incomplete':
+            wsTurnIncompleteReasonRef.current = msg.reason;
+            break;
+          case 'response':
+            wsResponseTextRef.current = msg.text || '';
+            break;
+          case 'audio_start':
+            if (!wsAudioBufferRef.current) {
+              wsAudioBufferRef.current = new WebSocketAudioJitterBuffer();
+              wsAudioBufferRef.current.start();
+            }
+            if (stateRef.current !== 'idle') {
+              setVoiceState('speaking');
+            }
+            break;
+          case 'audio_unavailable':
+            wsResponseTextRef.current = msg.text || wsResponseTextRef.current;
+            wsAudioUnavailableRef.current = true;
+            wsAudioChunksRef.current = [];
+            wsAudioBufferRef.current?.reset();
+            wsAudioBufferRef.current = null;
+            break;
+          case 'audio_end': {
+            const chunks = wsAudioChunksRef.current;
+            if (msg.interrupted) {
+              wsAudioChunksRef.current = [];
+              wsResponseTextRef.current = '';
+              wsAudioBufferRef.current?.reset();
+              wsAudioBufferRef.current = null;
+              wsAudioUnavailableRef.current = false;
+              wsTurnIncompleteReasonRef.current = undefined;
+              if (stateRef.current !== 'idle') {
+                setVoiceState('listening');
+                resetInactivityTimer();
+              }
+              break;
+            }
+            if (chunks.length > 0 && !wsAudioUnavailableRef.current) {
+              const bufferedAudio = await wsAudioBufferRef.current?.finish();
+              if (wsBlobUrlRef.current) URL.revokeObjectURL(wsBlobUrlRef.current);
+              wsBlobUrlRef.current = bufferedAudio?.audioUrl || createBufferedAudioUrl(chunks);
+              onResponseRef.current({
+                text: wsResponseTextRef.current,
+                user_text: wsUserTextRef.current,
+                audio_url: wsBlobUrlRef.current,
+                audio_streamed: bufferedAudio?.streamed ?? false,
+                turn_incomplete_reason: wsTurnIncompleteReasonRef.current,
+                session_id: sessionIdRef.current || '',
+                timings: msg.timings,
+              });
+            } else {
+              onResponseRef.current({
+                text: wsResponseTextRef.current,
+                user_text: wsUserTextRef.current,
+                audio_url: '',
+                turn_incomplete_reason: wsTurnIncompleteReasonRef.current,
+                session_id: sessionIdRef.current || '',
+                timings: msg.timings,
+              });
+            }
+            wsAudioChunksRef.current = [];
+            if (!wsAudioBufferRef.current?.isStreaming) {
+              wsAudioBufferRef.current = null;
+            }
+            wsAudioUnavailableRef.current = false;
+            wsTurnIncompleteReasonRef.current = undefined;
+            if (stateRef.current !== 'idle') {
+              setVoiceState('listening');
+              resetInactivityTimer();
+            }
+            break;
+          }
+          case 'error':
+            wsAudioBufferRef.current?.reset();
+            wsAudioBufferRef.current = null;
+            wsAudioUnavailableRef.current = false;
+            wsTurnIncompleteReasonRef.current = undefined;
+            onErrorRef.current(msg.text || 'Processing failed');
+            if (stateRef.current !== 'idle') setVoiceState('listening');
+            break;
+        }
+      };
+
       setVoiceState('listening');
 
-      // Step 4: Start VAD loop
       // Step 5: Start inactivity timer
       resetInactivityTimer();
 
@@ -516,6 +718,22 @@ export function useVoiceSession({
       audioContextRef.current = null;
     }
 
+    // Close WebSocket and clean up blob URLs (P4)
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'session_stopped');
+      wsRef.current = null;
+    }
+    if (wsBlobUrlRef.current) {
+      URL.revokeObjectURL(wsBlobUrlRef.current);
+      wsBlobUrlRef.current = null;
+    }
+    wsAudioBufferRef.current?.reset();
+    wsAudioBufferRef.current = null;
+    wsAudioChunksRef.current = [];
+    wsResponseTextRef.current = '';
+    wsAudioUnavailableRef.current = false;
+    wsTurnIncompleteReasonRef.current = undefined;
+
     // Reset state
     analyserRef.current = null;
     mediaRecorderRef.current = null;
@@ -542,12 +760,84 @@ export function useVoiceSession({
     };
   }, [stopSession]);
 
+  const notifyPlaybackStart = useCallback(() => {
+    // Pause VAD while Rose is speaking
+    if (stateRef.current !== 'idle') {
+      setVoiceState('speaking');
+    }
+  }, [setVoiceState]);
+
+  const notifyPlaybackEnd = useCallback(() => {
+    // Resume VAD after Rose finishes
+    if (stateRef.current !== 'idle') {
+      setVoiceState('listening');
+      resetInactivityTimer();
+    }
+  }, [resetInactivityTimer, setVoiceState]);
+
+  /**
+   * 🔄 Resume listening immediately (barge-in path).
+   *
+   * Called when the user interrupts Rose mid-speech. The mic stream and
+   * AudioContext are already open; we only need to reset VAD counters and
+   * flip back to 'listening' so the RAF loop re-activates.
+   */
+  const resumeListening = useCallback(() => {
+    if (!streamRef.current || !analyserRef.current) {
+      // Fallback: full session restart if the stream was somehow closed
+      console.warn('⚠️ resumeListening: no active stream, falling back to startSession()');
+      startSession();
+      return;
+    }
+
+    // Signal interrupt to server so it stops streaming audio (P4)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
+    }
+    wsAudioBufferRef.current?.reset();
+    wsAudioBufferRef.current = null;
+    wsAudioUnavailableRef.current = false;
+    wsTurnIncompleteReasonRef.current = undefined;
+
+    console.info('🔄 resumeListening: resetting VAD and resuming listening after barge-in');
+
+    // Discard any in-flight recording
+    if (utteranceActiveRef.current) {
+      clearDeferredStopTimeout();
+      clearMaxRecordingTimeout();
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      utteranceActiveRef.current = false;
+    }
+
+    // Reset VAD counters
+    activationFramesRef.current = 0;
+    deactivationFramesRef.current = 0;
+    recorderStartingRef.current = false;
+    setIsUserSpeaking(false);
+    audioChunksRef.current = [];
+
+    // Resume the state machine
+    setVoiceState('listening');
+    resetInactivityTimer();
+  }, [
+    startSession,
+    clearDeferredStopTimeout,
+    clearMaxRecordingTimeout,
+    setVoiceState,
+    resetInactivityTimer,
+  ]);
+
   return {
     state,
     userAmplitude,
     isUserSpeaking,
     startSession,
     stopSession,
+    resumeListening,
+    notifyPlaybackStart,
+    notifyPlaybackEnd,
     sessionId,
     error,
   };

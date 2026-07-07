@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Startup initialization for the long-term memory system.
 
 This module provides functions to initialize and verify the Qdrant vector
@@ -19,6 +18,7 @@ Usage:
 import logging
 from typing import Optional
 
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 from ai_companion.modules.memory.long_term.constants import QDRANT_COLLECTION_NAME
 from ai_companion.modules.memory.long_term.vector_store import get_vector_store
 
@@ -56,11 +56,11 @@ def initialize_memory_system(required: bool = False) -> bool:
         >>> initialize_memory_system(required=True)  # Raises if fails
     """
     try:
-        logger.info("🚀 Initializing long-term memory system...")
+        logger.info("START Initializing long-term memory system...")
 
         # Get or create VectorStore singleton
         vector_store = get_vector_store()
-        logger.info("✅ VectorStore instance created")
+        logger.info("OK VectorStore instance created")
 
         # Initialize collection (creates if doesn't exist)
         success = vector_store.initialize_collection()
@@ -70,22 +70,27 @@ def initialize_memory_system(required: bool = False) -> bool:
             info = vector_store.get_collection_info()
             if info:
                 logger.info(
-                    f"✅ Memory system ready: {info['points_count']} memories in "
+                    f"OK Memory system ready: {info['points_count']} memories in "
                     f"'{QDRANT_COLLECTION_NAME}' (status: {info['status']})"
                 )
             else:
-                logger.info(f"✅ Memory system ready: '{QDRANT_COLLECTION_NAME}' collection created")
+                logger.info(f"OK Memory system ready: '{QDRANT_COLLECTION_NAME}' collection created")
             return True
         else:
-            error_msg = f"❌ Failed to initialize collection '{QDRANT_COLLECTION_NAME}'"
+            error_msg = f"ERROR Failed to initialize collection '{QDRANT_COLLECTION_NAME}'"
             logger.error(error_msg)
             if required:
                 raise RuntimeError(error_msg)
             return False
 
     except Exception as e:
-        error_msg = f"❌ Memory system initialization failed: {e}"
-        logger.error(error_msg, exc_info=True)
+        error_msg = "ERROR Memory system initialization failed"
+        logger.error(
+            "%s: %s",
+            error_msg,
+            exception_message_for_log(e),
+            exc_info=exc_info_for_log(),
+        )
         if required:
             raise RuntimeError(error_msg) from e
         return False
@@ -127,7 +132,7 @@ def verify_memory_system() -> Optional[dict]:
                 "collection_status": info["status"],
             }
         else:
-            logger.warning("⚠️ Memory system check: Collection not available")
+            logger.warning("WARNING Memory system check: Collection not available")
             return {
                 "status": "degraded",
                 "collection": QDRANT_COLLECTION_NAME,
@@ -136,5 +141,5 @@ def verify_memory_system() -> Optional[dict]:
             }
 
     except Exception as e:
-        logger.error(f"❌ Memory system check failed: {e}")
+        logger.error("ERROR Memory system check failed: %s", exception_message_for_log(e))
         return None

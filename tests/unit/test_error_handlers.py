@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for error handler decorators.
 
 This module tests the refactored error handling decorators to ensure they work
@@ -23,6 +22,8 @@ from ai_companion.core.exceptions import (
     MemoryError,
     WorkflowError,
 )
+from ai_companion.core.privacy_logging import REDACTED_TEXT
+from ai_companion.settings import settings
 
 
 class TestHandleApiErrors:
@@ -161,6 +162,26 @@ class TestHandleApiErrors:
         mock_logger.error.assert_called_once()
         mock_metrics.record_error.assert_called_once_with("test_service_api_error")
 
+    @patch("ai_companion.core.error_handlers.logger")
+    @patch("ai_companion.core.error_handlers.metrics")
+    def test_api_error_log_redacts_exception_message(self, mock_metrics, mock_logger, monkeypatch):
+        """Provider exceptions can echo user text and should be redacted by default."""
+
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        @handle_api_errors("test_service")
+        def sync_func():
+            raise ExternalAPIError("provider echoed private grief transcript")
+
+        with pytest.raises(HTTPException):
+            sync_func()
+
+        _, kwargs = mock_logger.error.call_args
+        assert kwargs["extra"]["error"] == REDACTED_TEXT
+        assert kwargs["extra"]["error_type"] == "ExternalAPIError"
+        assert kwargs["exc_info"] is False
+        assert "private grief" not in str(mock_logger.error.call_args)
+
 
 class TestHandleWorkflowErrors:
     """Tests for handle_workflow_errors decorator."""
@@ -271,6 +292,26 @@ class TestHandleWorkflowErrors:
         mock_logger.error.assert_called_once()
         mock_metrics.record_error.assert_called_once_with("workflow_execution_failed")
 
+    @patch("ai_companion.core.error_handlers.logger")
+    @patch("ai_companion.core.error_handlers.metrics")
+    def test_workflow_error_log_redacts_exception_message(self, mock_metrics, mock_logger, monkeypatch):
+        """Workflow errors should not log raw transcript or graph-state details by default."""
+
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        @handle_workflow_errors
+        def sync_workflow():
+            raise WorkflowError("graph echoed private grief transcript")
+
+        with pytest.raises(HTTPException):
+            sync_workflow()
+
+        _, kwargs = mock_logger.error.call_args
+        assert kwargs["extra"]["error"] == REDACTED_TEXT
+        assert kwargs["extra"]["error_type"] == "WorkflowError"
+        assert kwargs["exc_info"] is False
+        assert "private grief" not in str(mock_logger.error.call_args)
+
 
 class TestHandleMemoryErrors:
     """Tests for handle_memory_errors decorator."""
@@ -368,6 +409,24 @@ class TestHandleMemoryErrors:
         assert result is None
         mock_logger.warning.assert_called_once()
         mock_metrics.record_error.assert_called_once_with("memory_operation_failed")
+
+    @patch("ai_companion.core.error_handlers.logger")
+    @patch("ai_companion.core.error_handlers.metrics")
+    def test_memory_error_log_redacts_exception_message(self, mock_metrics, mock_logger, monkeypatch):
+        """Memory failures may include sensitive facts and should be redacted in logs."""
+
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        @handle_memory_errors
+        def sync_memory_op():
+            raise MemoryError("qdrant echoed private grief transcript")
+
+        assert sync_memory_op() is None
+
+        _, kwargs = mock_logger.warning.call_args
+        assert kwargs["extra"]["error"] == REDACTED_TEXT
+        assert kwargs["extra"]["error_type"] == "MemoryError"
+        assert "private grief" not in str(mock_logger.warning.call_args)
 
 
 class TestHandleValidationErrors:
@@ -476,6 +535,25 @@ class TestHandleValidationErrors:
 
         mock_logger.warning.assert_called_once()
         mock_metrics.record_error.assert_called_once_with("validation_error")
+
+    @patch("ai_companion.core.error_handlers.logger")
+    @patch("ai_companion.core.error_handlers.metrics")
+    def test_validation_error_log_redacts_exception_message(self, mock_metrics, mock_logger, monkeypatch):
+        """Validation details can include raw user text; logs keep them redacted."""
+
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        @handle_validation_errors
+        def sync_validate():
+            raise ValueError("audio contained private grief transcript")
+
+        with pytest.raises(HTTPException):
+            sync_validate()
+
+        _, kwargs = mock_logger.warning.call_args
+        assert kwargs["extra"]["error"] == REDACTED_TEXT
+        assert kwargs["extra"]["error_type"] == "ValueError"
+        assert "private grief" not in str(mock_logger.warning.call_args)
 
 
 class TestUserFacingErrorMessages:

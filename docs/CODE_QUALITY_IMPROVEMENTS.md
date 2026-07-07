@@ -208,8 +208,8 @@ All have sensible defaults and don't require immediate configuration.
 
 ## Related Documentation
 
-- [Deployment Readiness Requirements](../specs/deployment-readiness-review/requirements.md)
-- [Deployment Readiness Design](../specs/deployment-readiness-review/design.md)
+- Deployment readiness requirements, historical planning artifact, not tracked in this branch
+- Deployment readiness design, historical planning artifact, not tracked in this branch
 - [Circuit Breakers Documentation](CIRCUIT_BREAKERS.md)
 - [Security Implementation](SECURITY.md)
 

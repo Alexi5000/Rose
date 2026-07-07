@@ -12,6 +12,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ai_companion.interfaces.web.app import create_app
 from ai_companion.interfaces.web.routes.voice import get_compiled_graph, get_stt, get_tts
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def app():

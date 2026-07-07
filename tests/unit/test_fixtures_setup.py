@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Test to verify test infrastructure is properly set up.
 
 This test module validates that all fixtures are accessible and working correctly.

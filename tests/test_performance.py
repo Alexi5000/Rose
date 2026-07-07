@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from ai_companion.interfaces.web.app import create_app
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def client():

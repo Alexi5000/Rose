@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎤 useVoiceSession Hook Smoke Tests
  *
@@ -18,6 +17,9 @@ vi.mock('@/lib/api', () => ({
   processVoice: vi.fn(),
   getErrorMessage: vi.fn(() => 'Mock error message'),
   createSession: vi.fn(),
+  sanitizeApiUrlForLog: vi.fn((url: string | undefined) =>
+    (url ?? '[unknown-url]').replace(/session_id=[^&#]+/g, 'session_id=[session_id]')
+  ),
 }));
 
 // Constants (no magic numbers!)
@@ -87,7 +89,13 @@ describe('🎤 useVoiceSession Hook', () => {
       expect(result.current.state).toBe('listening');
     });
 
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 16000,
+      },
+    });
 
     console.log('  ✅ Session started, state is listening');
   });

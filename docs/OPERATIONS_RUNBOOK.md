@@ -3,7 +3,7 @@
 
 ## Overview
 
-This runbook provides troubleshooting guidance for common operational issues with the Rose the Healer Shaman application. Use this guide for quick diagnosis and resolution of production incidents.
+This runbook provides troubleshooting guidance for common operational issues with Rose. Use this guide for quick triage and resolution of production incidents.
 
 ## Quick Reference
 

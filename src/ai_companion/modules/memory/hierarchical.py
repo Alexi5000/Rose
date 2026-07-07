@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Hierarchical memory system for the AI companion.
 
 file: src/ai_companion/modules/memory/hierarchical.py
@@ -23,7 +22,7 @@ Tier 3: Long-Term Memory (Qdrant vector store)
 └── Memory decay mechanism
 
 Key features:
-- Hierarchical retrieval (working -> session -> long-term)
+- Hierarchical retrieval (working → session → long-term)
 - Automatic memory promotion and demotion
 - Conflict detection between memory tiers
 - Session summarization for context compression
@@ -35,6 +34,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage
+
+from ai_companion.core.privacy_logging import sensitive_text_for_log, session_id_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ class WorkingMemory:
     def update_emotion(self, emotion: str) -> None:
         """Update the current detected emotional state."""
         self.current_emotion = emotion
-        logger.debug(f"Working memory emotion updated: {emotion}")
+        logger.debug("Working memory emotion updated: %s", sensitive_text_for_log(emotion))
 
     def add_topic(self, topic: str) -> None:
         """Add an active topic to working memory."""
@@ -147,7 +148,11 @@ class SessionMemory:
         self.turn_count += 1
 
         if self.turn_count % SESSION_SUMMARY_THRESHOLD == 0:
-            logger.info(f"Session {self.session_id}: Turn {self.turn_count}, consider summarization")
+            logger.info(
+                "session_summarization_due session_log_id=%s turn_count=%s",
+                session_id_for_log(self.session_id),
+                self.turn_count,
+            )
 
     def needs_summarization(self) -> bool:
         """Check if the session is long enough to benefit from summarization."""
@@ -156,7 +161,7 @@ class SessionMemory:
     def update_summary(self, new_summary: str) -> None:
         """Update the session summary."""
         self.summary = new_summary
-        logger.debug(f"Session summary updated: {new_summary[:100]}...")
+        logger.debug("Session summary updated: %s", sensitive_text_for_log(new_summary, max_chars=100))
 
 
 class HierarchicalMemoryManager:
@@ -284,7 +289,11 @@ class HierarchicalMemoryManager:
                 # Check for negation patterns
                 negations = ["not", "no", "never", "doesn't", "don't", "isn't", "aren't", "changed"]
                 if any(neg in new_fact.lower() for neg in negations):
-                    logger.info(f"Potential conflict detected: '{new_fact}' vs '{existing}'")
+                    logger.info(
+                        "Potential conflict detected: new=%s existing=%s",
+                        sensitive_text_for_log(new_fact, max_chars=100),
+                        sensitive_text_for_log(existing, max_chars=100),
+                    )
                     return existing
 
         return None
@@ -293,7 +302,7 @@ class HierarchicalMemoryManager:
         """Clear session and working memory (called at session end)."""
         self.working.clear()
         self.session = SessionMemory(session_id=self.session_id)
-        logger.info(f"Hierarchical memory cleared for session {self.session_id}")
+        logger.info("hierarchical_memory_cleared session_log_id=%s", session_id_for_log(self.session_id))
 
 
 # Session-based cache of hierarchical memory managers
@@ -311,7 +320,7 @@ def get_hierarchical_memory(session_id: str) -> HierarchicalMemoryManager:
     """
     if session_id not in _hierarchical_managers:
         _hierarchical_managers[session_id] = HierarchicalMemoryManager(session_id)
-        logger.debug(f"Created hierarchical memory for session {session_id}")
+        logger.debug("hierarchical_memory_created session_log_id=%s", session_id_for_log(session_id))
 
     return _hierarchical_managers[session_id]
 
@@ -325,4 +334,4 @@ def clear_hierarchical_memory(session_id: str) -> None:
     if session_id in _hierarchical_managers:
         _hierarchical_managers[session_id].clear_session()
         del _hierarchical_managers[session_id]
-        logger.info(f"Removed hierarchical memory for session {session_id}")
+        logger.info("hierarchical_memory_removed session_log_id=%s", session_id_for_log(session_id))

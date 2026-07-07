@@ -37,7 +37,7 @@ Low Impact, Low Effort (Nice to Have)
 **Owner:** Unassigned
 
 **Description:**
-Preemptively warm the TTS cache with common therapeutic phrases during application startup or idle time.
+Preemptively warm the TTS cache with common supportive phrases during application startup or idle time.
 
 **Implementation:**
 ```python

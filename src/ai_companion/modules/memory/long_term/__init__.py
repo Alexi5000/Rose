@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Long-term memory module for AI Companion.
 
 This module provides long-term memory storage and retrieval using Qdrant vector database.

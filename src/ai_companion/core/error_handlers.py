@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Standardized error handling decorators for AI Companion application.
 
 This module provides decorators for consistent error handling across the application,
@@ -45,6 +44,7 @@ from ai_companion.core.exceptions import (
     WorkflowError,
 )
 from ai_companion.core.metrics import metrics
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,11 @@ def _handle_api_error_logic(
     if isinstance(exception, CircuitBreakerError):
         logger.error(
             f"Circuit breaker open for {service_name}",
-            extra={"service": service_name, "error": str(exception)},
+            extra={
+                "service": service_name,
+                "error": exception_message_for_log(exception),
+                "error_type": type(exception).__name__,
+            },
         )
         metrics.record_error(f"{service_name}_circuit_breaker_open")
         message = fallback_message or f"{service_name} service is temporarily unavailable"
@@ -82,8 +86,12 @@ def _handle_api_error_logic(
     elif isinstance(exception, ExternalAPIError):
         logger.error(
             f"API error in {func_name}",
-            extra={"service": service_name, "error": str(exception)},
-            exc_info=True,
+            extra={
+                "service": service_name,
+                "error": exception_message_for_log(exception),
+                "error_type": type(exception).__name__,
+            },
+            exc_info=exc_info_for_log(),
         )
         metrics.record_error(f"{service_name}_api_error")
         message = fallback_message or "External service error occurred"
@@ -91,8 +99,12 @@ def _handle_api_error_logic(
     else:
         logger.error(
             f"Unexpected error in {func_name}",
-            extra={"service": service_name, "error": str(exception)},
-            exc_info=True,
+            extra={
+                "service": service_name,
+                "error": exception_message_for_log(exception),
+                "error_type": type(exception).__name__,
+            },
+            exc_info=exc_info_for_log(),
         )
         metrics.record_error(f"{service_name}_unexpected_error")
         raise HTTPException(status_code=500, detail="Internal server error") from exception
@@ -163,8 +175,8 @@ def _handle_workflow_error_logic(func_name: str, exception: Exception) -> None:
     if isinstance(exception, WorkflowError):
         logger.error(
             f"Workflow error in {func_name}",
-            extra={"error": str(exception)},
-            exc_info=True,
+            extra={"error": exception_message_for_log(exception), "error_type": type(exception).__name__},
+            exc_info=exc_info_for_log(),
         )
         metrics.record_error("workflow_execution_failed")
         raise HTTPException(
@@ -174,8 +186,8 @@ def _handle_workflow_error_logic(func_name: str, exception: Exception) -> None:
     else:
         logger.error(
             f"Unexpected workflow error in {func_name}",
-            extra={"error": str(exception)},
-            exc_info=True,
+            extra={"error": exception_message_for_log(exception), "error_type": type(exception).__name__},
+            exc_info=exc_info_for_log(),
         )
         metrics.record_error("workflow_unexpected_error")
         raise HTTPException(status_code=500, detail="Internal server error") from exception
@@ -240,14 +252,14 @@ def _handle_memory_error_logic(func_name: str, exception: Exception) -> None:
     if isinstance(exception, MemoryError):
         logger.warning(
             f"Memory operation failed in {func_name}, continuing with degraded memory",
-            extra={"error": str(exception)},
+            extra={"error": exception_message_for_log(exception), "error_type": type(exception).__name__},
         )
         metrics.record_error("memory_operation_failed")
     else:
         logger.error(
             f"Unexpected memory error in {func_name}",
-            extra={"error": str(exception)},
-            exc_info=True,
+            extra={"error": exception_message_for_log(exception), "error_type": type(exception).__name__},
+            exc_info=exc_info_for_log(),
         )
         metrics.record_error("memory_unexpected_error")
 
@@ -313,7 +325,7 @@ def _handle_validation_error_logic(func_name: str, exception: ValueError) -> Non
     """
     logger.warning(
         f"Validation error in {func_name}",
-        extra={"error": str(exception)},
+        extra={"error": exception_message_for_log(exception), "error_type": type(exception).__name__},
     )
     metrics.record_error("validation_error")
     raise HTTPException(status_code=400, detail=str(exception)) from exception

@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Mock API response fixtures for testing.
 
 This module provides sample API responses from external services
@@ -49,7 +48,7 @@ def mock_groq_chat_response() -> Dict[str, Any]:
         "id": "chatcmpl-test123",
         "object": "chat.completion",
         "created": int(datetime.now().timestamp()),
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "choices": [
             {
                 "index": 0,

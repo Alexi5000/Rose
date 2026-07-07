@@ -1,12 +1,11 @@
-# Rose full repository refresh 2026-05-17
 """Database backup utilities for Rose the Healer Shaman."""
 
 import logging
-import os
 import shutil
-import tempfile
 from datetime import datetime
 from pathlib import Path
+
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +13,15 @@ logger = logging.getLogger(__name__)
 class BackupManager:
     """Manages database backups for SQLite and other data files."""
 
-    def __init__(self, backup_dir: str | None = None):
+    def __init__(self, backup_dir: str = "/app/data/backups"):
         """Initialize the backup manager.
 
         Args:
             backup_dir: Directory to store backups
         """
-        configured_dir = backup_dir or os.getenv("ROSE_BACKUP_DIR", "/app/data/backups")
-        self.backup_dir = Path(configured_dir)
-        try:
-            self.backup_dir.mkdir(parents=True, exist_ok=True)
-        except PermissionError:
-            fallback_dir = Path(tempfile.gettempdir()) / "rose" / "backups"
-            fallback_dir.mkdir(parents=True, exist_ok=True)
-            logger.warning("Backup directory %s is not writable, using %s", self.backup_dir, fallback_dir)
-            self.backup_dir = fallback_dir
-        logger.info(f"Backup manager initialized with directory: {self.backup_dir}")
+        self.backup_dir = Path(backup_dir)
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Backup manager initialized")
 
     def backup_database(self, max_backups: int = 7, db_path: str | None = None) -> Path | None:
         """Create a backup of the SQLite database.
@@ -50,7 +42,7 @@ class BackupManager:
             db_path = Path(db_path)
 
             if not db_path.exists():
-                logger.warning(f"Database file not found: {db_path}")
+                logger.warning("Database file not found")
                 return None
 
             # Create backup filename with timestamp (including microseconds for uniqueness)
@@ -60,7 +52,7 @@ class BackupManager:
 
             # Copy database file
             shutil.copy2(db_path, backup_path)
-            logger.info(f"Database backup created: {backup_path}")
+            logger.info("Database backup created: %s", backup_path.name)
 
             # Cleanup old backups
             self._cleanup_old_backups(max_backups)
@@ -68,7 +60,11 @@ class BackupManager:
             return backup_path
 
         except Exception as e:
-            logger.error(f"Failed to create database backup: {e}", exc_info=True)
+            logger.error(
+                "Failed to create database backup: %s",
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
             return None
 
     def _cleanup_old_backups(self, max_backups: int):
@@ -86,10 +82,14 @@ class BackupManager:
             # Remove old backups beyond the limit
             for old_backup in backup_files[max_backups:]:
                 old_backup.unlink()
-                logger.info(f"Removed old backup: {old_backup.name}")
+                logger.info("Removed old backup: %s", old_backup.name)
 
         except Exception as e:
-            logger.error(f"Failed to cleanup old backups: {e}", exc_info=True)
+            logger.error(
+                "Failed to cleanup old backups: %s",
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
 
     def list_backups(self) -> list[dict]:
         """List all available backups with metadata.
@@ -114,7 +114,11 @@ class BackupManager:
             return backups
 
         except Exception as e:
-            logger.error(f"Failed to list backups: {e}", exc_info=True)
+            logger.error(
+                "Failed to list backups: %s",
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
             return []
 
     def restore_backup(self, backup_filename: str, db_path: str | None = None) -> bool:
@@ -131,7 +135,7 @@ class BackupManager:
             backup_path = self.backup_dir / backup_filename
 
             if not backup_path.exists():
-                logger.error(f"Backup file not found: {backup_filename}")
+                logger.error("Backup file not found")
                 return False
 
             if db_path is None:
@@ -145,16 +149,20 @@ class BackupManager:
             if db_path.exists():
                 current_backup = db_path.with_suffix(".db.before_restore")
                 shutil.copy2(db_path, current_backup)
-                logger.info(f"Created safety backup: {current_backup}")
+                logger.info("Created safety backup: %s", current_backup.name)
 
             # Restore from backup
             shutil.copy2(backup_path, db_path)
-            logger.info(f"Database restored from backup: {backup_filename}")
+            logger.info("Database restored from backup: %s", backup_filename)
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to restore backup: {e}", exc_info=True)
+            logger.error(
+                "Failed to restore backup: %s",
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
             return False
 
 

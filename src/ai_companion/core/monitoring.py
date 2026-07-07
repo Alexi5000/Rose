@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Monitoring and alerting system for Rose application.
 
 This module provides comprehensive monitoring capabilities including:
@@ -15,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics
+from ai_companion.core.privacy_logging import exception_message_for_log, sensitive_text_for_log
 
 logger = get_logger(__name__)
 
@@ -118,7 +118,7 @@ class MonitoringSystem:
             except ImportError:
                 logger.warning("sentry_not_available", message="Sentry DSN configured but sentry-sdk not installed")
             except Exception as e:
-                logger.error("sentry_init_failed", error=str(e))
+                logger.error("sentry_init_failed", error=exception_message_for_log(e), error_type=type(e).__name__)
         else:
             logger.info("sentry_not_configured", message="SENTRY_DSN not set")
 
@@ -258,8 +258,7 @@ class MonitoringSystem:
         response_times = []
         for name, hist_data in histograms.items():
             if "duration_ms" in name:
-                # Use max as approximation for P95 (simplified)
-                response_times.append(hist_data.get("max", 0))
+                response_times.append(hist_data.get("p95", hist_data.get("max", 0)))
 
         if response_times:
             derived["response_time_p95_ms"] = max(response_times)
@@ -368,7 +367,7 @@ class MonitoringSystem:
                     },
                 )
             except Exception as e:
-                logger.error("sentry_alert_failed", error=str(e))
+                logger.error("sentry_alert_failed", error=exception_message_for_log(e), error_type=type(e).__name__)
 
         # Add to active alerts
         self._active_alerts.append(alert)
@@ -427,24 +426,30 @@ class MonitoringSystem:
             exception: Exception to capture
             context: Optional context information
         """
+        sanitized_context = {key: sensitive_text_for_log(str(value)) for key, value in (context or {}).items()}
+
         if self._sentry_enabled:
             try:
                 import sentry_sdk
 
                 with sentry_sdk.push_scope() as scope:
-                    if context:
-                        for key, value in context.items():
+                    if sanitized_context:
+                        for key, value in sanitized_context.items():
                             scope.set_extra(key, value)
                     sentry_sdk.capture_exception(exception)
             except Exception as e:
-                logger.error("sentry_exception_capture_failed", error=str(e))
+                logger.error(
+                    "sentry_exception_capture_failed",
+                    error=exception_message_for_log(e),
+                    error_type=type(e).__name__,
+                )
 
         # Always log the exception
         logger.error(
             "exception_captured",
             exception_type=type(exception).__name__,
-            exception_message=str(exception),
-            context=context or {},
+            exception_message=exception_message_for_log(exception),
+            context=sanitized_context,
         )
 
 

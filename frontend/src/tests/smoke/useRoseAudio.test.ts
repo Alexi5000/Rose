@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🔊 useRoseAudio Hook Smoke Tests
  *
@@ -43,6 +42,9 @@ const MOCK_RESPONSE: VoiceResponse = {
   session_id: 'test-session-1234',
 };
 
+let audioInstances: MockAudio[] = [];
+let shouldFailAudioLoad = false;
+
 class MockAudio {
   public src = '';
   public volume = 1;
@@ -60,6 +62,7 @@ class MockAudio {
     if (src) {
       this.src = src;
     }
+    audioInstances.push(this);
   }
 
   addEventListener(eventName: string, callback: (event: Event) => void) {
@@ -74,10 +77,17 @@ class MockAudio {
   }
 
   private emit(eventName: string) {
-    this.listeners[eventName]?.forEach((listener) => listener(new Event(eventName)));
+    this.listeners[eventName]?.forEach((listener) =>
+      listener({ type: eventName, target: this } as unknown as Event)
+    );
   }
 
   load() {
+    if (shouldFailAudioLoad) {
+      this.emit('error');
+      return;
+    }
+
     this.readyState = 4;
     this.emit('loadedmetadata');
   }
@@ -136,6 +146,8 @@ describe('🔊 useRoseAudio Hook', () => {
   beforeEach(() => {
     console.log('  🔧 Resetting mocks');
     vi.clearAllMocks();
+    audioInstances = [];
+    shouldFailAudioLoad = false;
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -203,7 +215,7 @@ describe('🔊 useRoseAudio Hook', () => {
 
   it('✅ surfaces errors when playback fails', async () => {
     const onError = vi.fn();
-    global.fetch = vi.fn().mockRejectedValue(new Error('network down')) as unknown as typeof fetch;
+    shouldFailAudioLoad = true;
 
     const { result } = renderHook(() => useRoseAudio({ onError }));
 
@@ -214,7 +226,7 @@ describe('🔊 useRoseAudio Hook', () => {
     ).rejects.toThrow();
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledWith('Unable to play Rose response');
     });
   });
 
@@ -230,9 +242,21 @@ describe('🔊 useRoseAudio Hook', () => {
       await result.current.playAudio(relativeResponse);
     });
 
-    expect(global.fetch).toHaveBeenCalled();
-    const fetchUrl = (global.fetch as any).mock.calls[0][0];
-    expect(fetchUrl).toBe(`${window.location.origin}/api/v1/voice/audio/test-file`);
+    expect(audioInstances[0]?.src).toBe(`${window.location.origin}/api/v1/voice/audio/test-file`);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('skips duplicate playback when WebSocket audio already streamed', async () => {
+    const onPlaybackStart = vi.fn();
+    const { result } = renderHook(() => useRoseAudio({ onPlaybackStart }));
+
+    await act(async () => {
+      await result.current.playAudio({ ...MOCK_RESPONSE, audio_streamed: true });
+    });
+
+    expect(audioInstances).toHaveLength(0);
+    expect(window.speechSynthesis.speak).not.toHaveBeenCalled();
+    expect(onPlaybackStart).not.toHaveBeenCalled();
   });
 });
 

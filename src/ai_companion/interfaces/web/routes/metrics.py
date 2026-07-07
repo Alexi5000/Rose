@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Metrics endpoints for monitoring and observability."""
 
 from typing import Dict
@@ -41,7 +40,14 @@ class MetricsResponse(BaseModel):
                     "counters": {"sessions_started": 42, "voice_requests_total": 156, "errors_total": 3},
                     "gauges": {},
                     "histograms": {
-                        "voice_audio_size_bytes": {"count": 156, "min": 12345, "max": 987654, "avg": 456789}
+                        "ws_voice_mic_to_first_audio_ms": {
+                            "count": 156,
+                            "min": 180,
+                            "max": 2400,
+                            "avg": 640,
+                            "p50": 520,
+                            "p95": 1180,
+                        }
                     },
                     "timestamp": "2025-10-21T12:34:56.789Z",
                 }

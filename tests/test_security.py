@@ -12,6 +12,8 @@ from ai_companion.interfaces.web.app import create_app
 from ai_companion.interfaces.web.middleware import set_secure_file_permissions
 from ai_companion.settings import settings
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def client():

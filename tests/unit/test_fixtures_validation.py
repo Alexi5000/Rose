@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Validation tests for test fixtures and infrastructure."""
 
 import pytest
@@ -9,14 +8,14 @@ def test_mock_groq_client(mock_groq_client):
     """Verify mock Groq client fixture works correctly."""
     # Test chat completion
     response = mock_groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": "Hello"}]
+        model="openai/gpt-oss-120b", messages=[{"role": "user", "content": "Hello"}]
     )
     assert response.choices[0].message.content
     assert "test response" in response.choices[0].message.content.lower()
 
     # Test audio transcription
     transcription = mock_groq_client.audio.transcriptions.create(
-        file=("test.wav", b"fake_audio_data"), model="whisper-large-v3"
+        file=("test.wav", b"fake_audio_data"), model="whisper-large-v3-turbo"
     )
     assert transcription.text
     assert "test transcription" in transcription.text.lower()

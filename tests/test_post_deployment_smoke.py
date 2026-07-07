@@ -18,8 +18,11 @@ from urllib.parse import urljoin
 import pytest
 import requests
 
-# Mark all tests as smoke tests
-pytestmark = pytest.mark.smoke
+# Mark deployed smoke tests as optional. They require a live deployment URL.
+pytestmark = [
+    pytest.mark.smoke,
+    pytest.mark.skipif(not os.getenv("DEPLOYED_URL"), reason="Set DEPLOYED_URL to run deployed smoke tests."),
+]
 
 
 @pytest.fixture(scope="module")
@@ -65,9 +68,9 @@ class TestDeploymentHealth:
             for service_name in ["groq", "elevenlabs", "qdrant"]:
                 if service_name in services:
                     service_status = services[service_name]
-                    assert (
-                        service_status.get("status") == "healthy"
-                    ), f"Service {service_name} is not healthy: {service_status}"
+                    assert service_status.get("status") == "healthy", (
+                        f"Service {service_name} is not healthy: {service_status}"
+                    )
 
     def test_application_responds_quickly(self, base_url, api_timeout):
         """Test that application responds within acceptable time."""
@@ -172,13 +175,13 @@ class TestSecurityHeaders:
             if header in headers:
                 actual_value = headers[header]
                 if isinstance(expected_value, list):
-                    assert (
-                        actual_value in expected_value
-                    ), f"Security header {header} has unexpected value: {actual_value}"
+                    assert actual_value in expected_value, (
+                        f"Security header {header} has unexpected value: {actual_value}"
+                    )
                 else:
-                    assert (
-                        actual_value == expected_value
-                    ), f"Security header {header} has unexpected value: {actual_value}"
+                    assert actual_value == expected_value, (
+                        f"Security header {header} has unexpected value: {actual_value}"
+                    )
 
     def test_cors_headers_configured(self, base_url, api_timeout):
         """Test that CORS headers are properly configured."""

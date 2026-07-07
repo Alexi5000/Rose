@@ -1,219 +1,224 @@
-# Rose full repository refresh 2026-05-17
-"""STT Provider abstraction for speech-to-text backends.
+"""Speech-to-text provider abstraction.
 
-This module provides:
-- Protocol-based abstraction for STT providers
-- Support for both batch and streaming transcription
-- Groq Whisper provider implementation (batch mode)
-- Factory function for provider instantiation
+The current production provider is Groq Whisper in batch mode. This seam lets
+the voice routes depend on a provider contract now, while leaving room for
+streaming providers such as Deepgram or local Whisper backends later.
 """
 
 import asyncio
 import logging
-from typing import AsyncIterator, Optional, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Callable, Optional, Protocol, runtime_checkable
 
-from ai_companion.core.exceptions import SpeechToTextError
-from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_groq_circuit_breaker
+from ai_companion.modules.speech.speech_to_text import SpeechToText
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
 
+GROQ_STT_PROVIDER = "groq"
+DEEPGRAM_STT_PROVIDER = "deepgram"
+
 
 @runtime_checkable
 class STTProvider(Protocol):
-    """Protocol for speech-to-text providers.
-
-    All STT providers must implement this interface to ensure consistent
-    behavior across different backends (Groq, Deepgram, AssemblyAI, etc.).
-    """
+    """Protocol for speech-to-text providers."""
 
     @property
     def supports_streaming(self) -> bool:
-        """Whether this provider supports streaming transcription."""
+        """Whether this provider can emit partial transcripts while audio arrives."""
         ...
 
     @property
     def name(self) -> str:
-        """Human-readable provider name for logging."""
+        """Human-readable provider name for metrics and logs."""
         ...
 
     async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None) -> str:
-        """Transcribe audio to text (batch mode).
-
-        Args:
-            audio_data: Binary audio data
-            audio_format: Optional audio format hint (e.g., 'wav', 'mp3')
-
-        Returns:
-            str: Transcribed text
-
-        Raises:
-            SpeechToTextError: If transcription fails
-        """
+        """Transcribe a complete audio buffer."""
         ...
 
     async def transcribe_streaming(self, audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
-        """Stream transcription as audio chunks arrive.
-
-        Args:
-            audio_stream: Async iterator of audio chunks
-
-        Yields:
-            str: Partial transcription results as they become available
-
-        Raises:
-            SpeechToTextError: If streaming transcription fails
-            NotImplementedError: If provider doesn't support streaming
-        """
+        """Transcribe audio chunks as they arrive."""
         ...
 
 
-class GroqWhisperProvider:
-    """Groq Whisper STT provider (batch mode only).
+class GroqWhisperProvider(SpeechToText):
+    """Groq Whisper provider.
 
-    Uses Groq's hosted Whisper model for transcription.
-    Does NOT support streaming - transcription happens after full audio is received.
-
-    This is the default provider as it's already integrated and provides
-    good accuracy with reasonable latency (~800ms for typical utterances).
+    Groq Whisper is currently batch-only for this app, so streaming calls are
+    collected into one audio buffer and passed through the existing transcriber.
     """
-
-    SUPPORTED_FORMATS = [".wav", ".mp3", ".webm", ".m4a", ".ogg", ".flac"]
-
-    def __init__(self) -> None:
-        """Initialize Groq Whisper provider."""
-        from groq import Groq
-
-        self._client: Optional[Groq] = None
-        self._circuit_breaker: CircuitBreaker = get_groq_circuit_breaker()
-
-    @property
-    def client(self):
-        """Get or create Groq client instance."""
-        if self._client is None:
-            from groq import Groq
-
-            self._client = Groq(api_key=settings.GROQ_API_KEY, timeout=settings.STT_TIMEOUT)
-        return self._client
 
     @property
     def supports_streaming(self) -> bool:
-        """Groq Whisper does not support streaming."""
         return False
 
     @property
     def name(self) -> str:
-        return "Groq Whisper"
-
-    def _detect_audio_format(self, audio_data: bytes) -> str:
-        """Detect audio format from file header."""
-        if audio_data[:4] == b"RIFF" and audio_data[8:12] == b"WAVE":
-            return ".wav"
-        elif audio_data[:3] == b"ID3" or audio_data[:2] == b"\xff\xfb" or audio_data[:2] == b"\xff\xf3":
-            return ".mp3"
-        elif audio_data[:4] == b"OggS":
-            return ".ogg"
-        elif audio_data[:4] == b"fLaC":
-            return ".flac"
-        elif len(audio_data) > 8 and audio_data[4:8] == b"ftyp":
-            return ".m4a"
-        else:
-            logger.warning("Could not detect audio format, defaulting to .wav")
-            return ".wav"
-
-    async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None) -> str:
-        """Transcribe audio using Groq Whisper (batch mode)."""
-        import os
-        import tempfile
-
-        if not audio_data:
-            raise ValueError("Audio data cannot be empty")
-
-        max_size = settings.STT_MAX_AUDIO_SIZE_MB * 1024 * 1024
-        if len(audio_data) > max_size:
-            raise ValueError(f"Audio file too large. Maximum size is {settings.STT_MAX_AUDIO_SIZE_MB}MB")
-
-        if audio_format:
-            file_ext = f".{audio_format.lstrip('.')}"
-        else:
-            file_ext = self._detect_audio_format(audio_data)
-
-        logger.info(f"[{self.name}] Transcribing: size={len(audio_data)} bytes, format={file_ext}")
-
-        last_exception = None
-        for attempt in range(settings.STT_MAX_RETRIES):
-            try:
-                with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temp_file:
-                    temp_file.write(audio_data)
-                    temp_file_path = temp_file.name
-
-                try:
-
-                    async def _call_groq_api() -> str:
-                        def _sync_transcribe() -> str:
-                            with open(temp_file_path, "rb") as audio_file:
-                                return self.client.audio.transcriptions.create(
-                                    file=audio_file,
-                                    model=settings.STT_MODEL_NAME,
-                                    language="en",
-                                    response_format="text",
-                                )
-
-                        return await asyncio.to_thread(_sync_transcribe)
-
-                    transcription: str = await self._circuit_breaker.call_async(_call_groq_api)
-
-                    if not transcription:
-                        raise SpeechToTextError("Transcription result is empty")
-
-                    logger.info(f"[{self.name}] Transcription successful: {transcription[:100]}...")
-                    return transcription
-
-                finally:
-                    try:
-                        await asyncio.to_thread(os.unlink, temp_file_path)
-                    except Exception as cleanup_error:
-                        logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
-
-            except CircuitBreakerError as e:
-                logger.error(f"[{self.name}] Circuit breaker is open: {str(e)}")
-                raise SpeechToTextError("Speech-to-text service is temporarily unavailable") from e
-
-            except ValueError:
-                raise
-
-            except Exception as e:
-                last_exception = e
-                logger.warning(f"[{self.name}] Attempt {attempt + 1} failed: {type(e).__name__}: {str(e)}")
-
-                if attempt < settings.STT_MAX_RETRIES - 1:
-                    backoff_time = min(settings.STT_INITIAL_BACKOFF * (2**attempt), settings.STT_MAX_BACKOFF)
-                    await asyncio.sleep(backoff_time)
-
-        error_msg = f"[{self.name}] Transcription failed after {settings.STT_MAX_RETRIES} attempts"
-        raise SpeechToTextError(error_msg) from last_exception
+        return "groq_stt"
 
     async def transcribe_streaming(self, audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
-        """Groq Whisper does not support streaming - collect all audio then transcribe."""
-        logger.warning(f"[{self.name}] Streaming not supported, falling back to batch mode")
-
-        # Collect all audio chunks
-        audio_chunks = []
+        audio_chunks: list[bytes] = []
         async for chunk in audio_stream:
-            audio_chunks.append(chunk)
+            if chunk:
+                audio_chunks.append(chunk)
 
-        audio_data = b"".join(audio_chunks)
-
-        # Transcribe as batch
-        result = await self.transcribe(audio_data)
+        result = await self.transcribe(b"".join(audio_chunks))
         yield result
 
 
-def get_stt_provider() -> STTProvider:
-    """Factory function to get the STT provider instance.
+class DeepgramStreamingProvider:
+    """Deepgram-backed STT provider with live streaming support.
 
-    Returns:
-        STTProvider: Configured Groq Whisper STT provider
+    The Deepgram SDK is optional so the default Groq installation stays lean.
+    Configure `STT_PROVIDER=deepgram` only when `deepgram-sdk` is installed and
+    `DEEPGRAM_API_KEY` is set.
     """
-    logger.info("Using Groq Whisper STT provider (batch mode)")
-    return GroqWhisperProvider()
+
+    def __init__(
+        self,
+        client: Any | None = None,
+        client_factory: Callable[[str], Any] | None = None,
+        live_options_cls: Any | None = None,
+        prerecorded_options_cls: Any | None = None,
+        events: Any | None = None,
+    ) -> None:
+        self._client = client
+        self._client_factory = client_factory
+        self._live_options_cls = live_options_cls
+        self._prerecorded_options_cls = prerecorded_options_cls
+        self._events = events
+
+    @property
+    def supports_streaming(self) -> bool:
+        return True
+
+    @property
+    def name(self) -> str:
+        return "deepgram_stt"
+
+    def _load_sdk(self) -> tuple[Any, Any, Any, Any]:
+        if self._live_options_cls and self._prerecorded_options_cls and self._events:
+            return self._client_factory, self._live_options_cls, self._prerecorded_options_cls, self._events
+
+        try:
+            from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents, PrerecordedOptions
+        except ImportError as exc:
+            raise ValueError(
+                "STT_PROVIDER=deepgram requires the optional Deepgram SDK. "
+                "Install with `uv sync --extra streaming-stt` or `pip install deepgram-sdk`."
+            ) from exc
+
+        return DeepgramClient, LiveOptions, PrerecordedOptions, LiveTranscriptionEvents
+
+    @property
+    def client(self) -> Any:
+        if self._client is None:
+            if not settings.DEEPGRAM_API_KEY:
+                raise ValueError("DEEPGRAM_API_KEY is required when STT_PROVIDER=deepgram")
+            client_factory, _, _, _ = self._load_sdk()
+            self._client = client_factory(settings.DEEPGRAM_API_KEY)
+        return self._client
+
+    async def transcribe(self, audio_data: bytes, audio_format: Optional[str] = None) -> str:
+        """Transcribe a complete audio buffer through Deepgram prerecorded STT."""
+        _, _, prerecorded_options_cls, _ = self._load_sdk()
+        options = prerecorded_options_cls(
+            model=settings.DEEPGRAM_MODEL_NAME,
+            language=settings.DEEPGRAM_LANGUAGE,
+            smart_format=True,
+        )
+        source = {
+            "buffer": audio_data,
+            "mimetype": audio_format or settings.DEEPGRAM_AUDIO_MIMETYPE,
+        }
+
+        listen = self.client.listen
+        if hasattr(listen, "rest"):
+            response = listen.rest.v("1").transcribe_file(source, options)
+        else:
+            response = listen.v1.media.transcribe_file(request=audio_data, model=settings.DEEPGRAM_MODEL_NAME)
+
+        return _extract_deepgram_transcript(response)
+
+    async def transcribe_streaming(self, audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
+        """Stream audio chunks to Deepgram and yield partial/final transcripts."""
+        _, live_options_cls, _, events = self._load_sdk()
+        transcript_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        connection = self.client.listen.websocket.v("1")
+
+        def handle_transcript(result: Any, **_: Any) -> None:
+            transcript = _extract_deepgram_transcript(result)
+            if transcript:
+                transcript_queue.put_nowait(transcript)
+
+        transcript_event = getattr(events, "Transcript", "Transcript")
+        connection.on(transcript_event, handle_transcript)
+        connection.start(
+            live_options_cls(
+                model=settings.DEEPGRAM_MODEL_NAME,
+                language=settings.DEEPGRAM_LANGUAGE,
+                interim_results=True,
+                endpointing=settings.DEEPGRAM_ENDPOINTING_MS,
+                utterance_end_ms=settings.DEEPGRAM_UTTERANCE_END_MS,
+                smart_format=True,
+            )
+        )
+
+        async def send_audio() -> None:
+            try:
+                async for chunk in audio_stream:
+                    if chunk:
+                        connection.send(chunk)
+            finally:
+                connection.finish()
+                transcript_queue.put_nowait(None)
+
+        sender = asyncio.create_task(send_audio())
+        try:
+            while True:
+                transcript = await transcript_queue.get()
+                if transcript is None:
+                    break
+                yield transcript
+        finally:
+            await sender
+
+
+def _extract_deepgram_transcript(response: Any) -> str:
+    """Extract the best transcript from common Deepgram SDK response shapes."""
+    try:
+        return response.channel.alternatives[0].transcript.strip()
+    except (AttributeError, IndexError, TypeError):
+        pass
+
+    try:
+        return response.results.channels[0].alternatives[0].transcript.strip()
+    except (AttributeError, IndexError, TypeError):
+        pass
+
+    if isinstance(response, dict):
+        try:
+            return response["results"]["channels"][0]["alternatives"][0]["transcript"].strip()
+        except (KeyError, IndexError, TypeError):
+            return ""
+
+    return ""
+
+
+def _normalize_provider(provider: str | None) -> str:
+    normalized = (provider or GROQ_STT_PROVIDER).strip().lower()
+    return normalized or GROQ_STT_PROVIDER
+
+
+def get_stt_provider() -> STTProvider:
+    """Return the configured STT provider."""
+    provider = _normalize_provider(settings.STT_PROVIDER)
+    if provider == GROQ_STT_PROVIDER:
+        logger.info("Using Groq Whisper STT provider", supports_streaming=False)
+        return GroqWhisperProvider()
+    if provider in {DEEPGRAM_STT_PROVIDER, "deepgram_streaming"}:
+        logger.info("Using Deepgram streaming STT provider", supports_streaming=True)
+        return DeepgramStreamingProvider()
+
+    raise ValueError(f"Unsupported STT_PROVIDER '{provider}'. Supported providers: groq, deepgram")

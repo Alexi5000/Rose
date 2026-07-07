@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎨 Render Smoke Test
  *
@@ -112,6 +111,29 @@ describe('🎨 App Rendering', () => {
     expect(wrapper).toHaveClass('fixed', 'inset-0');
 
     console.log('  ✅ Interactive overlay present');
+  });
+
+  it('✅ renders memory privacy controls', () => {
+    console.log('  🔍 Testing memory controls');
+
+    render(<App />);
+
+    expect(screen.getByLabelText('Session-only memory')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Forget' })).toBeInTheDocument();
+
+    console.log('  ✅ Memory controls present');
+  });
+
+  it('✅ renders safety boundary copy', () => {
+    console.log('  🔍 Testing safety boundary copy');
+
+    render(<App />);
+
+    expect(screen.getByText(/Rose is AI emotional support/i)).toBeInTheDocument();
+    expect(screen.getByText(/call or text 988/i)).toBeInTheDocument();
+
+    console.log('  ✅ Safety boundary copy present');
   });
 
   it('✅ renders without console errors', () => {

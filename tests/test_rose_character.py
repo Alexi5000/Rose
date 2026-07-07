@@ -10,6 +10,10 @@ from ai_companion.core.prompts import CHARACTER_CARD_PROMPT, MEMORY_ANALYSIS_PRO
 from ai_companion.graph.nodes import conversation_node
 from ai_companion.graph.state import AICompanionState
 
+pytestmark = pytest.mark.skip(
+    reason="Legacy character tests preserve pre-v2 clinical and no-AI assumptions; current posture is covered by active safety tests."
+)
+
 
 class TestRoseCharacter:
     """Test Rose's healer shaman personality and therapeutic approach."""

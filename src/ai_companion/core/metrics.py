@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Application metrics collection and tracking.
 
 This module provides metrics collection for monitoring application behavior,
@@ -12,8 +11,29 @@ from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
 from ai_companion.core.logging_config import get_logger
+from ai_companion.core.privacy_logging import session_id_for_log
 
 logger = get_logger(__name__)
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    """Return a percentile using linear interpolation between sorted values."""
+
+    if not values:
+        return 0.0
+
+    sorted_values = sorted(values)
+    if len(sorted_values) == 1:
+        return float(sorted_values[0])
+
+    rank = (len(sorted_values) - 1) * percentile
+    lower_index = int(rank)
+    upper_index = min(lower_index + 1, len(sorted_values) - 1)
+    fraction = rank - lower_index
+
+    lower_value = sorted_values[lower_index]
+    upper_value = sorted_values[upper_index]
+    return float(lower_value + (upper_value - lower_value) * fraction)
 
 
 class MetricsCollector:
@@ -68,7 +88,7 @@ class MetricsCollector:
             session_id: Session identifier
         """
         self.increment_counter("sessions_started")
-        logger.info("session_started", session_id=session_id)
+        logger.info("session_started", session_log_id=session_id_for_log(session_id))
 
     def record_voice_request(self, session_id: str, audio_size_bytes: int) -> None:
         """Record a voice processing request.
@@ -79,7 +99,7 @@ class MetricsCollector:
         """
         self.increment_counter("voice_requests_total")
         self.record_histogram("voice_audio_size_bytes", audio_size_bytes)
-        logger.info("voice_request", session_id=session_id, audio_size_bytes=audio_size_bytes)
+        logger.info("voice_request", session_log_id=session_id_for_log(session_id), audio_size_bytes=audio_size_bytes)
 
     def record_api_call(self, service: str, success: bool, duration_ms: float) -> None:
         """Record an external API call.
@@ -119,7 +139,12 @@ class MetricsCollector:
         status = "success" if success else "failure"
         self.increment_counter(f"workflow_executions_{status}")
         self.record_histogram("workflow_duration_ms", duration_ms)
-        logger.info("workflow_execution", session_id=session_id, duration_ms=duration_ms, success=success)
+        logger.info(
+            "workflow_execution",
+            session_log_id=session_id_for_log(session_id),
+            duration_ms=duration_ms,
+            success=success,
+        )
 
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get a summary of all collected metrics.
@@ -136,6 +161,8 @@ class MetricsCollector:
                     "min": min(values) if values else 0,
                     "max": max(values) if values else 0,
                     "avg": sum(values) / len(values) if values else 0,
+                    "p50": _percentile(values, 0.50),
+                    "p95": _percentile(values, 0.95),
                 }
                 for name, values in self._histograms.items()
             },

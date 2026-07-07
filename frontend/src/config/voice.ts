@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🎙️ Voice Configuration Constants
  *
@@ -7,12 +6,12 @@
  */
 
 // 🔊 Voice Activity Detection (VAD) Thresholds
-export const RMS_ACTIVATION_THRESHOLD = 0.002; // Min amplitude to consider as speech (lowered for sensitivity)
-export const RMS_DEACTIVATION_THRESHOLD = 0.001; // Max amplitude to consider as silence (lowered for sensitivity)
+export const RMS_ACTIVATION_THRESHOLD = 0.006; // Min amplitude to consider as speech (above typical ambient floor noise)
+export const RMS_DEACTIVATION_THRESHOLD = 0.003; // Max amplitude to consider as silence (proportional to activation)
 
 // 🎯 Frame-Based Detection (prevents false positives)
-export const ACTIVATION_FRAMES_REQUIRED = 1; // Consecutive frames above threshold to start recording (reduced for faster response)
-export const DEACTIVATION_FRAMES_REQUIRED = 15; // Consecutive frames below threshold to stop recording (~250ms at 60fps - Phase 1 optimization)
+export const ACTIVATION_FRAMES_REQUIRED = 4; // Consecutive frames above threshold to start recording (~67ms at 60fps, eliminates transient clicks/breaths)
+export const DEACTIVATION_FRAMES_REQUIRED = 45; // Consecutive frames below threshold to stop recording (~750ms at 60fps)
 
 // ⏱️ Recording Duration Limits
 export const MIN_RECORDING_DURATION_MS = 300; // Discard recordings shorter than this (filters coughs, clicks)

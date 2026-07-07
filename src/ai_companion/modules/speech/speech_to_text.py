@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Speech-to-text conversion using Groq's Whisper model.
 
 This module provides the SpeechToText class for converting audio to text using
@@ -60,10 +59,12 @@ from typing import Optional
 from groq import Groq
 
 from ai_companion.core.exceptions import SpeechToTextError
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log, sensitive_text_for_log
 from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_groq_circuit_breaker
 from ai_companion.settings import settings
 
 logger = logging.getLogger(__name__)
+EMPTY_TRANSCRIPTION_ERROR = "Transcription result is empty"
 
 
 class SpeechToText:
@@ -110,6 +111,9 @@ class SpeechToText:
             return ".flac"
         elif len(audio_data) > 8 and audio_data[4:8] == b"ftyp":
             return ".m4a"
+        elif audio_data[:4] == b"\x1a\x45\xdf\xa3":
+            # EBML header , WebM/Matroska container (browser MediaRecorder default)
+            return ".webm"
         else:
             # Default to wav if format cannot be detected
             logger.warning("Could not detect audio format, defaulting to .wav")
@@ -141,7 +145,7 @@ class SpeechToText:
         if audio_format:
             file_ext = f".{audio_format.lstrip('.')}"
             if file_ext not in self.SUPPORTED_FORMATS:
-                logger.warning(f"Unsupported format {file_ext}, attempting anyway")
+                logger.warning("Unsupported audio format, attempting anyway: %s", file_ext)
         else:
             file_ext = self._detect_audio_format(audio_data)
 
@@ -171,7 +175,7 @@ class SpeechToText:
                         # We need to open the file inside the thread to avoid file handle issues
                         def _sync_transcribe() -> str:
                             with open(temp_file_path, "rb") as audio_file:
-                                return self.client.audio.transcriptions.create(  # type: ignore[return-value]  # Groq returns Transcription object with text attribute
+                                return self.client.audio.transcriptions.create(  # type: ignore[return-value]
                                     file=audio_file,
                                     model=settings.STT_MODEL_NAME,
                                     language="en",
@@ -183,9 +187,12 @@ class SpeechToText:
                     transcription: str = await self._circuit_breaker.call_async(_call_groq_api)
 
                     if not transcription:
-                        raise SpeechToTextError("Transcription result is empty")
+                        raise SpeechToTextError(EMPTY_TRANSCRIPTION_ERROR)
 
-                    logger.info(f"Transcription successful: {transcription[:100]}...")
+                    logger.info(
+                        "Transcription successful: "
+                        f"length={len(transcription)} preview={sensitive_text_for_log(transcription, max_chars=100)}"
+                    )
                     return transcription
 
                 finally:
@@ -193,19 +200,34 @@ class SpeechToText:
                     try:
                         await asyncio.to_thread(os.unlink, temp_file_path)
                     except Exception as cleanup_error:
-                        logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
+                        logger.warning(
+                            "Failed to cleanup temp audio file: %s",
+                            exception_message_for_log(cleanup_error),
+                            exc_info=exc_info_for_log(),
+                        )
 
             except CircuitBreakerError as e:
                 # Circuit breaker is open - fail fast without retrying
                 # This prevents wasting time on retries when the service is known to be down
-                logger.error(f"Circuit breaker is open for Groq API: {str(e)}")
+                logger.error(
+                    "Circuit breaker is open for Groq STT API: %s",
+                    exception_message_for_log(e),
+                    exc_info=exc_info_for_log(),
+                )
                 raise SpeechToTextError("Speech-to-text service is temporarily unavailable") from e
 
             except Exception as e:
+                if isinstance(e, SpeechToTextError) and e.args and e.args[0] == EMPTY_TRANSCRIPTION_ERROR:
+                    raise
+
                 last_exception = e
                 logger.warning(
-                    f"Attempt {attempt + 1}/{settings.STT_MAX_RETRIES} failed: {type(e).__name__}: {str(e)}",
-                    exc_info=attempt == settings.STT_MAX_RETRIES - 1,  # Full traceback on last attempt
+                    "STT attempt %s/%s failed: %s: %s",
+                    attempt + 1,
+                    settings.STT_MAX_RETRIES,
+                    type(e).__name__,
+                    exception_message_for_log(e),
+                    exc_info=exc_info_for_log() and attempt == settings.STT_MAX_RETRIES - 1,
                 )
 
                 # Don't retry on validation errors (they won't succeed on retry)
@@ -224,6 +246,13 @@ class SpeechToText:
         # All retries exhausted
         error_msg = f"Speech-to-text conversion failed after {settings.STT_MAX_RETRIES} attempts"
         if last_exception:
-            error_msg += f": {str(last_exception)}"
-        logger.error(error_msg)
+            logger.error(
+                "%s: %s: %s",
+                error_msg,
+                type(last_exception).__name__,
+                exception_message_for_log(last_exception),
+                exc_info=exc_info_for_log(),
+            )
+        else:
+            logger.error(error_msg)
         raise SpeechToTextError(error_msg) from last_exception

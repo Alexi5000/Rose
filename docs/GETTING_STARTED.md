@@ -185,4 +185,4 @@ For more information, check the [Makefile](../Makefile).
 
 ## Troubleshooting
 
-If you encounter issues, see [DEVELOPMENT.md](../DEVELOPMENT.md) for detailed troubleshooting steps.
+If you encounter issues, see the [operations runbook](OPERATIONS_RUNBOOK.md) for detailed troubleshooting steps.

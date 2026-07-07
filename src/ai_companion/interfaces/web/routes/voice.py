@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Voice processing endpoints.
 
 This module provides the core voice processing API for Rose, including:
@@ -12,6 +11,7 @@ Reference: docs/PERFORMANCE_BACKLOG.md, docs/ARCHITECTURE.md
 """
 
 import asyncio
+import base64
 import os
 import stat
 import tempfile
@@ -49,9 +49,16 @@ from ai_companion.config.server_config import (
 from ai_companion.core.exceptions import SpeechToTextError, TextToSpeechError, WorkflowError
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics, track_performance
+from ai_companion.core.privacy_logging import (
+    exc_info_for_log,
+    exception_message_for_log,
+    sensitive_text_for_log,
+    session_id_for_log,
+)
 from ai_companion.core.resilience import CircuitBreakerError
-from ai_companion.modules.speech.speech_to_text import SpeechToText
-from ai_companion.modules.speech.text_to_speech import TextToSpeech
+from ai_companion.graph.utils.helpers import get_text_to_speech_module
+from ai_companion.modules.speech.stt_provider import STTProvider, get_stt_provider
+from ai_companion.modules.speech.tts_provider import TTSProvider
 from ai_companion.settings import settings
 
 logger = get_logger(__name__)
@@ -62,7 +69,7 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 # Constants - No Magic Numbers (Uncle Bob approved)
-AUDIO_SERVE_PATH = "/api/v1/voice/audio"  # 🔧 FIX: Added /v1 for API versioning consistency
+AUDIO_SERVE_PATH = "/api/v1/voice/audio"
 MAX_FILE_SAVE_RETRIES = 3
 MS_PER_SECOND = 1000  # Conversion factor for timing calculations
 
@@ -116,7 +123,7 @@ class PipelineTimings:
 
     def log_summary(self, session_id: str) -> None:
         """Log a formatted summary of pipeline timings."""
-        logger.info("pipeline_timings", session_id=session_id, **self.to_dict())
+        logger.info("pipeline_timings", session_log_id=session_id_for_log(session_id), **self.to_dict())
 
 
 @asynccontextmanager
@@ -141,15 +148,19 @@ async def timed_stage(timings: PipelineTimings, stage_name: str) -> AsyncGenerat
 
 # Dependency injection functions
 @lru_cache()
-def get_stt() -> SpeechToText:
-    """Get or create SpeechToText instance."""
-    return SpeechToText()
+def get_stt() -> STTProvider:
+    """Get or create configured speech-to-text provider."""
+    return get_stt_provider()
 
 
-@lru_cache()
-def get_tts() -> TextToSpeech:
-    """Get or create TextToSpeech instance."""
-    return TextToSpeech()
+def get_tts() -> TTSProvider:
+    """Get the shared text-to-speech provider singleton.
+
+    Delegates to get_text_to_speech_module() so that the TTS cache warmed
+    on startup (app.py lifespan) is reused by all voice routes and the
+    WebSocket path rather than being silently discarded.
+    """
+    return get_text_to_speech_module()
 
 
 @lru_cache()
@@ -179,22 +190,23 @@ def get_compiled_graph(request: Request):
 def track_api_call(
     service_name: str,
     session_id: str,
-    success_emoji: str = "✅",
-    error_emoji: str = "❌",
+    success_marker: str = "success",
+    error_marker: str = "error",
 ) -> Generator[dict, None, None]:
     """Context manager for tracking API calls with metrics and logging.
 
     Args:
         service_name: Name of the service being called (e.g., "groq_stt", "elevenlabs_tts")
         session_id: Session identifier for logging
-        success_emoji: Emoji to use for success logs
-        error_emoji: Emoji to use for error logs
+        success_marker: Plain-text marker for success logs
+        error_marker: Plain-text marker for error logs
 
     Yields:
         dict: Context dictionary that can be updated with additional log data
     """
     start_time = time.time()
-    context = {"session_id": session_id}
+    session_log_id = session_id_for_log(session_id)
+    context = {"session_log_id": session_log_id}
 
     try:
         yield context
@@ -206,7 +218,7 @@ def track_api_call(
         logger.info(
             "service_success",
             service=service_name,
-            emoji=success_emoji,
+            marker=success_marker,
             duration_ms=round(duration_ms, 2),
             **context,
         )
@@ -217,7 +229,14 @@ def track_api_call(
         # Record failure metrics
         metrics.record_api_call(service_name, success=False, duration_ms=duration_ms)
         logger.info("metrics_recorded", service=service_name, duration_ms=round(duration_ms, 2), success=False)
-        logger.error("service_failed", service=service_name, emoji=error_emoji, error=str(e), **context, exc_info=True)
+        logger.error(
+            "service_failed",
+            service=service_name,
+            marker=error_marker,
+            error=exception_message_for_log(e),
+            **context,
+            exc_info=exc_info_for_log(),
+        )
         raise
 
 
@@ -229,7 +248,7 @@ def record_error_metrics(error_type: str, endpoint: str = "voice_process") -> No
         endpoint: Endpoint name for metrics
     """
     metrics.record_error(error_type, endpoint=endpoint)
-    logger.info("📊 error_metrics_recorded", error_type=error_type)
+    logger.info("error_metrics_recorded", error_type=error_type)
 
 
 async def _validate_and_read_audio(audio: UploadFile) -> bytes:
@@ -258,13 +277,13 @@ async def _validate_and_read_audio(audio: UploadFile) -> bytes:
     return audio_data
 
 
-async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToText) -> str:
+async def _transcribe_audio(audio_data: bytes, session_id: str, stt: STTProvider) -> str:
     """Transcribe audio to text with metrics tracking.
 
     Args:
         audio_data: Audio file bytes
         session_id: Session identifier
-        stt: SpeechToText instance
+        stt: Speech-to-text provider
 
     Returns:
         str: Transcribed text
@@ -273,28 +292,39 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
         HTTPException: If audio validation fails
         SpeechToTextError: If transcription fails
     """
+    session_log_id = session_id_for_log(session_id)
+
     # Record voice request metrics
     metrics.record_voice_request(session_id, len(audio_data))
-    logger.info("📊 voice_request_metrics_recorded", session_id=session_id, audio_size_bytes=len(audio_data))
-    logger.info("🎤 voice_processing_started", session_id=session_id, audio_size_bytes=len(audio_data))
+    logger.info("voice_request_metrics_recorded", session_log_id=session_log_id, audio_size_bytes=len(audio_data))
+    logger.info("voice_processing_started", session_log_id=session_log_id, audio_size_bytes=len(audio_data))
 
     try:
-        with track_api_call("groq_stt", session_id, success_emoji="✅", error_emoji="❌") as ctx:
+        with track_api_call(stt.name, session_id) as ctx:
             transcribed_text = await stt.transcribe(audio_data)
             ctx["transcribed_length"] = len(transcribed_text)
 
-            # 📝 Log transcription for debugging
-            logger.info("transcription_complete", text=transcribed_text, session_id=session_id)
+            # Log transcription for debugging without raw text by default.
+            logger.info(
+                "transcription_complete",
+                session_log_id=session_log_id,
+                text_length=len(transcribed_text),
+                text=sensitive_text_for_log(transcribed_text),
+            )
 
-            # 🛡️ Input Guard: Filter out known Whisper hallucination artifacts
+            # Input guard: filter out known Whisper hallucination artifacts.
             # Only exact matches - substring matching caused false positives
             # (e.g. "thank you" is legitimate user speech, "audio" appears in real sentences)
-            whisper_artifacts = {"subtitles by", "copyright", "thanks for watching", "you"}
+            whisper_artifacts = {"subtitles by", "copyright", "thanks for watching"}
             cleaned = transcribed_text.strip().lower()
 
             if not cleaned or cleaned in whisper_artifacts:
                 logger.warning(
-                    "input_guard_filtered", reason="whisper_artifact", text=transcribed_text, session_id=session_id
+                    "input_guard_filtered",
+                    reason="whisper_artifact",
+                    text_length=len(transcribed_text),
+                    text=sensitive_text_for_log(transcribed_text),
+                    session_log_id=session_log_id,
                 )
                 return ""
 
@@ -303,7 +333,7 @@ async def _transcribe_audio(audio_data: bytes, session_id: str, stt: SpeechToTex
     except ValueError as e:
         # Validation errors (bad audio format, empty file, etc.)
         record_error_metrics("audio_validation_failed")
-        logger.error("❌ audio_validation_failed", error=str(e), session_id=session_id)
+        logger.error("audio_validation_failed", error=exception_message_for_log(e), session_log_id=session_log_id)
         raise HTTPException(status_code=400, detail=ERROR_MSG_AUDIO_VALIDATION_FAILED)
 
     except Exception:
@@ -327,6 +357,7 @@ async def _process_workflow(transcribed_text: str, session_id: str, compiled_gra
         HTTPException: If workflow times out or circuit breaker is open
         WorkflowError: If workflow execution fails
     """
+    session_log_id = session_id_for_log(session_id)
     workflow_start = time.time()
 
     try:
@@ -346,14 +377,14 @@ async def _process_workflow(transcribed_text: str, session_id: str, compiled_gra
             workflow_duration_ms = (time.time() - workflow_start) * 1000
             metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
             logger.info(
-                "📊 workflow_metrics_recorded",
-                session_id=session_id,
+                "workflow_metrics_recorded",
+                session_log_id=session_log_id,
                 duration_ms=round(workflow_duration_ms, 2),
                 success=False,
             )
             record_error_metrics("workflow_timeout")
             logger.error(
-                "❌ workflow_timeout", session_id=session_id, timeout_seconds=settings.WORKFLOW_TIMEOUT_SECONDS
+                "workflow_timeout", session_log_id=session_log_id, timeout_seconds=settings.WORKFLOW_TIMEOUT_SECONDS
             )
             raise HTTPException(status_code=504, detail=ERROR_MSG_WORKFLOW_TIMEOUT)
 
@@ -363,14 +394,14 @@ async def _process_workflow(transcribed_text: str, session_id: str, compiled_gra
         workflow_duration_ms = (time.time() - workflow_start) * 1000
         metrics.record_workflow_execution(session_id, workflow_duration_ms, success=True)
         logger.info(
-            "📊 workflow_metrics_recorded",
-            session_id=session_id,
+            "workflow_metrics_recorded",
+            session_log_id=session_log_id,
             duration_ms=round(workflow_duration_ms, 2),
             success=True,
         )
         logger.info(
-            "✅ workflow_execution_success",
-            session_id=session_id,
+            "workflow_execution_success",
+            session_log_id=session_log_id,
             response_length=len(response_text),
             duration_ms=round(workflow_duration_ms, 2),
         )
@@ -381,13 +412,13 @@ async def _process_workflow(transcribed_text: str, session_id: str, compiled_gra
         workflow_duration_ms = (time.time() - workflow_start) * 1000
         metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
         logger.info(
-            "📊 workflow_metrics_recorded",
-            session_id=session_id,
+            "workflow_metrics_recorded",
+            session_log_id=session_log_id,
             duration_ms=round(workflow_duration_ms, 2),
             success=False,
         )
         record_error_metrics("circuit_breaker_open")
-        logger.error("❌ circuit_breaker_open", error=str(e), session_id=session_id)
+        logger.error("circuit_breaker_open", error=exception_message_for_log(e), session_log_id=session_log_id)
         raise HTTPException(status_code=503, detail=ERROR_MSG_SERVICE_UNAVAILABLE)
 
     except HTTPException:
@@ -398,30 +429,31 @@ async def _process_workflow(transcribed_text: str, session_id: str, compiled_gra
         workflow_duration_ms = (time.time() - workflow_start) * 1000
         metrics.record_workflow_execution(session_id, workflow_duration_ms, success=False)
         logger.info(
-            "📊 workflow_metrics_recorded",
-            session_id=session_id,
+            "workflow_metrics_recorded",
+            session_log_id=session_log_id,
             duration_ms=round(workflow_duration_ms, 2),
             success=False,
         )
         record_error_metrics("workflow_execution_failed")
         logger.error(
-            "❌ workflow_execution_failed",
-            error=str(e),
-            session_id=session_id,
-            input_text=(transcribed_text[:200] + "..." if len(transcribed_text) > 200 else transcribed_text),
-            exc_info=True,
+            "workflow_execution_failed",
+            error=exception_message_for_log(e),
+            session_log_id=session_log_id,
+            input_text=sensitive_text_for_log(transcribed_text, max_chars=200),
+            input_text_length=len(transcribed_text),
+            exc_info=exc_info_for_log(),
         )
         # Raise a WorkflowError with a concise message while logging the full stack trace
         raise WorkflowError(f"{ERROR_MSG_WORKFLOW_FAILED} (type={type(e).__name__})")
 
 
-async def _generate_audio_response(response_text: str, session_id: str, tts: TextToSpeech) -> bytes:
+async def _generate_audio_response(response_text: str, session_id: str, tts: TTSProvider) -> bytes:
     """Generate audio response using TTS.
 
     Args:
         response_text: Text to synthesize
         session_id: Session identifier
-        tts: TextToSpeech instance
+        tts: Configured text-to-speech provider
 
     Returns:
         bytes: Audio file bytes
@@ -430,15 +462,14 @@ async def _generate_audio_response(response_text: str, session_id: str, tts: Tex
         TextToSpeechError: If TTS synthesis fails
     """
     try:
-        with track_api_call("elevenlabs_tts", session_id, success_emoji="🔊", error_emoji="❌") as ctx:
-            audio_bytes = await tts.synthesize(response_text)
+        with track_api_call(tts.name, session_id, success_marker="audio_success") as ctx:
+            audio_bytes = await tts.synthesize_cached(response_text)
             ctx["audio_size_bytes"] = len(audio_bytes)
             return audio_bytes
 
     except Exception:
         record_error_metrics("text_to_speech_failed")
-        # Include the response text in the error so user can still see what Rose wanted to say
-        raise TextToSpeechError(ERROR_MSG_TTS_FAILED.format(response_text=response_text))
+        raise TextToSpeechError(ERROR_MSG_TTS_FAILED)
 
 
 async def _save_audio_file(audio_bytes: bytes, session_id: str, audio_dir: Path) -> str:
@@ -455,6 +486,8 @@ async def _save_audio_file(audio_bytes: bytes, session_id: str, audio_dir: Path)
     Raises:
         HTTPException: If file save fails after retries
     """
+    session_log_id = session_id_for_log(session_id)
+
     for attempt in range(MAX_FILE_SAVE_RETRIES):
         audio_id = str(uuid.uuid4())
         audio_path = audio_dir / f"{audio_id}.mp3"
@@ -467,20 +500,25 @@ async def _save_audio_file(audio_bytes: bytes, session_id: str, audio_dir: Path)
             finally:
                 os.close(fd)
 
-            logger.info("audio_file_saved", audio_id=audio_id, path=str(audio_path), session_id=session_id)
+            logger.info("audio_file_saved", audio_id=audio_id, session_log_id=session_log_id)
             return f"{AUDIO_SERVE_PATH}/{audio_id}"
 
         except FileExistsError:
             # UUID collision (extremely rare) - retry with new UUID
             if attempt == MAX_FILE_SAVE_RETRIES - 1:
                 record_error_metrics("audio_save_failed")
-                logger.error("❌ audio_save_failed_max_retries", audio_id=audio_id, session_id=session_id)
+                logger.error("audio_save_failed_max_retries", audio_id=audio_id, session_log_id=session_log_id)
                 raise HTTPException(status_code=500, detail=ERROR_MSG_AUDIO_SAVE_FAILED)
             continue
 
         except Exception as e:
             record_error_metrics("audio_save_failed")
-            logger.error("❌ audio_save_failed", error=str(e), audio_id=audio_id, session_id=session_id)
+            logger.error(
+                "audio_save_failed",
+                error=exception_message_for_log(e),
+                audio_id=audio_id,
+                session_log_id=session_log_id,
+            )
             raise HTTPException(status_code=500, detail=ERROR_MSG_AUDIO_SAVE_FAILED)
 
     # Should never reach here due to exception in loop
@@ -508,14 +546,19 @@ class VoiceProcessResponse(BaseModel):
     """Response model for voice processing.
 
     Attributes:
-        text: The transcribed and processed text response from Rose
+        text: The processed text response from Rose
+        user_text: The user's own transcribed speech (for UI display)
         audio_url: URL to download the generated audio response (MP3 format)
         session_id: Unique session identifier for conversation continuity
         timings: Optional pipeline timing metrics for performance analysis
     """
 
     text: str
+    user_text: str = ""
     audio_url: str
+    audio_data: Optional[str] = Field(
+        default=None, description="Base64-encoded MP3 audio (inline delivery, avoids extra HTTP round-trip)"
+    )
     session_id: str
     timings: Optional[PipelineTimingsResponse] = Field(
         default=None, description="Pipeline latency breakdown (only included when FEATURE_TIMING_METRICS is enabled)"
@@ -525,7 +568,7 @@ class VoiceProcessResponse(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "text": "I hear the pain in your words. It's okay to feel this way. Tell me more about what you're experiencing.",
+                    "text": "That sounds heavy. Take one slow breath with me, then tell me what part feels loudest right now.",
                     "audio_url": "/api/v1/voice/audio/550e8400-e29b-41d4-a716-446655440000",
                     "session_id": "123e4567-e89b-12d3-a456-426614174000",
                     "timings": {
@@ -552,16 +595,16 @@ async def process_voice(
     request: Request,
     audio: UploadFile = File(..., description="Audio file containing user's voice input"),
     session_id: str = Form(..., description="UUID v4 session identifier from /session/start"),
-    stt: SpeechToText = Depends(get_stt),
-    tts: TextToSpeech = Depends(get_tts),
+    stt: STTProvider = Depends(get_stt),
+    tts: TTSProvider = Depends(get_tts),
     audio_dir: Path = Depends(get_audio_dir),
     compiled_graph=Depends(get_compiled_graph),
 ) -> VoiceProcessResponse:
     """Process voice input and generate audio response.
 
-    Accepts an audio file, transcribes it using Groq Whisper,
-    processes through LangGraph workflow with Rose's therapeutic AI,
-    and generates an empathetic audio response using ElevenLabs TTS.
+    Accepts an audio file, transcribes it using the configured STT provider,
+    processes through the LangGraph workflow with safety and memory controls,
+    and generates a short voice-native emotional-support response.
 
     **Validation Rules:**
     - Audio file size: Maximum 10MB
@@ -572,18 +615,18 @@ async def process_voice(
 
     **Processing Flow:**
     1. Validate audio file size and format
-    2. Transcribe audio to text using Groq Whisper
-    3. Process through LangGraph workflow with memory context
-    4. Generate empathetic response using Rose's character
-    5. Synthesize audio response using ElevenLabs TTS
+    2. Transcribe audio to text using the configured STT provider
+    3. Process through LangGraph workflow with safety and memory context
+    4. Generate a short, voice-native emotional-support response
+    5. Synthesize audio response using the configured TTS provider
     6. Return text and audio URL
 
     Args:
         request: FastAPI request object (injected)
         audio: Audio file (WAV, MP3, WebM, M4A, OGG) - max 10MB
         session_id: Session identifier for conversation tracking (UUID v4)
-        stt: SpeechToText instance (injected)
-        tts: TextToSpeech instance (injected)
+        stt: Speech-to-text provider (injected)
+        tts: Text-to-speech provider (injected)
         audio_dir: Audio directory path (injected)
         checkpointer: AsyncSqliteSaver instance (injected)
 
@@ -601,6 +644,7 @@ async def process_voice(
     # Initialize timing instrumentation
     timings = PipelineTimings()
     pipeline_start = time.perf_counter()
+    session_log_id = session_id_for_log(session_id)
 
     try:
         # Stage 1: Validate and read audio
@@ -611,24 +655,28 @@ async def process_voice(
         async with timed_stage(timings, "stt_ms"):
             transcribed_text = await _transcribe_audio(audio_data, session_id, stt)
 
-        # 🛡️ Input Guard: Handle silence with varied responses
+        # Input guard: handle silence with varied responses.
         if not transcribed_text:
             count = _silence_counts.get(session_id, 0)
             _silence_counts[session_id] = count + 1
-            logger.info("🤫 silence_detected", session_id=session_id, silence_count=count + 1)
+            logger.info("silence_detected", session_log_id=session_log_id, silence_count=count + 1)
 
             # After exhausting varied responses, return empty to avoid spamming
             if count >= MAX_SILENCE_RESPONSES:
-                return VoiceProcessResponse(text="", audio_url="", session_id=session_id)
+                return VoiceProcessResponse(text="", user_text="", audio_url="", session_id=session_id)
 
             silence_text = SILENCE_RESPONSES[count]
             try:
                 audio_bytes = await _generate_audio_response(silence_text, session_id, tts)
                 audio_url = await _save_audio_file(audio_bytes, session_id, audio_dir)
             except Exception:
-                logger.warning("silence_tts_fallback", session_id=session_id)
-                return VoiceProcessResponse(text=silence_text, audio_url="", session_id=session_id)
-            return VoiceProcessResponse(text=silence_text, audio_url=audio_url, session_id=session_id)
+                logger.warning("silence_tts_fallback", session_log_id=session_log_id)
+                return VoiceProcessResponse(
+                    text=silence_text, user_text=transcribed_text, audio_url="", session_id=session_id
+                )
+            return VoiceProcessResponse(
+                text=silence_text, user_text=transcribed_text, audio_url=audio_url, session_id=session_id
+            )
 
         # User spoke - reset silence counter for this session
         _silence_counts.pop(session_id, None)
@@ -638,16 +686,27 @@ async def process_voice(
             response_text, workflow_audio = await _process_workflow(transcribed_text, session_id, compiled_graph)
 
         # Stage 4: Generate audio response (Text-to-Speech)
+        audio_bytes: bytes | None = None
         async with timed_stage(timings, "tts_ms"):
             if workflow_audio:
                 audio_bytes = workflow_audio
-                logger.info("✅ using_workflow_generated_audio", session_id=session_id)
+                logger.info("using_workflow_generated_audio", session_log_id=session_log_id)
             else:
-                audio_bytes = await _generate_audio_response(response_text, session_id, tts)
+                try:
+                    audio_bytes = await _generate_audio_response(response_text, session_id, tts)
+                except TextToSpeechError:
+                    metrics.increment_counter("voice_tts_text_only_fallback_total", tags={"tts_provider": tts.name})
+                    logger.warning(
+                        "voice_tts_text_only_fallback",
+                        session_log_id=session_log_id,
+                        tts_provider=tts.name,
+                    )
 
         # Stage 5: Save audio file
-        async with timed_stage(timings, "audio_save_ms"):
-            audio_url = await _save_audio_file(audio_bytes, session_id, audio_dir)
+        audio_url = ""
+        if audio_bytes:
+            async with timed_stage(timings, "audio_save_ms"):
+                audio_url = await _save_audio_file(audio_bytes, session_id, audio_dir)
 
         # Calculate total time
         timings.total_ms = (time.perf_counter() - pipeline_start) * MS_PER_SECOND
@@ -662,16 +721,19 @@ async def process_voice(
         metrics.record_histogram("pipeline_tts_ms", timings.tts_ms)
 
         logger.info(
-            "✅ voice_processing_complete",
-            session_id=session_id,
+            "voice_processing_complete",
+            session_log_id=session_log_id,
             response_length=len(response_text),
             total_ms=round(timings.total_ms, 2),
         )
 
         # Build response with optional timing metrics
+        audio_data_b64 = base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else None
         response = VoiceProcessResponse(
             text=response_text,
+            user_text=transcribed_text,
             audio_url=audio_url,
+            audio_data=audio_data_b64,
             session_id=session_id,
         )
 
@@ -683,20 +745,40 @@ async def process_voice(
 
     except HTTPException:
         raise
-    except SpeechToTextError:
-        logger.exception("❌ SpeechToTextError during voice processing", session_id=session_id)
+    except SpeechToTextError as e:
+        logger.error(
+            "speech_to_text_error",
+            session_log_id=session_log_id,
+            error=exception_message_for_log(e),
+            exc_info=exc_info_for_log(),
+        )
         raise
-    except TextToSpeechError:
-        logger.exception("❌ TextToSpeechError during voice processing", session_id=session_id)
+    except TextToSpeechError as e:
+        logger.error(
+            "text_to_speech_error",
+            session_log_id=session_log_id,
+            error=exception_message_for_log(e),
+            exc_info=exc_info_for_log(),
+        )
         raise
-    except WorkflowError:
+    except WorkflowError as e:
         # Log extra details for workflow failures to help debugging
-        logger.exception("❌ WorkflowError during voice processing", session_id=session_id)
+        logger.error(
+            "workflow_error",
+            session_log_id=session_log_id,
+            error=exception_message_for_log(e),
+            exc_info=exc_info_for_log(),
+        )
         record_error_metrics("workflow_execution_failed")
         raise
     except Exception as e:
         record_error_metrics("unexpected_error")
-        logger.error("❌ unexpected_error", error=str(e), session_id=session_id, exc_info=True)
+        logger.error(
+            "unexpected_error",
+            error=exception_message_for_log(e),
+            session_log_id=session_log_id,
+            exc_info=exc_info_for_log(),
+        )
         raise HTTPException(status_code=500, detail=ERROR_MSG_INTERNAL_ERROR)
 
 
@@ -707,7 +789,7 @@ async def stream_tts(
     request: Request,
     text: str = Form(..., description="Text to synthesize"),
     session_id: str = Form(..., description="Session ID for logging"),
-    tts: TextToSpeech = Depends(get_tts),
+    tts: TTSProvider = Depends(get_tts),
 ) -> StreamingResponse:
     """Stream TTS audio directly to the client.
 
@@ -726,12 +808,13 @@ async def stream_tts(
         request: FastAPI request object (injected)
         text: Text to synthesize to speech
         session_id: Session identifier for logging
-        tts: TextToSpeech instance (injected)
+        tts: Text-to-speech provider (injected)
 
     Returns:
         StreamingResponse: MP3 audio stream with chunked transfer encoding
     """
-    logger.info("stream_tts_started", session_id=session_id, text_length=len(text))
+    session_log_id = session_id_for_log(session_id)
+    logger.info("stream_tts_started", session_log_id=session_log_id, text_length=len(text))
 
     async def audio_stream_generator():
         """Generate audio chunks from TTS streaming."""
@@ -739,7 +822,7 @@ async def stream_tts(
             async for chunk in tts.synthesize_streaming(text):
                 yield chunk
         except Exception as e:
-            logger.error("stream_tts_error", session_id=session_id, error=str(e))
+            logger.error("stream_tts_error", session_log_id=session_log_id, error=exception_message_for_log(e))
             # Stream ends on error - client will handle incomplete audio
 
     return StreamingResponse(
@@ -780,7 +863,7 @@ async def get_audio(audio_id: str, audio_dir: Path = Depends(get_audio_dir)) -> 
 
     if not audio_path.exists():
         record_error_metrics("audio_not_found", endpoint="audio_serving")
-        logger.error("❌ audio_file_not_found", audio_id=audio_id)
+        logger.error("audio_file_not_found", audio_id=audio_id)
         raise HTTPException(status_code=404, detail=ERROR_MSG_AUDIO_NOT_FOUND)
 
     logger.info("audio_file_served", audio_id=audio_id)
@@ -819,4 +902,4 @@ async def cleanup_old_audio_files(max_age_hours: Optional[int] = None, audio_dir
         logger.info("audio_cleanup_complete", deleted_count=deleted_count, max_age_hours=max_age)
 
     except Exception as e:
-        logger.error("audio_cleanup_failed", error=str(e), exc_info=True)
+        logger.error("audio_cleanup_failed", error=exception_message_for_log(e), exc_info=exc_info_for_log())

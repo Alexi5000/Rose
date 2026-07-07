@@ -187,6 +187,7 @@ class TestQdrantIntegration:
     async def test_qdrant_connection(self, check_api_keys):
         """Test Qdrant connection and collection access."""
         from ai_companion.modules.memory.long_term_memory import get_qdrant_client
+
         from ai_companion.settings import settings
 
         client = get_qdrant_client()
@@ -227,8 +228,9 @@ class TestQdrantIntegration:
     @pytest.mark.asyncio
     async def test_qdrant_circuit_breaker_integration(self, check_api_keys):
         """Test that Qdrant circuit breaker works with real API."""
-        from ai_companion.core.resilience import get_qdrant_circuit_breaker
         from ai_companion.modules.memory.long_term_memory import get_qdrant_client
+
+        from ai_companion.core.resilience import get_qdrant_circuit_breaker
         from ai_companion.settings import settings
 
         breaker = get_qdrant_circuit_breaker()

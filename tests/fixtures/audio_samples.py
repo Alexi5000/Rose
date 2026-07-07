@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Audio sample fixtures for speech-to-text testing.
 
 This module provides pytest fixtures for test audio files in various formats.

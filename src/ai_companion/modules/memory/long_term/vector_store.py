@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Vector storage operations for long-term memory using Qdrant.
 
 This module provides the VectorStore class which handles all interactions with
@@ -55,12 +54,19 @@ from typing import Any, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import exceptions as qdrant_exceptions
-from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
+from qdrant_client.models import Distance, FieldCondition, Filter, FilterSelector, MatchValue, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 from ai_companion.core.metrics import metrics
+from ai_companion.core.privacy_logging import (
+    exc_info_for_log,
+    exception_message_for_log,
+    sensitive_text_for_log,
+    session_id_for_log,
+)
 from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_qdrant_circuit_breaker
 from ai_companion.core.retry import retry_with_exponential_backoff
+from ai_companion.modules.memory.embedding_provider import EmbeddingProvider, get_embedding_provider
 from ai_companion.modules.memory.long_term.constants import (
     DEFAULT_MEMORY_SEARCH_LIMIT,
     DEFAULT_SESSION_ID,
@@ -165,11 +171,11 @@ class VectorStore:
     and efficient resource management.
 
     Features:
-    - 🔒 Session-based isolation for multi-user deployments
-    - ♻️ Automatic duplicate detection using semantic similarity
-    - ⚡ Circuit breaker protection for resilience
-    - 📊 Comprehensive logging of all operations
-    - 🎯 Configurable via constants (no magic numbers)
+    - ISOLATION Session-based isolation for multi-user deployments
+    - DUPLICATE Automatic duplicate detection using semantic similarity
+    - CIRCUIT Circuit breaker protection for resilience
+    - STATS Comprehensive logging of all operations
+    - CONFIG Configurable via constants (no magic numbers)
     """
 
     _instance: Optional["VectorStore"] = None
@@ -195,20 +201,21 @@ class VectorStore:
         if not self._initialized:
             self.logger = logging.getLogger(__name__)
             self.model: SentenceTransformer = SentenceTransformer(EMBEDDING_MODEL_NAME)
+            self.embedding_provider: EmbeddingProvider = get_embedding_provider(model=self.model)
 
-            # 🔧 Initialize Qdrant client with optional API key support
+            # SETUP Initialize Qdrant client with optional API key support
             # API key is only required for Qdrant Cloud, not for local Docker deployments
             if settings.QDRANT_API_KEY and settings.QDRANT_API_KEY.lower() not in ["none", "", "null"]:
-                self.logger.info("🔐 Initializing Qdrant client with API key authentication")
+                self.logger.info("AUTH Initializing Qdrant client with API key authentication")
                 self.client: QdrantClient = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
             else:
-                self.logger.info(f"🌐 Initializing Qdrant client for local deployment: {settings.QDRANT_URL}")
+                self.logger.info(f"NETWORK Initializing Qdrant client for local deployment: {settings.QDRANT_URL}")
                 self.client: QdrantClient = QdrantClient(url=settings.QDRANT_URL)
 
             self._circuit_breaker: CircuitBreaker = get_qdrant_circuit_breaker()
             VectorStore._initialized = True
             self.logger.info(
-                f"✅ VectorStore initialized (model: {EMBEDDING_MODEL_NAME}, collection: {QDRANT_COLLECTION_NAME})"
+                f"OK VectorStore initialized (model: {EMBEDDING_MODEL_NAME}, collection: {QDRANT_COLLECTION_NAME})"
             )
 
     def _collection_exists(self) -> bool:
@@ -221,13 +228,13 @@ class VectorStore:
             collections = self._circuit_breaker.call(self.client.get_collections).collections
             exists = any(col.name == QDRANT_COLLECTION_NAME for col in collections)
             if exists:
-                self.logger.debug(f"✅ Collection '{QDRANT_COLLECTION_NAME}' exists")
+                self.logger.debug(f"OK Collection '{QDRANT_COLLECTION_NAME}' exists")
             else:
-                self.logger.debug(f"📭 Collection '{QDRANT_COLLECTION_NAME}' does not exist")
+                self.logger.debug(f"EMPTY Collection '{QDRANT_COLLECTION_NAME}' does not exist")
             return exists
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.warning("⚡ Circuit breaker OPEN: Cannot check collection existence")
+                self.logger.warning("CIRCUIT Circuit breaker OPEN: Cannot check collection existence")
             return False
 
     def _create_collection(self) -> None:
@@ -241,10 +248,10 @@ class VectorStore:
         Raises:
             No exceptions raised; errors are logged via circuit breaker
         """
-        sample_embedding = self.model.encode("sample text")
+        sample_embedding = self.embedding_provider.embed_text("sample text")
         vector_size = len(sample_embedding)
 
-        self.logger.info(f"🏗️ Creating collection '{QDRANT_COLLECTION_NAME}' (dim={vector_size}, metric=COSINE)")
+        self.logger.info(f"CREATE Creating collection '{QDRANT_COLLECTION_NAME}' (dim={vector_size}, metric=COSINE)")
 
         def _create():
             return self.client.create_collection(
@@ -257,10 +264,13 @@ class VectorStore:
 
         try:
             self._circuit_breaker.call(_create)
-            self.logger.info(f"✅ Collection '{QDRANT_COLLECTION_NAME}' created successfully")
+            self.logger.info(f"OK Collection '{QDRANT_COLLECTION_NAME}' created successfully")
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.error(f"⚡ Circuit breaker OPEN: Cannot create collection '{QDRANT_COLLECTION_NAME}'")
+                self.logger.error(
+                    "CIRCUIT Circuit breaker OPEN: Cannot create collection",
+                    extra={"collection": QDRANT_COLLECTION_NAME},
+                )
 
     def find_similar_memory(self, text: str, session_id: Optional[str] = None) -> Optional[Memory]:
         """Find if a similar memory already exists to prevent duplicates.
@@ -286,12 +296,12 @@ class VectorStore:
         if results and results[0].score and results[0].score >= DUPLICATE_DETECTION_SIMILARITY_THRESHOLD:
             if LOG_DUPLICATE_DETECTION:
                 self.logger.info(
-                    f"♻️ Duplicate detected: '{text[:60]}...' "
+                    f"Duplicate detected: length={len(text)} preview={sensitive_text_for_log(text, max_chars=60)} "
                     f"(similarity: {results[0].score:.2f} >= {DUPLICATE_DETECTION_SIMILARITY_THRESHOLD:.2f})"
                 )
             return results[0]
 
-        self.logger.debug(f"✅ No duplicate found for: '{text[:60]}...'")
+        self.logger.debug(f"No duplicate found for memory length={len(text)}")
         return None
 
     def store_memory(self, text: str, metadata: MemoryMetadata, session_id: Optional[str] = None) -> None:
@@ -322,37 +332,42 @@ class VectorStore:
             if not self._collection_exists():
                 self._create_collection()
 
-            # 🔒 Ensure session isolation if enabled
+            # ISOLATION Ensure session isolation if enabled
+            if session_id:
+                metadata[SESSION_ID_METADATA_KEY] = session_id
+
             if ENABLE_SESSION_ISOLATION:
                 effective_session_id = session_id or DEFAULT_SESSION_ID
                 metadata[SESSION_ID_METADATA_KEY] = effective_session_id
                 if not session_id:
                     self.logger.warning(
-                        f"⚠️ No session_id provided, using default: {DEFAULT_SESSION_ID}. "
+                        f"WARNING No session_id provided, using default: {DEFAULT_SESSION_ID}. "
                         "This may cause data leakage in multi-user deployments!"
                     )
             else:
                 effective_session_id = None
 
-            # ♻️ Check if similar memory exists (prevents duplicates within session)
+            # DUPLICATE Check if similar memory exists (prevents duplicates within session)
             similar_memory: Optional[Memory] = self.find_similar_memory(text, session_id=effective_session_id)
             if similar_memory and similar_memory.id:
-                self.logger.info(f"🔄 Updating existing memory: {similar_memory.id}")
+                self.logger.info(f"UPDATE Updating existing memory: {similar_memory.id}")
                 metadata["id"] = similar_memory.id  # Keep same ID for update
             else:
-                self.logger.info(f"💾 Storing new memory: '{text[:60]}...'")
+                self.logger.info(
+                    f"Storing new memory: length={len(text)} preview={sensitive_text_for_log(text, max_chars=60)}"
+                )
 
-            # 🧠 Generate embedding using sentence transformer model
-            embedding: Any = self.model.encode(text)
+            # ANALYZE Generate embedding using sentence transformer model
+            embedding: Any = self.embedding_provider.embed_text(text)
             # Log embedding dimension for observability
             try:
-                self.logger.debug(f"🧩 Memory embedding dimension: {len(embedding)}")
+                self.logger.debug(f"EMBEDDING Memory embedding dimension: {len(embedding)}")
             except Exception:
-                self.logger.debug("🧩 Memory embedding dimension: unknown")
+                self.logger.debug("EMBEDDING Memory embedding dimension: unknown")
             # Validate embedding shape/dimensions to avoid Qdrant panics
             if not hasattr(embedding, "__len__") or len(embedding) != EMBEDDING_VECTOR_DIMENSIONS:
                 self.logger.warning(
-                    "⚠️ Generated embedding has unexpected dimensions - skipping memory storage: "
+                    "WARNING Generated embedding has unexpected dimensions - skipping memory storage: "
                     f"dim={getattr(embedding, '__len__', lambda: 'unknown')()} expected={EMBEDDING_VECTOR_DIMENSIONS}"
                 )
                 return
@@ -382,13 +397,18 @@ class VectorStore:
                 self._circuit_breaker.call(_upsert_with_retry)
             except Exception as e:
                 # Log and continue - memory storage shouldn't break the workflow
-                self.logger.exception(f"⚠️ Failed to store memory to Qdrant: {type(e).__name__}: {str(e)}")
+                self.logger.warning(
+                    "memory_store_failed error_type=%s error=%s",
+                    type(e).__name__,
+                    exception_message_for_log(e),
+                    exc_info=exc_info_for_log(),
+                )
                 return
-            self.logger.debug(f"✅ Memory stored successfully: {metadata.get('id')}")
+            self.logger.debug(f"OK Memory stored successfully: {metadata.get('id')}")
 
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.error(f"⚡ Circuit breaker OPEN: Cannot store memory. Text: {text[:50]}...")
+                self.logger.error("Circuit breaker OPEN: Cannot store memory")
 
     def search_memories(
         self, query: str, k: int = DEFAULT_MEMORY_SEARCH_LIMIT, session_id: Optional[str] = None
@@ -420,35 +440,40 @@ class VectorStore:
         """
         try:
             if not self._collection_exists():
-                self.logger.debug("📭 Collection does not exist, cannot search")
+                self.logger.debug("EMPTY Collection does not exist, cannot search")
                 return []
 
-            # 🔒 Ensure session isolation if enabled
+            # ISOLATION Ensure session isolation if enabled
             effective_session_id = None
             query_filter = None
             if ENABLE_SESSION_ISOLATION:
                 effective_session_id = session_id or DEFAULT_SESSION_ID
                 if not session_id:
-                    self.logger.warning(f"⚠️ No session_id provided for search, using default: {DEFAULT_SESSION_ID}")
+                    self.logger.warning(
+                        f"WARNING No session_id provided for search, using default: {DEFAULT_SESSION_ID}"
+                    )
                 # Create Qdrant filter for session-based retrieval
                 query_filter = Filter(
                     must=[FieldCondition(key=SESSION_ID_METADATA_KEY, match=MatchValue(value=effective_session_id))]
                 )
 
-            self.logger.debug(f"🔍 Searching memories: query='{query[:60]}...', k={k}, session={effective_session_id}")
+            self.logger.debug(
+                f"Searching memories: query_length={len(query)}, "
+                f"query_preview={sensitive_text_for_log(query, max_chars=60)}, k={k}, session={effective_session_id}"
+            )
 
-            # 🧠 Generate embedding for the query using the same model as storage
-            query_embedding: Any = self.model.encode(query)
+            # ANALYZE Generate embedding for the query using the same model as storage
+            query_embedding: Any = self.embedding_provider.embed_text(query)
             # Log query embedding dimension for observability
             try:
-                self.logger.debug(f"🧩 Query embedding dimension: {len(query_embedding)}")
+                self.logger.debug(f"EMBEDDING Query embedding dimension: {len(query_embedding)}")
             except Exception:
-                self.logger.debug("🧩 Query embedding dimension: unknown")
+                self.logger.debug("EMBEDDING Query embedding dimension: unknown")
 
             # Validate query embedding dimensions to avoid Qdrant internal panics
             if not hasattr(query_embedding, "__len__") or len(query_embedding) != EMBEDDING_VECTOR_DIMENSIONS:
                 self.logger.warning(
-                    "⚠️ Query embedding has unexpected dimensions - aborting search: "
+                    "WARNING Query embedding has unexpected dimensions - aborting search: "
                     f"dim={getattr(query_embedding, '__len__', lambda: 'unknown')()} expected={EMBEDDING_VECTOR_DIMENSIONS}"
                 )
                 return []
@@ -463,7 +488,7 @@ class VectorStore:
 
             # If guard indicates Qdrant is degraded, skip search immediately and return empty list
             if memory_guard.is_disabled():
-                self.logger.warning("⚠️ Qdrant is degraded; skipping memory search due to recent errors")
+                self.logger.warning("WARNING Qdrant is degraded; skipping memory search due to recent errors")
                 return []
 
             # Wrap search with retry/backoff to handle transient Qdrant internal errors
@@ -485,19 +510,23 @@ class VectorStore:
                 for hit in results
             ]
 
-            # 📊 Log search results with scores
+            # STATS Log search results with scores
             if LOG_MEMORY_SEARCH_SCORES and memories:
-                self.logger.info(f"🔍 Found {len(memories)} memories:")
+                self.logger.info(f"Found {len(memories)} memories:")
                 for memory in memories:
-                    self.logger.info(f"  📌 '{memory.text[:60]}...' (score: {memory.score:.3f})")
+                    self.logger.info(
+                        f"Memory match: length={len(memory.text)} "
+                        f"preview={sensitive_text_for_log(memory.text, max_chars=60)} "
+                        f"(score: {memory.score:.3f})"
+                    )
             elif not memories:
-                self.logger.debug(f"📭 No memories found for query: '{query[:60]}...'")
+                self.logger.debug(f"No memories found for query_length={len(query)}")
 
             return memories
 
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.error("⚡ Circuit breaker OPEN: Cannot search memories")
+                self.logger.error("CIRCUIT Circuit breaker OPEN: Cannot search memories")
             return []
         except Exception as e:
             # Unexpected Qdrant or embedding errors should not crash the app
@@ -507,13 +536,17 @@ class VectorStore:
                     status = getattr(e, "status", None)
                     content = getattr(e, "content", None)
                     self.logger.error(
-                        "⚠️ UnexpectedResponse from Qdrant",
-                        status=status,
-                        content=str(content)[:500],
-                        exc_info=True,
+                        "qdrant_unexpected_response status=%s content=%s error=%s",
+                        status,
+                        sensitive_text_for_log(str(content), max_chars=500),
+                        exception_message_for_log(e),
+                        exc_info=exc_info_for_log(),
                     )
                 except Exception:
-                    self.logger.exception("⚠️ UnexpectedResponse from Qdrant (unable to extract details)")
+                    self.logger.error(
+                        "qdrant_unexpected_response_parse_failed",
+                        exc_info=exc_info_for_log(),
+                    )
                 # Record metric for monitoring so alerting picks this up
                 try:
                     metrics.record_error("qdrant_unexpected_response", endpoint="qdrant_search")
@@ -521,13 +554,115 @@ class VectorStore:
                 except Exception:
                     self.logger.debug("Failed to record qdrant_unexpected_response metric")
             else:
-                self.logger.exception(f"⚠️ Memory search failed with an unexpected error: {type(e).__name__}: {str(e)}")
+                self.logger.warning(
+                    "memory_search_failed error_type=%s error=%s",
+                    type(e).__name__,
+                    exception_message_for_log(e),
+                    exc_info=exc_info_for_log(),
+                )
                 try:
                     metrics.record_error("qdrant_unexpected_response", endpoint="qdrant_search")
                     memory_guard.record_error()
                 except Exception:
                     self.logger.debug("Failed to record qdrant_unexpected_response metric")
             return []
+
+    def _build_session_filter(self, session_id: str) -> Filter:
+        """Build a Qdrant payload filter for one session."""
+
+        return Filter(must=[FieldCondition(key=SESSION_ID_METADATA_KEY, match=MatchValue(value=session_id))])
+
+    def export_memories_for_session(self, session_id: str, limit: int = 100) -> MemorySearchResult:
+        """Export stored memories for a session without embedding vectors."""
+
+        try:
+            if not self._collection_exists():
+                self.logger.debug("Collection does not exist, cannot export session memories")
+                return []
+
+            memories: list[Memory] = []
+            next_offset: Any = None
+            session_filter = self._build_session_filter(session_id)
+
+            while True:
+                batch_limit = min(limit - len(memories), 100)
+                if batch_limit <= 0:
+                    break
+
+                def _scroll() -> Any:
+                    return self.client.scroll(
+                        collection_name=QDRANT_COLLECTION_NAME,
+                        scroll_filter=session_filter,
+                        limit=batch_limit,
+                        offset=next_offset,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+
+                records, next_offset = self._circuit_breaker.call(_scroll)
+                for record in records:
+                    payload = record.payload or {}
+                    memories.append(
+                        Memory(
+                            text=payload.get("text", ""),
+                            metadata={key: value for key, value in payload.items() if key != "text"},
+                        )
+                    )
+
+                if not next_offset or not records:
+                    break
+
+            return memories
+        except CircuitBreakerError:
+            if LOG_CIRCUIT_BREAKER_EVENTS:
+                self.logger.error("Circuit breaker OPEN: Cannot export session memories")
+            return []
+        except Exception as e:
+            self.logger.warning(
+                "session_memory_export_failed error_type=%s error=%s session_log_id=%s",
+                type(e).__name__,
+                exception_message_for_log(e),
+                session_id_for_log(session_id),
+                exc_info=exc_info_for_log(),
+            )
+            return []
+
+    def delete_memories_for_session(self, session_id: str) -> bool:
+        """Delete all long-term memories tagged with a session ID."""
+
+        try:
+            if not self._collection_exists():
+                self.logger.debug("Collection does not exist, no session memories to delete")
+                return True
+
+            session_filter = self._build_session_filter(session_id)
+
+            def _delete() -> Any:
+                return self.client.delete(
+                    collection_name=QDRANT_COLLECTION_NAME,
+                    points_selector=FilterSelector(filter=session_filter),
+                    wait=True,
+                )
+
+            self._circuit_breaker.call(_delete)
+            self.logger.info(
+                "session_memories_delete_submitted session_log_id=%s",
+                session_id_for_log(session_id),
+            )
+            return True
+        except CircuitBreakerError:
+            if LOG_CIRCUIT_BREAKER_EVENTS:
+                self.logger.error("Circuit breaker OPEN: Cannot delete session memories")
+            return False
+        except Exception as e:
+            self.logger.warning(
+                "session_memory_delete_failed error_type=%s error=%s session_log_id=%s",
+                type(e).__name__,
+                exception_message_for_log(e),
+                session_id_for_log(session_id),
+                exc_info=exc_info_for_log(),
+            )
+            return False
 
     def get_collection_info(self) -> Optional[CollectionInfo]:
         """Get information about the memory collection for monitoring.
@@ -545,7 +680,7 @@ class VectorStore:
         """
         try:
             if not self._collection_exists():
-                self.logger.debug("📭 Collection does not exist, cannot get info")
+                self.logger.debug("EMPTY Collection does not exist, cannot get info")
                 return None
 
             def _get_info() -> Any:
@@ -560,12 +695,12 @@ class VectorStore:
                 "status": collection_info.status if hasattr(collection_info, "status") else "unknown",
             }
 
-            self.logger.debug(f"📊 Collection info: {info['points_count']} memories, status={info['status']}")
+            self.logger.debug(f"STATS Collection info: {info['points_count']} memories, status={info['status']}")
             return info
 
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.error("⚡ Circuit breaker OPEN: Cannot get collection info")
+                self.logger.error("CIRCUIT Circuit breaker OPEN: Cannot get collection info")
             return None
 
     def initialize_collection(self) -> bool:
@@ -586,28 +721,33 @@ class VectorStore:
         """
         try:
             if self._collection_exists():
-                self.logger.info(f"✅ Collection '{QDRANT_COLLECTION_NAME}' already exists")
+                self.logger.info(f"OK Collection '{QDRANT_COLLECTION_NAME}' already exists")
                 info = self.get_collection_info()
                 if info:
-                    self.logger.info(f"📊 Current state: {info['points_count']} memories stored")
+                    self.logger.info(f"STATS Current state: {info['points_count']} memories stored")
                 # Validate collection vector dimensions on startup
                 if not self._validate_collection_vector_dimensions():
                     self.logger.error(
-                        "❌ Collection dimension validation failed: the configured vector size does not match the embedding model"
+                        "ERROR Collection dimension validation failed: the configured vector size does not match the embedding model"
                     )
                 return True
             else:
-                self.logger.info(f"🏗️ Collection does not exist, creating '{QDRANT_COLLECTION_NAME}'...")
+                self.logger.info(f"CREATE Collection does not exist, creating '{QDRANT_COLLECTION_NAME}'...")
                 self._create_collection()
                 # Verify creation succeeded
                 if self._collection_exists():
-                    self.logger.info(f"✅ Collection '{QDRANT_COLLECTION_NAME}' created and verified")
+                    self.logger.info(f"OK Collection '{QDRANT_COLLECTION_NAME}' created and verified")
                     return True
                 else:
-                    self.logger.error("❌ Collection creation verification failed")
+                    self.logger.error("ERROR Collection creation verification failed")
                     return False
         except Exception as e:
-            self.logger.error(f"❌ Collection initialization failed: {e}")
+            self.logger.error(
+                "collection_initialization_failed error_type=%s error=%s",
+                type(e).__name__,
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
             return False
 
     def _extract_vector_size_from_collection_info(self, collection_info: Any) -> Optional[int]:
@@ -661,7 +801,7 @@ class VectorStore:
         """
         try:
             if not self._collection_exists():
-                self.logger.debug("📭 Collection does not exist for dimension validation")
+                self.logger.debug("EMPTY Collection does not exist for dimension validation")
                 return True
 
             def _get() -> Any:
@@ -674,36 +814,41 @@ class VectorStore:
             except Exception:
                 pass
             if not coll_info:
-                self.logger.debug("📭 Collection info is unavailable for dimension validation")
+                self.logger.debug("EMPTY Collection info is unavailable for dimension validation")
                 return True
 
             vector_size = self._extract_vector_size_from_collection_info(coll_info)
             if vector_size is None:
                 self.logger.warning(
-                    "⚠️ Could not determine collection vector size; skipping strict validation (Qdrant client returned unknown format)"
+                    "WARNING Could not determine collection vector size; skipping strict validation (Qdrant client returned unknown format)"
                 )
                 return True
 
             if vector_size != EMBEDDING_VECTOR_DIMENSIONS:
                 self.logger.error(
-                    "❌ Qdrant collection vector dimension mismatch",
-                    expected=EMBEDDING_VECTOR_DIMENSIONS,
-                    configured=vector_size,
-                    collection=QDRANT_COLLECTION_NAME,
+                    "qdrant_collection_vector_dimension_mismatch expected=%s configured=%s collection=%s",
+                    EMBEDDING_VECTOR_DIMENSIONS,
+                    vector_size,
+                    QDRANT_COLLECTION_NAME,
                 )
                 # Return False to indicate mismatch detected (but do not auto-recreate by default)
                 return False
 
             self.logger.info(
-                f"✅ Qdrant collection vector dimension validated: {vector_size} == {EMBEDDING_VECTOR_DIMENSIONS}"
+                f"OK Qdrant collection vector dimension validated: {vector_size} == {EMBEDDING_VECTOR_DIMENSIONS}"
             )
             return True
         except CircuitBreakerError:
             if LOG_CIRCUIT_BREAKER_EVENTS:
-                self.logger.warning("⚡ Circuit breaker OPEN: Cannot validate collection dimensions")
+                self.logger.warning("CIRCUIT Circuit breaker OPEN: Cannot validate collection dimensions")
             return True
         except Exception as e:
-            self.logger.error("❌ Failed to validate collection dimensions", error=str(e))
+            self.logger.error(
+                "collection_dimension_validation_failed error_type=%s error=%s",
+                type(e).__name__,
+                exception_message_for_log(e),
+                exc_info=exc_info_for_log(),
+            )
             return True
 
 

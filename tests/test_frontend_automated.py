@@ -3,6 +3,8 @@
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 # Note: These tests require Playwright or Selenium to be installed
 # Install with: pip install playwright pytest-playwright
 # Then run: playwright install

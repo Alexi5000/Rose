@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Monitoring and metrics API endpoints.
 
 This module provides endpoints for accessing monitoring data, metrics,
@@ -13,6 +12,7 @@ from pydantic import BaseModel
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics
 from ai_companion.core.monitoring import monitoring
+from ai_companion.core.privacy_logging import exception_message_for_log
 
 logger = get_logger(__name__)
 
@@ -69,7 +69,7 @@ async def get_metrics(request: Request) -> MetricsResponse:
         return MetricsResponse(**metrics_summary)
 
     except Exception as e:
-        logger.error("metrics_retrieval_failed", error=str(e))
+        logger.error("metrics_retrieval_failed", error=exception_message_for_log(e), error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
 
 
@@ -97,7 +97,11 @@ async def get_monitoring_status(request: Request) -> MonitoringStatusResponse:
         return MonitoringStatusResponse(**status)
 
     except Exception as e:
-        logger.error("monitoring_status_retrieval_failed", error=str(e))
+        logger.error(
+            "monitoring_status_retrieval_failed",
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+        )
         raise HTTPException(status_code=500, detail="Failed to retrieve monitoring status")
 
 
@@ -143,7 +147,7 @@ async def get_alerts(request: Request, hours: int = 24) -> list[AlertResponse]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("alerts_retrieval_failed", error=str(e))
+        logger.error("alerts_retrieval_failed", error=exception_message_for_log(e), error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to retrieve alerts")
 
 
@@ -180,5 +184,5 @@ async def evaluate_thresholds(request: Request) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error("threshold_evaluation_failed", error=str(e))
+        logger.error("threshold_evaluation_failed", error=exception_message_for_log(e), error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to evaluate thresholds")
