@@ -1,17 +1,18 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for Speech-to-Text module.
 
 Tests audio transcription with various formats, retry logic, circuit breaker
 integration, and error handling with mocked Groq client.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai_companion.core.exceptions import SpeechToTextError
+from ai_companion.core.privacy_logging import REDACTED_TEXT
 from ai_companion.core.resilience import CircuitBreakerError
 from ai_companion.modules.speech.speech_to_text import SpeechToText
+from ai_companion.settings import settings
 
 
 @pytest.mark.unit
@@ -54,7 +55,7 @@ class TestAudioTranscription:
             assert result == "Transcription with explicit format."
             # Verify the API was called with correct parameters
             call_args = mock_groq_client.audio.transcriptions.create.call_args
-            assert call_args[1]["model"] == "whisper-large-v3"
+            assert call_args[1]["model"] == "whisper-large-v3-turbo"
             assert call_args[1]["language"] == "en"
             assert call_args[1]["response_format"] == "text"
 
@@ -156,7 +157,7 @@ class TestRetryLogic:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep") as mock_sleep:  # Mock sleep to speed up test
+                with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
                     stt = SpeechToText()
                     result = await stt.transcribe(sample_wav_audio)
 
@@ -186,7 +187,7 @@ class TestRetryLogic:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep") as mock_sleep:
+                with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
                     stt = SpeechToText()
                     await stt.transcribe(sample_wav_audio)
 
@@ -217,7 +218,7 @@ class TestRetryLogic:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep") as mock_sleep:
+                with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
                     with patch("ai_companion.settings.settings.STT_MAX_BACKOFF", 5.0):
                         stt = SpeechToText()
                         await stt.transcribe(sample_wav_audio)
@@ -255,7 +256,7 @@ class TestRetryLogic:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep"):  # Mock sleep to speed up test
+                with patch("asyncio.sleep", new_callable=AsyncMock):
                     stt = SpeechToText()
 
                     with pytest.raises(SpeechToTextError, match="failed after 3 attempts"):
@@ -263,6 +264,35 @@ class TestRetryLogic:
 
                     # Verify all retry attempts were made
                     assert mock_groq_client.audio.transcriptions.create.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_retry_failure_logs_redacted_provider_error(
+        self, sample_wav_audio, mock_groq_client, monkeypatch, caplog
+    ):
+        """Provider errors can echo transcripts and should be redacted in STT retry logs."""
+        mock_groq_client.audio.transcriptions.create.side_effect = Exception("provider echoed private grief transcript")
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
+            with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
+                mock_breaker = MagicMock()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
+                mock_cb.return_value = mock_breaker
+
+                with patch("asyncio.sleep", new_callable=AsyncMock):
+                    stt = SpeechToText()
+
+                    with caplog.at_level("WARNING", logger="ai_companion.modules.speech.speech_to_text"):
+                        with pytest.raises(SpeechToTextError) as exc_info:
+                            await stt.transcribe(sample_wav_audio)
+
+        assert "private grief" not in str(exc_info.value)
+        assert "private grief" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
 
 
 @pytest.mark.unit
@@ -288,6 +318,29 @@ class TestCircuitBreakerIntegration:
                 mock_breaker.call_async.assert_called_once()
                 # Verify no retries occurred (circuit breaker fails fast)
                 assert mock_breaker.call_async.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_open_log_redacts_error(
+        self, sample_wav_audio, mock_groq_client, monkeypatch, caplog
+    ):
+        """Circuit breaker failures should not leak private provider/user text."""
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
+            with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
+                mock_breaker = MagicMock()
+                mock_breaker.call_async.side_effect = CircuitBreakerError("breaker echoed private grief transcript")
+                mock_cb.return_value = mock_breaker
+
+                stt = SpeechToText()
+
+                with caplog.at_level("ERROR", logger="ai_companion.modules.speech.speech_to_text"):
+                    with pytest.raises(SpeechToTextError) as exc_info:
+                        await stt.transcribe(sample_wav_audio)
+
+        assert "temporarily unavailable" in str(exc_info.value)
+        assert "private grief" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_success_path(self, sample_wav_audio, mock_groq_client):
@@ -327,7 +380,7 @@ class TestCircuitBreakerIntegration:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep"):  # Speed up test
+                with patch("asyncio.sleep", new_callable=AsyncMock):
                     stt = SpeechToText()
 
                     with pytest.raises(SpeechToTextError):
@@ -395,7 +448,7 @@ class TestErrorHandling:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep"):
+                with patch("asyncio.sleep", new_callable=AsyncMock):
                     stt = SpeechToText()
 
                     with pytest.raises(SpeechToTextError, match="Transcription result is empty"):
@@ -417,7 +470,7 @@ class TestErrorHandling:
                 mock_breaker.call_async.side_effect = mock_call_async
                 mock_cb.return_value = mock_breaker
 
-                with patch("time.sleep"):
+                with patch("asyncio.sleep", new_callable=AsyncMock):
                     stt = SpeechToText()
 
                     with pytest.raises(SpeechToTextError, match="failed after 3 attempts"):
@@ -463,7 +516,7 @@ class TestErrorHandling:
                 mock_cb.return_value = mock_breaker
 
                 with patch("os.unlink") as mock_unlink:
-                    with patch("time.sleep"):
+                    with patch("asyncio.sleep", new_callable=AsyncMock):
                         stt = SpeechToText()
 
                         with pytest.raises(SpeechToTextError):
@@ -471,6 +524,34 @@ class TestErrorHandling:
 
                         # Verify temp file was deleted on each attempt
                         assert mock_unlink.call_count == 3  # Once per retry attempt
+
+    @pytest.mark.asyncio
+    async def test_temp_cleanup_failure_log_redacts_path_error(
+        self, sample_wav_audio, mock_groq_client, monkeypatch, caplog
+    ):
+        """Temporary file cleanup failures should not leak raw temp paths or provider details."""
+        mock_groq_client.audio.transcriptions.create.return_value = "Transcription successful."
+        monkeypatch.setattr(settings, "LOG_SENSITIVE_CONTENT", False)
+
+        with patch("ai_companion.modules.speech.speech_to_text.Groq", return_value=mock_groq_client):
+            with patch("ai_companion.modules.speech.speech_to_text.get_groq_circuit_breaker") as mock_cb:
+                mock_breaker = MagicMock()
+
+                async def mock_call_async(func, *args, **kwargs):
+                    return await func(*args, **kwargs)
+
+                mock_breaker.call_async.side_effect = mock_call_async
+                mock_cb.return_value = mock_breaker
+
+                with patch("os.unlink", side_effect=OSError("cleanup failed for private grief path")):
+                    stt = SpeechToText()
+
+                    with caplog.at_level("WARNING", logger="ai_companion.modules.speech.speech_to_text"):
+                        result = await stt.transcribe(sample_wav_audio)
+
+        assert result == "Transcription successful."
+        assert "private grief" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
 
 
 @pytest.mark.unit

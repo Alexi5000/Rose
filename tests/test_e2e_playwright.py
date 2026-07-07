@@ -15,18 +15,21 @@ Run with: pytest tests/test_e2e_playwright.py -v --headed
 """
 
 import re
+from typing import Any
 
 import pytest
 
-playwright_sync = pytest.importorskip(
-    "playwright.sync_api",
-    reason="Playwright E2E tests require the optional playwright extra and browser installation.",
-)
-Page = playwright_sync.Page
-expect = playwright_sync.expect
+try:
+    from playwright.sync_api import Page, expect
+except ImportError:
+    Page = Any
+    expect = None
 
 # Mark all tests as E2E
-pytestmark = pytest.mark.e2e
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.skipif(expect is None, reason="Playwright E2E tests require the optional playwright extra."),
+]
 
 
 @pytest.fixture(scope="session")

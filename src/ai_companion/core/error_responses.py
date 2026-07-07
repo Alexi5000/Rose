@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Standardized error response models and handlers.
 
 This module provides consistent error response formats across all API endpoints,
@@ -20,6 +19,7 @@ from ai_companion.core.exceptions import (
     WorkflowError,
 )
 from ai_companion.core.logging_config import get_logger
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 
 logger = get_logger(__name__)
 
@@ -96,9 +96,9 @@ async def ai_companion_error_handler(request: Request, exc: AICompanionError) ->
     logger.error(
         "ai_companion_error",
         error_type=type(exc).__name__,
-        error_message=str(exc),
+        error_message=exception_message_for_log(exc),
         request_id=request_id,
-        exc_info=True,
+        exc_info=exc_info_for_log(),
     )
 
     # Map exception types to user-friendly messages
@@ -145,7 +145,7 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
     """
     request_id = get_request_id(request)
 
-    logger.warning("validation_error", error_message=str(exc), request_id=request_id)
+    logger.warning("validation_error", error_message=exception_message_for_log(exc), request_id=request_id)
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -173,9 +173,9 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     logger.error(
         "unhandled_exception",
         error_type=type(exc).__name__,
-        error_message=str(exc),
+        error_message=exception_message_for_log(exc),
         request_id=request_id,
-        exc_info=True,
+        exc_info=exc_info_for_log(),
     )
 
     return JSONResponse(

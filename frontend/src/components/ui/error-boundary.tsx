@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface ErrorBoundaryProps {

@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Background scheduler for monitoring tasks.
 
 This module provides a background scheduler that periodically evaluates
@@ -10,6 +9,7 @@ from typing import Optional
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.monitoring import monitoring
+from ai_companion.core.privacy_logging import exception_message_for_log
 
 logger = get_logger(__name__)
 
@@ -66,7 +66,11 @@ class MonitoringScheduler:
                     logger.debug("monitoring_evaluation_completed", triggered_alerts=0)
 
             except Exception as e:
-                logger.error("monitoring_evaluation_error", error=str(e), error_type=type(e).__name__)
+                logger.error(
+                    "monitoring_evaluation_error",
+                    error=exception_message_for_log(e),
+                    error_type=type(e).__name__,
+                )
 
             # Wait for next evaluation
             try:

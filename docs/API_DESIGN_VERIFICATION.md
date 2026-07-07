@@ -1,5 +1,8 @@
-<!-- Rose full repository refresh 2026-05-17 -->
 # API Design and Documentation Verification
+
+> Historical verification note: this report records a deployment-readiness task. For current product positioning,
+> Rose is an AI emotional support companion, not a grief counselor, therapist, doctor, emergency service, or clinical
+> product.
 
 ## Task 7: Enhance API Design and Documentation
 
@@ -57,7 +60,7 @@ OpenAPI documentation is fully configured:
 # src/ai_companion/interfaces/web/app.py
 app = FastAPI(
     title="Rose the Healer Shaman API",
-    description="Voice-first AI grief counselor and holistic healing companion...",
+    description="Voice-first AI emotional support companion...",
     version="1.0.0",
     docs_url="/api/v1/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,
@@ -139,7 +142,7 @@ model_config = {
     "json_schema_extra": {
         "examples": [{
             "session_id": "123e4567-e89b-12d3-a456-426614174000",
-            "message": "Session initialized. Ready to begin your healing journey with Rose."
+            "message": "Session initialized. Rose is ready for emotional support when you are."
         }]
     }
 }

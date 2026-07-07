@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Sample audio file fixtures for STT testing."""
 
 import io

@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Text-to-speech conversion using ElevenLabs with Rose's therapeutic voice.
 
 This module provides the TextToSpeech class for converting text to speech using
@@ -37,14 +36,15 @@ Example:
 import asyncio
 import hashlib
 import logging
-import queue
 import threading
 from datetime import datetime, timedelta
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
-from elevenlabs import ElevenLabs, VoiceSettings
+from elevenlabs import ElevenLabs
+from elevenlabs.types import VoiceSettings
 
 from ai_companion.core.exceptions import TextToSpeechError
+from ai_companion.core.privacy_logging import sensitive_text_for_log
 from ai_companion.core.resilience import CircuitBreaker, CircuitBreakerError, get_elevenlabs_circuit_breaker
 from ai_companion.settings import settings
 
@@ -128,8 +128,8 @@ class TextToSpeech:
         if len(text) > settings.TTS_MAX_TEXT_LENGTH:
             raise ValueError(f"Input text exceeds maximum length of {settings.TTS_MAX_TEXT_LENGTH} characters")
 
-        # Use Rose-specific voice if configured, otherwise use default
-        selected_voice_id = voice_id or settings.ROSE_VOICE_ID or settings.ELEVENLABS_VOICE_ID
+        # Use configured voice ID or fall back to default
+        selected_voice_id = voice_id or settings.ELEVENLABS_VOICE_ID
 
         # Rose's therapeutic voice settings: high stability for calming, grounding effect
         # Slightly slower speech rate is achieved through voice selection, not API parameters
@@ -139,28 +139,31 @@ class TextToSpeech:
         logger.info(
             f"Synthesizing speech for Rose: {len(text)} chars, "
             f"voice_id={selected_voice_id}, stability={voice_stability}, similarity={voice_similarity}, "
-            f"latency_level={settings.TTS_STREAMING_LATENCY_LEVEL}, format={settings.TTS_OUTPUT_FORMAT}"
+            f"format={settings.TTS_OUTPUT_FORMAT}"
         )
 
         try:
-            # Use circuit breaker for API call (async version).
-            # The ElevenLabs SDK is synchronous, so the upstream-compatible convert call
-            # runs in a thread pool to avoid blocking the event loop.
+            # Use circuit breaker for API call (async version)
+            # Note: ElevenLabs SDK is synchronous, so we use asyncio.to_thread() to run it
+            # in a thread pool, preventing event loop blocking.
             async def _call_elevenlabs_api() -> bytes:
+                # Run sync ElevenLabs API call in thread pool to avoid blocking event loop
                 def _sync_generate() -> bytes:
-                    audio_generator = self.client.text_to_speech.convert(
+                    # Use the v1.x SDK API: text_to_speech.convert() returns an iterator[bytes]
+                    audio_iterator = self.client.text_to_speech.convert(
                         voice_id=selected_voice_id,
                         text=text,
                         model_id=settings.TTS_MODEL_NAME,
                         voice_settings=VoiceSettings(
                             stability=voice_stability,
                             similarity_boost=voice_similarity,
+                            style=settings.TTS_VOICE_STYLE,
                             use_speaker_boost=settings.TTS_USE_SPEAKER_BOOST,
                         ),
                         output_format=settings.TTS_OUTPUT_FORMAT,
-                        optimize_streaming_latency=settings.TTS_STREAMING_LATENCY_LEVEL,
+                        language_code=settings.TTS_LANGUAGE_CODE,
                     )
-                    return b"".join(audio_generator)
+                    return b"".join(audio_iterator)
 
                 return await asyncio.to_thread(_sync_generate)
 
@@ -179,7 +182,9 @@ class TextToSpeech:
 
         except ValueError:
             # Re-raise validation errors
-            logger.error(f"TTS validation error: {text[:50]}...")
+            logger.error(
+                f"TTS validation error: length={len(text)} preview={sensitive_text_for_log(text, max_chars=50)}"
+            )
             raise
         except Exception as e:
             logger.error(f"TTS conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
@@ -217,78 +222,75 @@ class TextToSpeech:
         if len(text) > settings.TTS_MAX_TEXT_LENGTH:
             raise ValueError(f"Input text exceeds maximum length of {settings.TTS_MAX_TEXT_LENGTH} characters")
 
-        # Use Rose-specific voice if configured
-        selected_voice_id = voice_id or settings.ROSE_VOICE_ID or settings.ELEVENLABS_VOICE_ID
+        # Use configured voice ID or fall back to default
+        selected_voice_id = voice_id or settings.ELEVENLABS_VOICE_ID
         voice_stability = stability if stability is not None else settings.TTS_VOICE_STABILITY
         voice_similarity = similarity_boost if similarity_boost is not None else settings.TTS_VOICE_SIMILARITY
 
         logger.info(
             f"Streaming TTS for Rose: {len(text)} chars, "
-            f"voice_id={selected_voice_id}, latency_level={settings.TTS_STREAMING_LATENCY_LEVEL}"
+            f"voice_id={selected_voice_id}, format={settings.TTS_OUTPUT_FORMAT}"
         )
 
-        # Use a thread-safe queue to pass chunks from sync generator to async iterator
-        chunk_queue: queue.Queue[bytes | None | Exception] = queue.Queue()
+        # True async streaming via thread+queue bridge.
+        # ElevenLabs SDK is synchronous, so we run convert_as_stream() in a
+        # daemon thread and push each chunk into an asyncio.Queue as it arrives.
+        # This yields bytes to the caller immediately as ElevenLabs generates
+        # them , not after the full audio is collected.
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[bytes | BaseException | None] = asyncio.Queue()
 
-        def _generate_in_thread() -> None:
-            """Run the synchronous ElevenLabs generator in a separate thread."""
+        def _stream_worker() -> None:
+            """Run convert_as_stream() in a thread and push chunks to the async queue."""
             try:
-                audio_generator = self.client.text_to_speech.convert(
+                for chunk in self.client.text_to_speech.convert_as_stream(
                     voice_id=selected_voice_id,
                     text=text,
                     model_id=settings.TTS_MODEL_NAME,
                     voice_settings=VoiceSettings(
                         stability=voice_stability,
                         similarity_boost=voice_similarity,
+                        style=settings.TTS_VOICE_STYLE,
                         use_speaker_boost=settings.TTS_USE_SPEAKER_BOOST,
                     ),
                     output_format=settings.TTS_OUTPUT_FORMAT,
-                    optimize_streaming_latency=settings.TTS_STREAMING_LATENCY_LEVEL,
-                )
-                for chunk in audio_generator:
-                    chunk_queue.put(chunk)
-                # Signal completion
-                chunk_queue.put(None)
-            except Exception as e:
-                chunk_queue.put(e)
+                    language_code=settings.TTS_LANGUAGE_CODE,
+                ):
+                    if chunk:  # SDK may yield empty bytes on keep-alive frames
+                        loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as exc:
+                loop.call_soon_threadsafe(queue.put_nowait, exc)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: stream done
 
-        # Start generator thread
-        generator_thread = threading.Thread(target=_generate_in_thread, daemon=True)
-        generator_thread.start()
+        t = threading.Thread(target=_stream_worker, daemon=True)
+        t.start()
 
-        # Yield chunks as they become available
         total_bytes = 0
         try:
             while True:
-                # Non-blocking check with small timeout to allow async cancellation
-                try:
-                    item = await asyncio.get_event_loop().run_in_executor(None, lambda: chunk_queue.get(timeout=0.1))
-                except queue.Empty:
-                    continue
-
-                if item is None:
-                    # Stream complete
+                item = await queue.get()
+                if item is None:  # sentinel , stream complete
                     break
-                elif isinstance(item, Exception):
-                    # Error from generator thread
-                    raise TextToSpeechError(f"Streaming TTS failed: {str(item)}") from item
-                else:
-                    total_bytes += len(item)
-                    yield item
+                if isinstance(item, BaseException):
+                    raise item
+                total_bytes += len(item)
+                yield item
 
             logger.info(f"Streaming TTS complete: {total_bytes} bytes yielded")
 
         except CircuitBreakerError as e:
-            # Circuit breaker is open - fail fast
             logger.error(f"Circuit breaker is open for ElevenLabs API: {str(e)}")
             raise TextToSpeechError("Text-to-speech service is temporarily unavailable") from e
-
         except ValueError:
-            # Re-raise validation errors
-            logger.error(f"TTS validation error: {text[:50]}...")
+            logger.error(
+                f"TTS validation error: length={len(text)} preview={sensitive_text_for_log(text, max_chars=50)}"
+            )
+            raise
+        except TextToSpeechError:
             raise
         except Exception as e:
-            logger.error(f"TTS conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
+            logger.error(f"TTS streaming failed: {type(e).__name__}: {str(e)}", exc_info=True)
             raise TextToSpeechError(f"Text-to-speech conversion failed: {str(e)}") from e
 
     async def synthesize_with_fallback(
@@ -318,7 +320,7 @@ class TextToSpeech:
             This method never raises exceptions - it always returns a usable response.
         """
         try:
-            audio_bytes = await self.synthesize(
+            audio_bytes = await self.synthesize_cached(
                 text=text, voice_id=voice_id, stability=stability, similarity_boost=similarity_boost
             )
             self._tts_available = True  # Reset availability flag on success
@@ -370,7 +372,7 @@ class TextToSpeech:
         Returns:
             str: SHA256 hash of the parameters
         """
-        selected_voice_id = voice_id or settings.ROSE_VOICE_ID or settings.ELEVENLABS_VOICE_ID
+        selected_voice_id = voice_id or settings.ELEVENLABS_VOICE_ID
         cache_input = f"{text}|{selected_voice_id}|{stability}|{similarity}|{settings.TTS_MODEL_NAME}"
         return hashlib.sha256(cache_input.encode()).hexdigest()
 

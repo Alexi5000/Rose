@@ -1,9 +1,11 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for settings validation."""
+
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+import ai_companion.settings as settings_module
 from ai_companion.settings import Settings
 
 # Shared base kwargs for constructing a valid Settings instance
@@ -81,6 +83,84 @@ class TestRangeValidators:
         with pytest.raises(ValidationError) as exc_info:
             Settings(**_BASE_SETTINGS, WORKFLOW_TIMEOUT_SECONDS=0)
         assert "WORKFLOW_TIMEOUT_SECONDS must be a positive number" in str(exc_info.value)
+
+    @pytest.mark.parametrize("field_name", ["DEEPGRAM_ENDPOINTING_MS", "DEEPGRAM_UTTERANCE_END_MS"])
+    def test_deepgram_streaming_timing_values_reject_zero_or_negative(self, field_name):
+        """Test Deepgram streaming timing knobs reject invalid millisecond values."""
+
+        with pytest.raises(ValidationError) as exc_info:
+            Settings(**_BASE_SETTINGS, **{field_name: 0})
+
+        assert f"{field_name} must be a positive integer in milliseconds" in str(exc_info.value)
+
+
+class TestProviderSettings:
+    """Test provider configuration defaults."""
+
+    def test_llm_provider_defaults_keep_groq_primary(self):
+        settings = Settings(**_BASE_SETTINGS)
+
+        assert settings.LLM_PROVIDER == "groq"
+        assert settings.LLM_FALLBACK_PROVIDER == "openrouter"
+        assert settings.OPENROUTER_API_KEY is None
+        assert settings.OPENROUTER_BASE_URL == "https://openrouter.ai/api/v1"
+        assert settings.STT_PROVIDER == "groq"
+        assert settings.DEEPGRAM_API_KEY is None
+        assert settings.DEEPGRAM_MODEL_NAME == "nova-3"
+        assert settings.DEEPGRAM_LANGUAGE == "en-US"
+        assert settings.DEEPGRAM_ENDPOINTING_MS == 300
+        assert settings.DEEPGRAM_UTTERANCE_END_MS == 1000
+        assert settings.LOG_SENSITIVE_CONTENT is False
+
+    def test_provider_selectors_accept_supported_aliases(self):
+        settings = Settings(
+            **_BASE_SETTINGS,
+            LLM_PROVIDER="openrouter",
+            LLM_FALLBACK_PROVIDER="",
+            STT_PROVIDER="deepgram_streaming",
+            TTS_PROVIDER="browser_speech",
+            EMBEDDING_PROVIDER="local",
+            MEMORY_PROVIDER="qdrant",
+            SAFETY_PROVIDER="deterministic_crisis",
+        )
+
+        assert settings.LLM_PROVIDER == "openrouter"
+        assert settings.LLM_FALLBACK_PROVIDER is None
+        assert settings.STT_PROVIDER == "deepgram_streaming"
+        assert settings.TTS_PROVIDER == "browser_speech"
+        assert settings.EMBEDDING_PROVIDER == "local"
+        assert settings.MEMORY_PROVIDER == "qdrant"
+        assert settings.SAFETY_PROVIDER == "deterministic_crisis"
+
+    @pytest.mark.parametrize(
+        ("field_name", "message"),
+        [
+            ("LLM_PROVIDER", "LLM_PROVIDER must be one of"),
+            ("LLM_FALLBACK_PROVIDER", "LLM_FALLBACK_PROVIDER must be empty or one of"),
+            ("STT_PROVIDER", "STT_PROVIDER must be one of"),
+            ("TTS_PROVIDER", "TTS_PROVIDER must be one of"),
+            ("EMBEDDING_PROVIDER", "EMBEDDING_PROVIDER must be one of"),
+            ("MEMORY_PROVIDER", "MEMORY_PROVIDER must be one of"),
+            ("SAFETY_PROVIDER", "SAFETY_PROVIDER must be one of"),
+        ],
+    )
+    def test_provider_selectors_reject_unknown_values(self, field_name, message):
+        with pytest.raises(ValidationError) as exc_info:
+            Settings(**_BASE_SETTINGS, **{field_name: "unknown"})
+
+        assert message in str(exc_info.value)
+
+
+class TestSettingsTextQuality:
+    """Guard active startup/configuration messages against mojibake."""
+
+    def test_settings_source_runtime_text_is_ascii(self):
+        text = Path(settings_module.__file__).read_text(encoding="utf-8")
+
+        assert text.isascii()
+        assert "Configuration error: missing or invalid environment variables" in text
+        assert "Qdrant connectivity validated successfully" in text
+        assert "Qdrant connectivity check failed" in text
 
 
 class TestCrossFieldValidation:

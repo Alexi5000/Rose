@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Administrative endpoints for system monitoring and maintenance."""
 
 from datetime import datetime
@@ -8,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai_companion.core.logging_config import get_logger
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 from ai_companion.modules.memory.long_term.constants import (
     DEFAULT_SESSION_ID,
     EMBEDDING_MODEL_NAME,
@@ -118,9 +118,11 @@ async def get_memory_status() -> MemorySystemStatus:
             "is_disabled": memory_guard.is_disabled(),
             "error_count": len(recent_errors),
             "last_error_time": datetime.fromtimestamp(recent_errors[-1]).isoformat() if recent_errors else None,
-            "disable_until": datetime.fromtimestamp(memory_guard.disabled_until).isoformat()
-            if memory_guard.disabled_until > current_time
-            else None,
+            "disable_until": (
+                datetime.fromtimestamp(memory_guard.disabled_until).isoformat()
+                if memory_guard.disabled_until > current_time
+                else None
+            ),
             "window_seconds": memory_guard.window_seconds,
             "threshold": memory_guard.threshold,
             "cooldown_seconds": memory_guard.cooldown_seconds,
@@ -153,10 +155,15 @@ async def get_memory_status() -> MemorySystemStatus:
         )
 
     except Exception as e:
-        logger.error("admin_memory_status_failed", error=str(e), exc_info=True)
+        logger.error(
+            "admin_memory_status_failed",
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get memory status: {type(e).__name__}: {str(e)}",
+            detail="Failed to get memory status",
         )
 
 
@@ -185,19 +192,26 @@ async def get_guard_status() -> GuardStatus:
             is_disabled=memory_guard.is_disabled(),
             error_count=len(recent_errors),
             last_error_time=datetime.fromtimestamp(recent_errors[-1]).isoformat() if recent_errors else None,
-            disable_until=datetime.fromtimestamp(memory_guard.disabled_until).isoformat()
-            if memory_guard.disabled_until > current_time
-            else None,
+            disable_until=(
+                datetime.fromtimestamp(memory_guard.disabled_until).isoformat()
+                if memory_guard.disabled_until > current_time
+                else None
+            ),
             window_seconds=memory_guard.window_seconds,
             threshold=memory_guard.threshold,
             cooldown_seconds=memory_guard.cooldown_seconds,
         )
 
     except Exception as e:
-        logger.error("admin_guard_status_failed", error=str(e), exc_info=True)
+        logger.error(
+            "admin_guard_status_failed",
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get guard status: {type(e).__name__}: {str(e)}",
+            detail="Failed to get guard status",
         )
 
 
@@ -228,10 +242,15 @@ async def reset_guard() -> Dict[str, str]:
         }
 
     except Exception as e:
-        logger.error("admin_guard_reset_failed", error=str(e), exc_info=True)
+        logger.error(
+            "admin_guard_reset_failed",
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to reset guard: {type(e).__name__}: {str(e)}",
+            detail="Failed to reset guard",
         )
 
 
@@ -269,8 +288,13 @@ async def get_collection_details() -> Dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("admin_collection_details_failed", error=str(e), exc_info=True)
+        logger.error(
+            "admin_collection_details_failed",
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get collection details: {type(e).__name__}: {str(e)}",
+            detail="Failed to get collection details",
         )

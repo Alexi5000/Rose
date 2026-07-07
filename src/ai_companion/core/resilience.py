@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Resilience patterns including circuit breakers for external service calls.
 
 This module provides circuit breaker implementations to protect against cascading
@@ -38,6 +37,7 @@ from functools import wraps
 from typing import Any, Callable, Optional, TypeVar
 
 from ai_companion.core.exceptions import CircuitBreakerError
+from ai_companion.core.privacy_logging import exception_message_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class CircuitBreaker:
                 self._state = "HALF_OPEN"
             else:
                 # Still in recovery period: block request and fail fast
-                logger.warning(f"{self.name}: Circuit is OPEN, blocking request")
+                logger.warning("%s: Circuit is OPEN, blocking request", self.name)
                 raise CircuitBreakerError(f"{self.name}: Circuit breaker is open, service unavailable")
 
     def _handle_success(self) -> None:
@@ -147,7 +147,12 @@ class CircuitBreaker:
         # Increment failure counter regardless of current state
         self._failure_count += 1
         logger.warning(
-            f"{self.name}: Failure {self._failure_count}/{self.failure_threshold} - {type(exception).__name__}: {str(exception)}"
+            "%s: Failure %s/%s - %s: %s",
+            self.name,
+            self._failure_count,
+            self.failure_threshold,
+            type(exception).__name__,
+            exception_message_for_log(exception),
         )
 
         # Open circuit if threshold reached (prevents cascading failures)

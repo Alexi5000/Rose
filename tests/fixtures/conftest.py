@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Pytest configuration and shared fixtures."""
 
 # Import all fixtures to make them available to tests

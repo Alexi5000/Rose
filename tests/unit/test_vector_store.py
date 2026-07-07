@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for Vector Store operations.
 
 Tests storing memories in Qdrant, searching with similarity scores,
@@ -11,7 +10,9 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
+from ai_companion.core.privacy_logging import REDACTED_TEXT, session_id_for_log
 from ai_companion.modules.memory.long_term.vector_store import (
+    DEFAULT_SESSION_ID,
     Memory,
     VectorStore,
     get_vector_store,
@@ -109,6 +110,7 @@ class TestMemoryStorage:
         assert point.payload["text"] == memory_text
         assert point.payload["id"] == "mem_456"
         assert point.payload["emotion"] == "calm"
+        assert point.payload["session_id"] == DEFAULT_SESSION_ID
 
     def test_store_memory_generates_embedding(self, mock_vector_store_deps):
         """Test that memory text is converted to embedding."""
@@ -124,6 +126,55 @@ class TestMemoryStorage:
 
         # Verify encode was called with the memory text
         mock_model.encode.assert_called()
+
+    def test_store_memory_tags_payload_with_session_id_when_provided(self, mock_vector_store_deps):
+        """Test that stored memories keep session metadata for export/delete controls."""
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+
+        store = VectorStore()
+        store.store_memory("User likes quiet morning rituals", {"id": "mem-session"}, session_id="session-123")
+
+        point = mock_client.upsert.call_args[1]["points"][0]
+        assert point.payload["session_id"] == "session-123"
+
+    def test_store_memory_failure_log_redacts_provider_error(self, mock_vector_store_deps, monkeypatch, caplog):
+        """Qdrant errors may echo payloads; storage logs should redact by default."""
+
+        mock_client = mock_vector_store_deps["client"]
+        monkeypatch.setattr("ai_companion.settings.settings.LOG_SENSITIVE_CONTENT", False)
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.search.return_value = []
+        mock_client.upsert.side_effect = RuntimeError("qdrant echoed private grief memory payload")
+
+        store = VectorStore()
+
+        with caplog.at_level("WARNING", logger="ai_companion.modules.memory.long_term.vector_store"):
+            store.store_memory("User has a private grief memory", {"id": "mem-private"}, session_id="session-private")
+
+        assert "private grief" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
+        assert "memory_store_failed" in caplog.text
+
+    def test_store_memory_defaults_to_isolated_session_when_missing(self, mock_vector_store_deps):
+        """Test the safe default does not store unscoped memories."""
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+
+        store = VectorStore()
+        store.store_memory("User wants privacy by default", {"id": "mem-default"})
+
+        point = mock_client.upsert.call_args[1]["points"][0]
+        assert point.payload["session_id"] == DEFAULT_SESSION_ID
 
 
 @pytest.mark.unit
@@ -193,6 +244,27 @@ class TestMemorySearch:
         # Should return empty list and not raise
         assert results == []
 
+    def test_search_memories_error_log_redacts_query_echo(self, mock_vector_store_deps, monkeypatch, caplog):
+        """Search failures should not log provider-echoed query text."""
+
+        mock_client = mock_vector_store_deps["client"]
+        monkeypatch.setattr("ai_companion.settings.settings.LOG_SENSITIVE_CONTENT", False)
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.search.side_effect = RuntimeError("qdrant echoed private grief query")
+
+        store = VectorStore()
+
+        with caplog.at_level("WARNING", logger="ai_companion.modules.memory.long_term.vector_store"):
+            results = store.search_memories("private grief query", session_id="session-private")
+
+        assert results == []
+        assert "private grief" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
+        assert "memory_search_failed" in caplog.text
+
     def test_search_memories_with_k_parameter(self, mock_vector_store_deps):
         """Test that search respects the k parameter."""
         mock_client = mock_vector_store_deps["client"]
@@ -212,6 +284,38 @@ class TestMemorySearch:
         # Verify search was called with correct limit
         call_args = mock_client.search.call_args
         assert call_args[1]["limit"] == 5
+
+    def test_search_memories_filters_to_session_when_provided(self, mock_vector_store_deps):
+        """Test semantic retrieval cannot cross session boundaries by default."""
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.search.return_value = []
+
+        store = VectorStore()
+        store.search_memories("privacy", session_id="session-123")
+
+        query_filter = mock_client.search.call_args[1]["query_filter"]
+        assert query_filter.must[0].key == "session_id"
+        assert query_filter.must[0].match.value == "session-123"
+
+    def test_search_memories_uses_default_session_filter_when_missing(self, mock_vector_store_deps):
+        """Test missing session IDs do not fall back to global memory search."""
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.search.return_value = []
+
+        store = VectorStore()
+        store.search_memories("privacy")
+
+        query_filter = mock_client.search.call_args[1]["query_filter"]
+        assert query_filter.must[0].key == "session_id"
+        assert query_filter.must[0].match.value == DEFAULT_SESSION_ID
 
     def test_search_memories_returns_empty_if_no_collection(self, mock_vector_store_deps):
         """Test that search returns empty list if collection doesn't exist."""
@@ -257,6 +361,96 @@ class TestMemorySearch:
         assert results[0].metadata["id"] == "mem3"
         assert results[0].metadata["topic"] == "mindfulness"
         assert "text" not in results[0].metadata  # text should be separate
+
+
+@pytest.mark.unit
+class TestMemoryPrivacyOperations:
+    """Test session export and deletion operations."""
+
+    def test_export_memories_for_session_scrolls_without_vectors(self, mock_vector_store_deps):
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+
+        mock_record = MagicMock()
+        mock_record.payload = {
+            "text": "User prefers gentler breathwork.",
+            "id": "mem-1",
+            "session_id": "session-123",
+        }
+        mock_client.scroll.return_value = ([mock_record], None)
+
+        store = VectorStore()
+        memories = store.export_memories_for_session("session-123")
+
+        assert len(memories) == 1
+        assert memories[0].text == "User prefers gentler breathwork."
+        assert memories[0].metadata == {"id": "mem-1", "session_id": "session-123"}
+
+        call_args = mock_client.scroll.call_args[1]
+        assert call_args["collection_name"] == "long_term_memory"
+        assert call_args["with_vectors"] is False
+        assert call_args["scroll_filter"].must[0].key == "session_id"
+        assert call_args["scroll_filter"].must[0].match.value == "session-123"
+
+    def test_delete_memories_for_session_uses_filter_selector(self, mock_vector_store_deps):
+        mock_client = mock_vector_store_deps["client"]
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+
+        store = VectorStore()
+        deleted = store.delete_memories_for_session("session-123")
+
+        assert deleted is True
+        call_args = mock_client.delete.call_args[1]
+        assert call_args["collection_name"] == "long_term_memory"
+        assert call_args["wait"] is True
+        assert call_args["points_selector"].filter.must[0].key == "session_id"
+        assert call_args["points_selector"].filter.must[0].match.value == "session-123"
+
+    def test_export_failure_log_redacts_exception_and_hashes_session(self, mock_vector_store_deps, monkeypatch, caplog):
+        mock_client = mock_vector_store_deps["client"]
+        monkeypatch.setattr("ai_companion.settings.settings.LOG_SENSITIVE_CONTENT", False)
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.scroll.side_effect = RuntimeError("export echoed private grief memory")
+
+        store = VectorStore()
+
+        with caplog.at_level("WARNING", logger="ai_companion.modules.memory.long_term.vector_store"):
+            memories = store.export_memories_for_session("session-private")
+
+        assert memories == []
+        assert "private grief" not in caplog.text
+        assert "session-private" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
+        assert session_id_for_log("session-private") in caplog.text
+
+    def test_delete_failure_log_redacts_exception_and_hashes_session(self, mock_vector_store_deps, monkeypatch, caplog):
+        mock_client = mock_vector_store_deps["client"]
+        monkeypatch.setattr("ai_companion.settings.settings.LOG_SENSITIVE_CONTENT", False)
+
+        mock_collection = MagicMock()
+        mock_collection.name = "long_term_memory"
+        mock_client.get_collections.return_value.collections = [mock_collection]
+        mock_client.delete.side_effect = RuntimeError("delete echoed private grief memory")
+
+        store = VectorStore()
+
+        with caplog.at_level("WARNING", logger="ai_companion.modules.memory.long_term.vector_store"):
+            deleted = store.delete_memories_for_session("session-private")
+
+        assert deleted is False
+        assert "private grief" not in caplog.text
+        assert "session-private" not in caplog.text
+        assert REDACTED_TEXT in caplog.text
+        assert session_id_for_log("session-private") in caplog.text
 
 
 @pytest.mark.unit

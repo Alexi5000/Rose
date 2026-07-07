@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """FastAPI application for Rose the Healer Shaman web interface."""
 
 from contextlib import asynccontextmanager
@@ -54,13 +53,14 @@ from ai_companion.core.error_responses import (
 from ai_companion.core.exceptions import AICompanionError
 from ai_companion.core.logging_config import configure_logging, get_logger
 from ai_companion.core.monitoring_scheduler import scheduler as monitoring_scheduler
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
 from ai_companion.core.session_cleanup import cleanup_old_sessions
 from ai_companion.graph.graph import create_workflow_graph
+from ai_companion.graph.utils.helpers import get_text_to_speech_module
 from ai_companion.interfaces.web.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from ai_companion.interfaces.web.routes import admin, health, monitoring, session, voice, voice_websocket
 from ai_companion.interfaces.web.routes import metrics as metrics_route
 from ai_companion.modules.memory.long_term.vector_store import get_vector_store
-from ai_companion.modules.speech.text_to_speech import TextToSpeech
 from ai_companion.settings import settings
 
 # Configure structured logging before any other imports
@@ -72,24 +72,36 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    logger.info("app_starting", emoji=LOG_EMOJI_STARTUP, service="rose_web_interface")
+    logger.info("app_starting", marker=LOG_EMOJI_STARTUP, service="rose_web_interface")
 
     # Validate external connectivity (Qdrant, DB)
     try:
         settings.validate_connectivity()
-    except Exception:
-        logger.warning("⚠️ Connectivity validation encountered issues; continuing in degraded mode", exc_info=True)
+    except Exception as e:
+        logger.warning(
+            "connectivity_validation_degraded",
+            marker=LOG_EMOJI_WARNING,
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
 
     # Initialize Qdrant collection and validate vector dimensions
     try:
         store = get_vector_store()
         initialized = store.initialize_collection()
         if initialized:
-            logger.info("✅ Qdrant collection initialization succeeded")
+            logger.info("qdrant_collection_initialization_succeeded", marker=LOG_EMOJI_SUCCESS)
         else:
-            logger.warning("⚠️ Qdrant collection initialization returned False; check logs for details")
-    except Exception:
-        logger.warning("⚠️ Qdrant collection initialization check failed; continuing in degraded mode", exc_info=True)
+            logger.warning("qdrant_collection_initialization_returned_false", marker=LOG_EMOJI_WARNING)
+    except Exception as e:
+        logger.warning(
+            "qdrant_collection_initialization_check_failed",
+            marker=LOG_EMOJI_WARNING,
+            error=exception_message_for_log(e),
+            error_type=type(e).__name__,
+            exc_info=exc_info_for_log(),
+        )
 
     # Initialize scheduler for background jobs
     scheduler = AsyncIOScheduler()
@@ -132,26 +144,36 @@ async def lifespan(app: FastAPI):
     # Start the scheduler
     scheduler.start()
     logger.info(
-        "scheduler_started", emoji=LOG_EMOJI_SUCCESS, jobs=["audio_cleanup", "database_backup", "session_cleanup"]
+        "scheduler_started",
+        marker=LOG_EMOJI_SUCCESS,
+        jobs=["audio_cleanup", "database_backup", "session_cleanup"],
     )
 
     # Start monitoring scheduler
     await monitoring_scheduler.start()
     logger.info(
         "monitoring_scheduler_started",
-        emoji=LOG_EMOJI_SUCCESS,
+        marker=LOG_EMOJI_SUCCESS,
         evaluation_interval=settings.MONITORING_EVALUATION_INTERVAL,
     )
 
     # Phase 1 Optimization: Warm TTS cache on startup
-    # Pre-generate common therapeutic phrases to improve first-response latency
+    # Pre-generate common support phrases to improve first-response latency.
+    # Uses the shared lru_cached instance from get_text_to_speech_module() so the
+    # warmed cache is actually reused by audio_node instead of being discarded.
     if settings.FEATURE_TTS_CACHE_ENABLED:
         try:
-            tts = TextToSpeech(enable_cache=True)
+            tts = get_text_to_speech_module()
             await tts.warm_cache()
-            logger.info("tts_cache_warmed", emoji=LOG_EMOJI_SUCCESS, phrases_cached=len(tts._cache))
+            logger.info("tts_cache_warmed", marker=LOG_EMOJI_SUCCESS, phrases_cached=len(tts._cache))
         except Exception as e:
-            logger.warning(f"⚠️ TTS cache warming failed (non-critical): {e}", exc_info=True)
+            logger.warning(
+                "tts_cache_warming_failed",
+                marker=LOG_EMOJI_WARNING,
+                error=exception_message_for_log(e),
+                error_type=type(e).__name__,
+                exc_info=exc_info_for_log(),
+            )
 
     # Initialize shared checkpointer and compiled graph (once, for app lifetime)
     # This eliminates per-request SQLite connection creation and graph recompilation.
@@ -161,18 +183,18 @@ async def lifespan(app: FastAPI):
         compiled_graph = create_workflow_graph().compile(checkpointer=checkpointer)
         app.state.checkpointer = checkpointer
         app.state.compiled_graph = compiled_graph
-        logger.info("graph_and_checkpointer_initialized", emoji=LOG_EMOJI_SUCCESS)
+        logger.info("graph_and_checkpointer_initialized", marker=LOG_EMOJI_SUCCESS)
 
         yield
 
         # Shutdown monitoring scheduler
         await monitoring_scheduler.stop()
-        logger.info("monitoring_scheduler_stopped", emoji=LOG_EMOJI_SUCCESS)
+        logger.info("monitoring_scheduler_stopped", marker=LOG_EMOJI_SUCCESS)
 
         # Shutdown scheduler
         scheduler.shutdown()
 
-    logger.info("app_shutdown", emoji=LOG_EMOJI_SUCCESS, service="rose_web_interface")
+    logger.info("app_shutdown", marker=LOG_EMOJI_SUCCESS, service="rose_web_interface")
 
 
 def create_app() -> FastAPI:
@@ -191,19 +213,24 @@ def create_app() -> FastAPI:
     # This is set at the application level and applies to all endpoints
     app.state.max_request_size = MAX_REQUEST_SIZE_BYTES
     logger.info(
-        "request_size_limit_configured", emoji=LOG_EMOJI_SUCCESS, max_size_mb=MAX_REQUEST_SIZE_BYTES / 1024 / 1024
+        "request_size_limit_configured",
+        marker=LOG_EMOJI_SUCCESS,
+        max_size_mb=MAX_REQUEST_SIZE_BYTES / 1024 / 1024,
     )
 
     if settings.ENABLE_API_DOCS:
         logger.info(
-            "api_documentation_enabled", emoji=LOG_EMOJI_SUCCESS, docs_url=API_DOCS_PATH, redoc_url=API_REDOC_PATH
+            "api_documentation_enabled",
+            marker=LOG_EMOJI_SUCCESS,
+            docs_url=API_DOCS_PATH,
+            redoc_url=API_REDOC_PATH,
         )
     else:
-        logger.info("api_documentation_disabled", emoji=LOG_EMOJI_SUCCESS)
+        logger.info("api_documentation_disabled", marker=LOG_EMOJI_SUCCESS)
 
     # Add request ID middleware (should be first to track all requests)
     app.add_middleware(RequestIDMiddleware)
-    logger.info("request_id_middleware_enabled", emoji=LOG_EMOJI_SUCCESS)
+    logger.info("request_id_middleware_enabled", marker=LOG_EMOJI_SUCCESS)
 
     # Add request size limit middleware
     @app.middleware("http")
@@ -230,7 +257,10 @@ def create_app() -> FastAPI:
         allowed_origins = settings.get_allowed_origins()
 
     logger.info(
-        "cors_configured", emoji=LOG_EMOJI_CONNECTION, allowed_origins=allowed_origins, environment=settings.ENVIRONMENT
+        "cors_configured",
+        marker=LOG_EMOJI_CONNECTION,
+        allowed_origins=allowed_origins,
+        environment=settings.ENVIRONMENT,
     )
 
     app.add_middleware(
@@ -244,7 +274,7 @@ def create_app() -> FastAPI:
     # Add security headers middleware
     if settings.ENABLE_SECURITY_HEADERS:
         app.add_middleware(SecurityHeadersMiddleware)
-        logger.info("security_headers_enabled", emoji=LOG_EMOJI_SUCCESS)
+        logger.info("security_headers_enabled", marker=LOG_EMOJI_SUCCESS)
 
     # Configure rate limiting
     if RATE_LIMIT_ENABLED:
@@ -252,18 +282,20 @@ def create_app() -> FastAPI:
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         logger.info(
-            "rate_limiting_enabled", emoji=LOG_EMOJI_SUCCESS, requests_per_minute=RATE_LIMIT_REQUESTS_PER_MINUTE
+            "rate_limiting_enabled",
+            marker=LOG_EMOJI_SUCCESS,
+            requests_per_minute=RATE_LIMIT_REQUESTS_PER_MINUTE,
         )
     else:
         # Create a no-op limiter if rate limiting is disabled
         app.state.limiter = None
-        logger.info("rate_limiting_disabled", emoji=LOG_EMOJI_SUCCESS)
+        logger.info("rate_limiting_disabled", marker=LOG_EMOJI_SUCCESS)
 
     # Register exception handlers
     app.add_exception_handler(AICompanionError, ai_companion_error_handler)
     app.add_exception_handler(ValueError, validation_error_handler)
     app.add_exception_handler(Exception, global_exception_handler)
-    logger.info("exception_handlers_registered", emoji=LOG_EMOJI_SUCCESS)
+    logger.info("exception_handlers_registered", marker=LOG_EMOJI_SUCCESS)
 
     # Register API routes with v1 versioning
     app.include_router(health.router, prefix=API_BASE_PATH, tags=["Health"])
@@ -274,11 +306,11 @@ def create_app() -> FastAPI:
     app.include_router(monitoring.router, prefix=API_BASE_PATH, tags=["Monitoring"])
     app.include_router(admin.router, prefix=API_BASE_PATH, tags=["Admin"])
 
-    logger.info("api_routes_registered", emoji=LOG_EMOJI_SUCCESS, version="v1")
+    logger.info("api_routes_registered", marker=LOG_EMOJI_SUCCESS, version="v1")
 
     # Serve React frontend static files (if build directory exists)
     if FRONTEND_BUILD_DIR.exists():
-        logger.info("frontend_serving_enabled", emoji=LOG_EMOJI_FRONTEND, build_dir=str(FRONTEND_BUILD_DIR))
+        logger.info("frontend_serving_enabled", marker=LOG_EMOJI_FRONTEND, build_dir=str(FRONTEND_BUILD_DIR))
 
         # Check if assets directory exists
         assets_dir = FRONTEND_BUILD_DIR / "assets"
@@ -286,9 +318,9 @@ def create_app() -> FastAPI:
             # Mount static assets (JS, CSS, images, etc.) with cache headers
             # Static files are immutable and can be cached for 1 year
             app.mount("/assets", StaticFiles(directory=assets_dir, html=False), name="assets")
-            logger.info("static_assets_mounted", emoji=LOG_EMOJI_SUCCESS, assets_dir=str(assets_dir))
+            logger.info("static_assets_mounted", marker=LOG_EMOJI_SUCCESS, assets_dir=str(assets_dir))
         else:
-            logger.warning("assets_directory_not_found", emoji=LOG_EMOJI_WARNING, expected_path=str(assets_dir))
+            logger.warning("assets_directory_not_found", marker=LOG_EMOJI_WARNING, expected_path=str(assets_dir))
 
         # Add cache headers for static files
         @app.middleware("http")
@@ -314,24 +346,26 @@ def create_app() -> FastAPI:
             """Serve React app for all non-API routes."""
             # Don't serve React app for API routes
             if full_path.startswith("api/"):
-                return {"detail": "Not found"}
+                return JSONResponse(status_code=404, content={"detail": "Not found"})
 
             # Serve index.html for all other routes (React Router handles routing)
             index_path = FRONTEND_BUILD_DIR / "index.html"
             if index_path.exists():
                 return FileResponse(index_path)
 
-            logger.error("index_html_not_found", emoji=LOG_EMOJI_ERROR, expected_path=str(index_path))
+            logger.error("index_html_not_found", marker=LOG_EMOJI_ERROR, expected_path=str(index_path))
             return {"detail": "Frontend not found"}
 
     else:
-        logger.error("frontend_build_not_found", emoji=LOG_EMOJI_ERROR, expected_path=str(FRONTEND_BUILD_DIR))
+        logger.error("frontend_build_not_found", marker=LOG_EMOJI_ERROR, expected_path=str(FRONTEND_BUILD_DIR))
         logger.warning(
-            "frontend_not_served", emoji=LOG_EMOJI_WARNING, message="run 'npm run build' in frontend directory"
+            "frontend_not_served",
+            marker=LOG_EMOJI_WARNING,
+            message="run 'npm run build' in frontend directory",
         )
 
     logger.info(
-        "server_ready", emoji=LOG_EMOJI_CONNECTION, port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists()
+        "server_ready", marker=LOG_EMOJI_CONNECTION, port=WEB_SERVER_PORT, frontend_enabled=FRONTEND_BUILD_DIR.exists()
     )
 
     return app

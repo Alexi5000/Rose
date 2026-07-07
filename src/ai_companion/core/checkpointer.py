@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Checkpointer factory for database abstraction.
 
 This module provides a factory function to create the appropriate checkpointer

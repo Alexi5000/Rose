@@ -10,8 +10,8 @@ tests/
 ├── README.md                      # This file
 ├── test_core.py                   # Core utility tests (existing)
 ├── test_voice_interaction.py      # Voice flow integration tests
-├── test_rose_character.py         # Rose's character and therapeutic responses
-├── test_memory_therapeutic.py     # Memory system with therapeutic context
+├── test_rose_character.py         # Rose's character and response posture
+├── test_memory_therapeutic.py     # Legacy memory context tests
 ├── test_frontend_automated.py     # Automated frontend tests (Playwright)
 ├── test_frontend_manual.md        # Manual frontend testing checklist
 ├── test_performance.py            # Performance and load tests
@@ -75,7 +75,7 @@ pytest tests/ -v -m unit
 # Voice interaction tests
 pytest tests/test_voice_interaction.py -v
 
-# Character and therapeutic response tests
+# Character and response posture tests
 pytest tests/test_rose_character.py -v
 
 # Memory system tests
@@ -122,18 +122,18 @@ pytest tests/test_voice_interaction.py -v
 
 ### 2. Rose Character Tests (`test_rose_character.py`)
 
-Tests Rose's healer shaman personality and therapeutic approach:
+Tests Rose's companion personality and response posture:
 - Character card contains Rose identity
 - Ancient wisdom and holistic approach
-- Therapeutic personality traits
+- Reflective companion traits
 - No Ava references remain
 - Response length constraints
-- Grief counseling scenarios
+- Grief support scenarios
 
 **Key Test Classes:**
 - `TestRoseCharacter`: Character profile validation
-- `TestTherapeuticMemoryAnalysis`: Memory prompt validation
-- `TestTherapeuticScenarios`: Various counseling scenarios
+- `TestTherapeuticMemoryAnalysis`: Legacy memory prompt validation
+- `TestTherapeuticScenarios`: Legacy support scenario coverage
 
 **Run:**
 ```bash
@@ -142,7 +142,7 @@ pytest tests/test_rose_character.py -v
 
 ### 3. Memory System Tests (`test_memory_therapeutic.py`)
 
-Tests memory extraction and retrieval with therapeutic context:
+Tests memory extraction and retrieval with supportive context:
 - Extraction of emotional states
 - Extraction of grief experiences
 - Extraction of coping mechanisms

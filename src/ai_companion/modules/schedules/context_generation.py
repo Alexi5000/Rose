@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 from datetime import datetime, time
 from typing import Dict, Optional
 
@@ -14,7 +13,7 @@ from ai_companion.core.schedules import (
 
 
 class ScheduleContextGenerator:
-    """Class to generate context about Rose's current activity based on schedules."""
+    """Generate ambient response-shaping context for Rose's current support tone."""
 
     SCHEDULES = {
         0: MONDAY_SCHEDULE,  # Monday
@@ -36,10 +35,10 @@ class ScheduleContextGenerator:
 
     @classmethod
     def get_current_activity(cls) -> Optional[str]:
-        """Get Rose's current activity based on the current time and day of the week.
+        """Get Rose's current ambient support context for the time and day.
 
         Returns:
-            str: Description of current activity, or None if no matching time slot is found
+            str: Non-biographical tone/context hint, or None if no matching time slot is found
         """
         # Get current time and day of week (0 = Monday, 6 = Sunday)
         current_datetime = datetime.now()

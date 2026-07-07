@@ -1,37 +1,30 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🔊 Rose Audio Playback Hook
  *
  * Guarantees that Rose replies audibly by first trying streamed audio URLs and
- * falling back to the SpeechSynthesis API when needed. Adds emoji logs at every
- * critical step so failures are easy to trace.
+ * falling back to the SpeechSynthesis API when needed.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  ANALYSER_FFT_SIZE,
-  ANALYSER_SMOOTHING,
   AUDIO_DEFAULT_VOLUME,
-  AUDIO_FETCH_TIMEOUT_MS,
   AUDIO_PLAYBACK_MAX_RETRIES,
   SPEECH_SYNTHESIS_LANGUAGE,
   SPEECH_SYNTHESIS_PITCH,
   SPEECH_SYNTHESIS_RATE,
 } from '@/config/voice';
-import { calculateRms, createPlaybackAnalyzer } from '@/lib/audio-utils';
 import type { VoiceResponse } from '@/types/voice';
 
 const SYNTHETIC_AMPLITUDE_BASE = 0.3;
 const SYNTHETIC_AMPLITUDE_VARIATION = 0.2;
 const SYNTHETIC_AMPLITUDE_PERIOD_MS = 160;
-const PLAYBACK_TEXT_PREVIEW_CHARS = 24;
-const AUDIO_FETCH_RETRY_DELAY_MS = 250;
+const AUDIO_FETCH_RETRY_DELAY_MS = 500;
 
 const resolveAudioUrl = (audioUrl: string): string => {
   try {
     return new URL(audioUrl, window.location.origin).toString();
   } catch (error) {
-    console.warn('⚠️ Failed to resolve audio URL, using raw value', audioUrl, error);
+    console.warn('Failed to resolve audio URL, using raw value', error);
     return audioUrl;
   }
 };
@@ -70,49 +63,11 @@ export function useRoseAudio({
 
   // 🔧 Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const amplitudeModeRef = useRef<'idle' | 'analyser' | 'synthetic'>('idle');
-
-  /**
-   * 🔊 Analyze audio amplitude loop (runs at 60fps)
-   */
-  const analyzePlayback = useCallback(() => {
-    if (amplitudeModeRef.current !== 'analyser' || !analyserRef.current) {
-      return;
-    }
-
-    const analyser = analyserRef.current;
-    const bufferLength = analyser.fftSize;
-    const dataArray = new Float32Array(bufferLength);
-    analyser.getFloatTimeDomainData(dataArray);
-
-    // Calculate RMS amplitude
-    const rms = calculateRms(dataArray);
-    setRoseAmplitude(rms);
-
-    // Continue loop
-    animationFrameRef.current = requestAnimationFrame(analyzePlayback);
-  }, []);
-
-  /**
-   * 🌊 Synthetic amplitude generator for SpeechSynthesis fallback
-   */
-  const runSyntheticAmplitude = useCallback(() => {
-    if (amplitudeModeRef.current !== 'synthetic') {
-      return;
-    }
-
-    const timeSeed = performance.now();
-    const amplitude =
-      SYNTHETIC_AMPLITUDE_BASE +
-      SYNTHETIC_AMPLITUDE_VARIATION * Math.abs(Math.sin(timeSeed / SYNTHETIC_AMPLITUDE_PERIOD_MS));
-    setRoseAmplitude(amplitude);
-    animationFrameRef.current = requestAnimationFrame(runSyntheticAmplitude);
-  }, []);
+  const amplitudeModeRef = useRef<'idle' | 'synthetic'>('idle');
+  // Tracks the current inline blob URL so it can be revoked when audio is released.
+  const inlineBlobUrlRef = useRef<string | null>(null);
 
   const stopAmplitudeTracking = useCallback(() => {
     if (animationFrameRef.current) {
@@ -123,17 +78,25 @@ export function useRoseAudio({
     setRoseAmplitude(0);
   }, []);
 
-  const startAnalyserAmplitude = useCallback(() => {
-    stopAmplitudeTracking();
-    amplitudeModeRef.current = 'analyser';
-    animationFrameRef.current = requestAnimationFrame(analyzePlayback);
-  }, [analyzePlayback, stopAmplitudeTracking]);
-
   const startSyntheticAmplitude = useCallback(() => {
     stopAmplitudeTracking();
     amplitudeModeRef.current = 'synthetic';
-    animationFrameRef.current = requestAnimationFrame(runSyntheticAmplitude);
-  }, [runSyntheticAmplitude, stopAmplitudeTracking]);
+
+    const tick = () => {
+      if (amplitudeModeRef.current !== 'synthetic') {
+        return;
+      }
+
+      const timeSeed = performance.now();
+      const amplitude =
+        SYNTHETIC_AMPLITUDE_BASE +
+        SYNTHETIC_AMPLITUDE_VARIATION * Math.abs(Math.sin(timeSeed / SYNTHETIC_AMPLITUDE_PERIOD_MS));
+      setRoseAmplitude(amplitude);
+      animationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(tick);
+  }, [stopAmplitudeTracking]);
 
   const stopSpeechSynthesis = useCallback(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -142,13 +105,13 @@ export function useRoseAudio({
 
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
-      console.log('🛑 SpeechSynthesis cancelled');
+      console.log('SpeechSynthesis cancelled');
     }
 
     utteranceRef.current = null;
   }, []);
 
-  const releaseAudioResources = useCallback(async () => {
+  const releaseAudioResources = useCallback(() => {
     stopAmplitudeTracking();
 
     if (audioRef.current) {
@@ -160,133 +123,65 @@ export function useRoseAudio({
       audioRef.current = null;
     }
 
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+    // Revoke any outstanding inline blob URL to free memory.
+    if (inlineBlobUrlRef.current) {
+      URL.revokeObjectURL(inlineBlobUrlRef.current);
+      inlineBlobUrlRef.current = null;
     }
-
-    if (audioContextRef.current) {
-      try {
-        await audioContextRef.current.close();
-      } catch (closeError) {
-        console.warn('⚠️ Error while closing AudioContext:', closeError);
-      }
-      audioContextRef.current = null;
-    }
-
-    analyserRef.current = null;
   }, [stopAmplitudeTracking]);
 
-  const waitForMetadata = useCallback((audio: HTMLAudioElement) => {
-    return new Promise<void>((resolve, reject) => {
-      const handleLoaded = () => {
-        audio.removeEventListener('loadedmetadata', handleLoaded);
-        audio.removeEventListener('error', handleError);
-        console.log(`✅ Audio metadata loaded: duration=${audio.duration.toFixed(2)}s`);
-        resolve();
-      };
-
-      const handleError = (event: Event) => {
-        audio.removeEventListener('loadedmetadata', handleLoaded);
-        audio.removeEventListener('error', handleError);
-        console.error('❌ Failed to load Rose audio metadata', {
-          event,
-          currentSrc: audio.currentSrc,
-        });
-        reject(event);
-      };
-
-      audio.addEventListener('loadedmetadata', handleLoaded);
-      audio.addEventListener('error', handleError);
-      audio.load();
-    });
-  }, []);
-
-  const fetchAudioBlob = useCallback(async (audioUrl: string): Promise<Blob> => {
-    const resolvedUrl = resolveAudioUrl(audioUrl);
-    console.log(`🌐 Fetching Rose audio from ${resolvedUrl}`);
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), AUDIO_FETCH_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(resolvedUrl, {
-        signal: controller.signal,
-        cache: 'no-store',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio (${response.status})`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      const blob = await response.blob();
-
-      if (!blob.size) {
-        throw new Error('Audio blob is empty');
-      }
-
-      let normalizedBlob = blob;
-      if (!blob.type || blob.type === 'application/octet-stream') {
-        console.warn('⚠️ Audio blob missing MIME type, forcing audio/mpeg', {
-          reportedType: blob.type || 'unset',
-          contentType,
-        });
-        normalizedBlob = blob.slice(0, blob.size, 'audio/mpeg');
-      }
-
-      console.log(`📥 Audio fetched ${(blob.size / 1024).toFixed(2)} KB`, {
-        blobType: normalizedBlob.type || 'unknown',
-        contentType,
-      });
-      return normalizedBlob;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }, []);
-
-  const playFromBlob = useCallback(
-    async (blob: Blob): Promise<void> => {
-      await releaseAudioResources();
+  /**
+   * 🌐 Play audio directly from a URL.
+   *
+   * Sets audio.src directly so the browser can start playing as soon as the
+   * first bytes arrive , no full-download wait, no objectURL round-trip.
+   * This shaves 200,500 ms off time-to-first-audio compared to blob-fetch.
+   */
+  const playFromUrl = useCallback(
+    async (audioUrl: string): Promise<void> => {
+      releaseAudioResources();
       stopSpeechSynthesis();
 
-      const objectUrl = URL.createObjectURL(blob);
-      objectUrlRef.current = objectUrl;
+      const resolvedUrl = resolveAudioUrl(audioUrl);
+      console.log('Playing Rose audio');
 
-      const audio = new Audio(objectUrl);
-      audio.crossOrigin = 'anonymous';
+      const audio = new Audio(resolvedUrl);
       audio.preload = 'auto';
       audio.volume = AUDIO_DEFAULT_VOLUME;
       audioRef.current = audio;
 
-      await waitForMetadata(audio);
-
-      const { audioContext, analyser } = createPlaybackAnalyzer(
-        audio,
-        ANALYSER_FFT_SIZE,
-        ANALYSER_SMOOTHING
-      );
-
-      if (audioContext.state === 'suspended') {
-        console.log('⏯️ Resuming Rose AudioContext');
-        await audioContext.resume();
-      }
-
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
+      // Wait for enough metadata to confirm the file is valid before calling play()
+      await new Promise<void>((resolve, reject) => {
+        const onLoaded = () => {
+          audio.removeEventListener('loadedmetadata', onLoaded);
+          audio.removeEventListener('error', onError_);
+          console.log(`Audio metadata loaded: duration=${audio.duration.toFixed(2)}s`);
+          resolve();
+        };
+        const onError_ = (event: Event) => {
+          audio.removeEventListener('loadedmetadata', onLoaded);
+          audio.removeEventListener('error', onError_);
+          const mediaError = (event.target as HTMLAudioElement).error;
+          console.error('Failed to load Rose audio', {
+            code: mediaError?.code,
+            message: mediaError?.message,
+          });
+          reject(new Error(`Audio load failed: code=${mediaError?.code}`));
+        };
+        audio.addEventListener('loadedmetadata', onLoaded);
+        audio.addEventListener('error', onError_);
+        audio.load();
+      });
 
       audio.onplay = () => {
-        console.log('▶️ Rose audio playback started', {
-          objectUrl,
-          duration: audio.duration,
-        });
+        console.log('Rose audio playback started', { duration: audio.duration });
         setIsPlaying(true);
-        startAnalyserAmplitude();
+        startSyntheticAmplitude();
         onPlaybackStart?.();
       };
 
       audio.onended = () => {
-        console.log('🏁 Rose audio playback finished');
+        console.log('Rose audio playback finished');
         setIsPlaying(false);
         stopAmplitudeTracking();
         onPlaybackEnd?.();
@@ -294,13 +189,10 @@ export function useRoseAudio({
 
       audio.onerror = (event) => {
         const mediaError = audio.error;
-        console.error('❌ Audio element error', {
+        console.error('Audio element error during playback', {
           event,
           code: mediaError?.code,
           message: mediaError?.message,
-          currentSrc: audio.currentSrc,
-          blobType: blob.type,
-          blobSize: blob.size,
         });
         setError('Audio playback error');
         setIsPlaying(false);
@@ -315,10 +207,9 @@ export function useRoseAudio({
       onPlaybackEnd,
       onPlaybackStart,
       releaseAudioResources,
-      startAnalyserAmplitude,
+      startSyntheticAmplitude,
       stopAmplitudeTracking,
       stopSpeechSynthesis,
-      waitForMetadata,
     ]
   );
 
@@ -342,7 +233,7 @@ export function useRoseAudio({
 
       return await new Promise<void>((resolve, reject) => {
         utterance.onend = () => {
-          console.log('🗣️ Speech synthesis finished');
+          console.log('Speech synthesis finished');
           setIsPlaying(false);
           stopAmplitudeTracking();
           onPlaybackEnd?.();
@@ -350,13 +241,13 @@ export function useRoseAudio({
         };
 
         utterance.onerror = (event) => {
-          console.error('❌ Speech synthesis error', event);
+          console.error('Speech synthesis error', event);
           setIsPlaying(false);
           stopAmplitudeTracking();
           reject(new Error('Speech synthesis failed'));
         };
 
-        console.log('🗣️ Speaking via SpeechSynthesis fallback');
+        console.log('Speaking via SpeechSynthesis fallback');
         window.speechSynthesis.speak(utterance);
       });
     },
@@ -375,28 +266,54 @@ export function useRoseAudio({
   const playAudio = useCallback(
     async (response: VoiceResponse): Promise<void> => {
       const audioUrl = response.audio_url;
-      console.log('🔊 Preparing Rose playback', {
+      console.log('Preparing Rose playback', {
         hasAudioUrl: Boolean(audioUrl),
-        textPreview: response.text?.slice(0, PLAYBACK_TEXT_PREVIEW_CHARS) ?? '(no text)',
+        hasInlineAudio: Boolean(response.audio_data),
+        audioStreamed: Boolean(response.audio_streamed),
+        responseTextLength: response.text?.length ?? 0,
       });
       setError(null);
 
-      if (!audioUrl && !response.text) {
-        console.log('🤫 Rose returned empty response (silence/listening mode)');
+      if (response.audio_streamed) {
+        console.log('Rose response already streamed over WebSocket');
+        return;
+      }
+
+      if (!audioUrl && !response.audio_data && !response.text) {
+        console.log('Rose returned empty response (silence/listening mode)');
         return;
       }
 
       let lastError: unknown = null;
 
+      // Prefer inline base64 audio , avoids extra HTTP round-trip
+      if (response.audio_data) {
+        try {
+          console.log('Playing inline audio');
+          const binary = atob(response.audio_data);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: 'audio/mpeg' });
+          const inlineUrl = URL.createObjectURL(blob);
+          inlineBlobUrlRef.current = inlineUrl; // tracked for revocation in releaseAudioResources
+          await playFromUrl(inlineUrl);
+          return;
+        } catch (inlineError) {
+          console.error('Inline audio playback failed, falling back to URL', inlineError);
+          lastError = inlineError;
+        }
+      }
+
       if (audioUrl) {
         for (let attempt = 1; attempt <= AUDIO_PLAYBACK_MAX_RETRIES; attempt += 1) {
           try {
-            console.log(`🎯 Audio playback attempt ${attempt}/${AUDIO_PLAYBACK_MAX_RETRIES}`);
-            const blob = await fetchAudioBlob(audioUrl);
-            await playFromBlob(blob);
+            console.log(`Audio playback attempt ${attempt}/${AUDIO_PLAYBACK_MAX_RETRIES}`);
+            await playFromUrl(audioUrl);
             return;
           } catch (attemptError) {
-            console.error('⚠️ Audio playback attempt failed', attemptError);
+            console.error('Audio playback attempt failed', attemptError);
             lastError = attemptError;
             if (attempt < AUDIO_PLAYBACK_MAX_RETRIES) {
               await new Promise((resolve) => setTimeout(resolve, AUDIO_FETCH_RETRY_DELAY_MS));
@@ -410,7 +327,7 @@ export function useRoseAudio({
           await speakWithSynthesis(response.text);
           return;
         } catch (synthError) {
-          console.error('❌ Speech synthesis fallback failed', synthError);
+          console.error('Speech synthesis fallback failed', synthError);
           lastError = synthError;
         }
       }
@@ -421,23 +338,28 @@ export function useRoseAudio({
       throw lastError instanceof Error ? lastError : new Error(errorMsg);
     },
     [
-      fetchAudioBlob,
       onError,
-      playFromBlob,
+      playFromUrl,
       speakWithSynthesis,
     ]
   );
 
   /**
    * ⏹️ Stop audio playback
+   *
+   * Explicitly firing onPlaybackEnd here ensures the voice session state
+   * machine resets even when audio is interrupted (barge-in), not just
+   * when it ends naturally via the audio.onended event.
    */
   const stopAudio = useCallback(() => {
-    console.log('⏹️ Stopping Rose audio');
+    console.log('Stopping Rose audio');
     stopSpeechSynthesis();
-    void releaseAudioResources();
+    releaseAudioResources();
     setIsPlaying(false);
     setRoseAmplitude(0);
-  }, [releaseAudioResources, stopSpeechSynthesis]);
+    // Notify voice session so it can reset from 'speaking' state
+    onPlaybackEnd?.();
+  }, [releaseAudioResources, stopSpeechSynthesis, onPlaybackEnd]);
 
   // Cleanup on unmount
   useEffect(() => {

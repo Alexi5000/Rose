@@ -1,4 +1,3 @@
-<!-- Rose full repository refresh 2026-05-17 -->
 # Developer Guide
 
 ## Overview
@@ -35,7 +34,7 @@ This guide provides comprehensive documentation for developers working on the Ro
 2. **Clone and Setup**:
    ```bash
    git clone <repository-url>
-   cd ai-companion
+   cd Rose
    uv sync
    cd frontend && npm install && cd ..
    ```
@@ -55,32 +54,24 @@ This guide provides comprehensive documentation for developers working on the Ro
 
 ### Project Structure
 
+Current contributor work should target the React/FastAPI voice surface under `frontend/` and
+`src/ai_companion/interfaces/web/`, plus the provider, memory, safety, and response-quality modules. Legacy Chainlit,
+WhatsApp, and image-generation references in older audit or course documents are preserved only as frozen lineage
+unless a current task explicitly revives them.
+
 ```
 src/ai_companion/
-├── core/                   # Shared utilities and patterns
-│   ├── exceptions.py       # Custom exception classes
-│   ├── error_handlers.py   # Error handling decorators
-│   ├── resilience.py       # Circuit breaker implementation
-│   ├── prompts.py          # System prompts and character cards
-│   └── schedules.py        # Activity scheduling logic
-├── graph/                  # LangGraph workflow
-│   ├── graph.py            # Workflow graph construction
-│   ├── state.py            # State schema definition
-│   ├── nodes.py            # Workflow node implementations
-│   ├── edges.py            # Conditional edge logic
-│   └── utils/              # Graph utilities (chains, helpers)
-├── interfaces/             # User-facing interfaces
-│   ├── web/                # FastAPI web interface
-│   └── chainlit/           # Chainlit chat interface
-├── modules/                # Feature modules
-│   ├── memory/             # Memory management
-│   │   ├── long_term/      # Vector-based long-term memory
-│   │   └── short_term/     # Conversation checkpointing
-│   ├── speech/             # Speech processing
-│   │   ├── speech_to_text.py
-│   │   └── text_to_speech.py
-│   └── image/              # Image generation (frozen)
-└── settings.py             # Configuration management
+|-- core/                   # Shared prompts, metrics, resilience, response quality
+|-- graph/                  # LangGraph workflow, state, nodes, and edges
+|-- interfaces/
+|   `-- web/                # FastAPI HTTP/WebSocket API and static app shell
+|-- modules/
+|   |-- memory/              # Qdrant memory and privacy controls (modules/memory/)
+|   |-- providers/           # LLM routing and provider contracts (modules/providers/)
+|   |-- safety/              # Crisis classifier and safety metadata (modules/safety/)
+|   |-- schedules/           # Schedule context generation (modules/schedules/)
+|   `-- speech/              # STT/TTS and timing metadata (modules/speech/)
+`-- settings.py             # Environment-driven configuration
 ```
 
 ## Common Patterns
@@ -183,7 +174,7 @@ Circuit breakers protect against cascading failures by preventing calls to faili
 ### Circuit Breaker States
 
 ```
-CLOSED (Normal) -> OPEN (Blocked) -> HALF_OPEN (Testing) -> CLOSED
+CLOSED (Normal) → OPEN (Blocked) → HALF_OPEN (Testing) → CLOSED
 ```
 
 - **CLOSED**: Normal operation, calls pass through
@@ -393,31 +384,27 @@ stt2 = get_speech_to_text()  # Returns same instance
 assert stt is stt2  # True
 ```
 
-### Session-Scoped Instances
+### WebSocket Session State
 
-For Chainlit interface, use session-scoped instances:
+For the FastAPI voice surface, keep per-connection state inside the WebSocket handler
+or a small session object passed to helper functions:
 
 ```python
-import chainlit as cl
+from fastapi import WebSocket
 
-@cl.on_chat_start
-async def on_chat_start():
-    """Initialize session-scoped modules."""
-    # Create instances for this session
-    cl.user_session.set("speech_to_text", SpeechToText())
-    cl.user_session.set("text_to_speech", TextToSpeech())
-    cl.user_session.set("memory_manager", MemoryManager())
+@router.websocket("/api/v1/voice/ws")
+async def voice_websocket(websocket: WebSocket) -> None:
+    """Handle one live voice session."""
+    await websocket.accept()
+    session = VoiceSessionState(
+        speech_to_text=get_speech_to_text(),
+        text_to_speech=get_text_to_speech(),
+        memory_manager=get_memory_manager(),
+    )
 
-@cl.on_message
-async def on_message(message: cl.Message):
-    """Handle message with session modules."""
-    # Retrieve instances from session
-    stt = cl.user_session.get("speech_to_text")
-    tts = cl.user_session.get("text_to_speech")
-    memory = cl.user_session.get("memory_manager")
-
-    # Use modules
-    # ...
+    while True:
+        message = await websocket.receive_json()
+        await handle_voice_message(websocket, session, message)
 ```
 
 ### Dependency Injection

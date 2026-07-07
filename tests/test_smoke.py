@@ -153,7 +153,7 @@ class TestBasicFunctionality:
         from ai_companion.interfaces.web.app import app
 
         client = TestClient(app)
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
 
         assert response.status_code == 200
         data = response.json()
@@ -171,7 +171,7 @@ class TestBasicFunctionality:
         from ai_companion.interfaces.web.app import app
 
         client = TestClient(app)
-        response = client.post("/api/session/start")
+        response = client.post("/api/v1/session/start")
 
         assert response.status_code == 200
         data = response.json()

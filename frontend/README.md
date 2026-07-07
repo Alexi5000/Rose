@@ -1,7 +1,11 @@
-<!-- Rose full repository refresh 2026-05-17 -->
-# 🌹 Rose Frontend
+# Rose Frontend
 
-Voice-first AI grief counselor with WebGL shader background and real-time audio reactivity.
+Voice-first emotional support interface with a WebGL background, browser VAD,
+WebSocket audio transport, and real-time playback feedback.
+
+Rose is not a therapist, doctor, emergency service, or clinical product. The
+frontend should keep that boundary visible while making the voice experience feel
+calm, responsive, and easy to leave.
 
 ## Quick Start
 
@@ -9,76 +13,98 @@ Voice-first AI grief counselor with WebGL shader background and real-time audio 
 # Install dependencies
 npm install
 
-# Run dev server (localhost:3000)
+# Run dev server at http://localhost:3000
 npm run dev
 
 # Build for production
 npm run build
 ```
 
-## Architecture
+Run the backend separately from the repository root:
 
-### User Interaction Flow
+```bash
+uv run uvicorn ai_companion.interfaces.web.app:app --app-dir src --reload --port 8000
+```
 
-1. **Tap anywhere on screen** -> Start voice session
-2. **Speak naturally** -> Auto-detected via VAD
-3. **Auto-records** when you speak
-4. **Auto-stops** when you pause
-5. **Rose responds** -> Audio plays with visual feedback
-6. **Tap again** -> Stop session (or auto-stops after 20s inactivity)
+Or start frontend and backend together:
 
-### Tech Stack
+```bash
+python scripts/run_dev_server.py
+```
 
-- React 18 + TypeScript (strict mode)
-- Vite 7.2 (build tool)
-- Tailwind CSS 3.4
-- shadcn/ui (Radix UI)
-- WebGL (shader)
-- Web Audio API (VAD)
+## Interaction Flow
+
+1. Tap the interface to start a voice session.
+2. Grant microphone permission.
+3. Speak naturally.
+4. Browser VAD records when speech is detected.
+5. The client streams or uploads audio to FastAPI.
+6. Rose responds with text and audio playback.
+7. Tap or speak during playback to interrupt and return to listening.
+
+## Tech Stack
+
+- React 19 and TypeScript
+- Vite 7
+- Tailwind CSS 3
+- shadcn/ui and Radix UI
+- WebGL background rendering
+- Web Audio API, MediaRecorder, and browser VAD
+- WebSocket audio jitter buffer with HTTP voice fallback
 
 ## Key Features
 
-- ✅ Full-screen voice interface (entire screen is clickable)
-- ✅ Voice Activity Detection with 3-frame hysteresis
-- ✅ Audio-reactive WebGL shader (pulses with voice)
-- ✅ State-based color transitions (Blue -> Purple -> Pink)
-- ✅ Automatic error handling with shadcn Alerts
-- ✅ Dev settings panel (Ctrl+Shift+D)
-- ✅ Desktop-first (mobile planned)
+- Full-screen voice-first interaction
+- Voice activity detection with configurable hysteresis
+- Audio-reactive visual state transitions
+- WebSocket voice transport with HTTP fallback
+- Barge-in support during Rose playback
+- Session-only memory toggle
+- Memory export and forget controls
+- Dev settings panel with Ctrl+Shift+D
 
 ## Configuration
 
-All VAD parameters in `src/config/voice.ts`:
+VAD settings live in `src/config/voice.ts`:
 
 ```typescript
-RMS_ACTIVATION_THRESHOLD = 0.02    // Speech detection
-RMS_DEACTIVATION_THRESHOLD = 0.01  // Silence detection
-INACTIVITY_TIMEOUT_MS = 20000      // 20s auto-stop
+RMS_ACTIVATION_THRESHOLD = 0.02;
+RMS_DEACTIVATION_THRESHOLD = 0.01;
+INACTIVITY_TIMEOUT_MS = 20000;
 ```
 
-## Dev Tools
-
-Press **Ctrl+Shift+D** to open settings panel:
-- Adjust VAD thresholds
-- Change timeout duration
-- View real-time audio metrics
+Backend connection helpers live in `src/lib/api.ts`. The default local API is
+`http://localhost:8000`.
 
 ## Build Output
 
-Builds to `../src/ai_companion/interfaces/web/static/` for backend serving.
+`npm run build` writes the production bundle to:
+
+```text
+../src/ai_companion/interfaces/web/static/
+```
+
+FastAPI serves that bundle in production mode when the directory exists.
 
 ## Browser Requirements
 
-- Chrome/Edge 90+
+- Chrome or Edge 90+
 - Firefox 88+
 - Safari 14.1+
-- Requires: WebGL, Web Audio API, MediaRecorder, getUserMedia
+- WebGL
+- Web Audio API
+- MediaRecorder
+- `getUserMedia`
 
 ## Troubleshooting
 
-**Mic permission denied?** Check browser permissions, use HTTPS
+**Mic permission denied:** check browser permissions. Some browsers require
+HTTPS outside localhost.
 
-**WebGL not working?** Update graphics drivers, check browser compatibility
+**WebGL unavailable:** update graphics drivers or try another supported browser.
 
-**Backend connection failed?** Ensure backend running on port 8000
+**Backend connection failed:** confirm the FastAPI backend is running on port
+8000 and that `/api/v1/health` responds.
 
+**No voice playback:** check the TTS provider key, browser autoplay policy, and
+the Network tab for `audio_unavailable` or failed audio responses.

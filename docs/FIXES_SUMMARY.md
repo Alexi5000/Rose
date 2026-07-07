@@ -17,8 +17,8 @@
 - **Result:** Rose couldn't remember past conversations because session IDs didn't match
 
 **Files Fixed:**
-- [`src/ai_companion/graph/nodes.py:299`](src/ai_companion/graph/nodes.py#L299) - `memory_extraction_node` now extracts and passes session_id
-- [`src/ai_companion/graph/nodes.py:328`](src/ai_companion/graph/nodes.py#L328) - `memory_injection_node` now extracts and passes session_id
+- [`src/ai_companion/graph/nodes.py:299`](../src/ai_companion/graph/nodes.py#L299) - `memory_extraction_node` now extracts and passes session_id
+- [`src/ai_companion/graph/nodes.py:328`](../src/ai_companion/graph/nodes.py#L328) - `memory_injection_node` now extracts and passes session_id
 
 **Changes:**
 ```python
@@ -47,8 +47,8 @@ memories = memory_manager.get_relevant_memories(recent_context, session_id=sessi
 - Example: `logger.info(f"{emoji} event", key=value)` ❌
 
 **Files Fixed:**
-- [`src/ai_companion/interfaces/web/routes/voice.py`](src/ai_companion/interfaces/web/routes/voice.py) - Lines 130, 142, 145, 212, 220
-- [`src/ai_companion/interfaces/web/app.py`](src/ai_companion/interfaces/web/app.py) - Multiple lines (70, 129, 145, 163, 166, etc.)
+- [`src/ai_companion/interfaces/web/routes/voice.py`](../src/ai_companion/interfaces/web/routes/voice.py) - Lines 130, 142, 145, 212, 220
+- [`src/ai_companion/interfaces/web/app.py`](../src/ai_companion/interfaces/web/app.py) - Multiple lines (70, 129, 145, 163, 166, etc.)
 
 **Changes:**
 ```python
@@ -75,8 +75,8 @@ logger.info("metrics_recorded", service=service_name, emoji="📊", duration_ms=
 - Memory limits too low (512M) causing OOM kills
 
 **Files Fixed:**
-- [`docker-compose.yml`](docker-compose.yml) - Ports, memory limits, health checks
-- [`Dockerfile`](Dockerfile) - Port exposure, health check
+- [`docker-compose.yml`](../docker-compose.yml) - Ports, memory limits, health checks
+- [`Dockerfile`](../Dockerfile) - Port exposure, health check
 
 **Changes:**
 ```yaml
@@ -116,7 +116,7 @@ rose:
 ## 🛠️ New Tools Created
 
 ### 1. **Qdrant Diagnostic Script**
-**File:** [`scripts/qdrant_diagnose.py`](scripts/qdrant_diagnose.py)
+**File:** [`scripts/archive/qdrant_diagnose.py`](../scripts/archive/qdrant_diagnose.py)
 
 **Features:**
 - ✅ Non-destructive collection health check
@@ -133,7 +133,7 @@ python scripts/qdrant_diagnose.py
 ---
 
 ### 2. **Non-Destructive Reindex Script**
-**File:** [`scripts/reindex_qdrant.py`](scripts/reindex_qdrant.py)
+**File:** [`scripts/archive/reindex_qdrant.py`](../scripts/archive/reindex_qdrant.py)
 
 **Features:**
 - ✅ Creates backup before reindexing
@@ -155,7 +155,7 @@ python scripts/reindex_qdrant.py
 ---
 
 ### 3. **Admin Endpoints for Monitoring**
-**File:** [`src/ai_companion/interfaces/web/routes/admin.py`](src/ai_companion/interfaces/web/routes/admin.py)
+**File:** [`src/ai_companion/interfaces/web/routes/admin.py`](../src/ai_companion/interfaces/web/routes/admin.py)
 
 **Endpoints:**
 
@@ -432,7 +432,7 @@ After completing all steps, verify:
 
 ## 📚 Additional Resources
 
-- **Docker Fixes Details:** [`docs/DOCKER_FIXES.md`](docs/DOCKER_FIXES.md)
+- **Docker Fixes Details:** [`docs/DOCKER_FIXES.md`](DOCKER_FIXES.md)
 - **Qdrant Diagnostics:** `python scripts/qdrant_diagnose.py --help`
 - **Reindex Guide:** `python scripts/reindex_qdrant.py --help`
 - **API Documentation:** http://localhost:8000/docs (when running)
@@ -459,7 +459,7 @@ If you encounter issues:
 1. Run diagnostics: `python scripts/qdrant_diagnose.py`
 2. Check logs: `docker-compose logs rose | tail -100`
 3. Check admin endpoint: `curl http://localhost:8000/api/v1/admin/memory/status`
-4. Review [docs/DOCKER_FIXES.md](docs/DOCKER_FIXES.md) for detailed troubleshooting
+4. Review [docs/DOCKER_FIXES.md](DOCKER_FIXES.md) for detailed troubleshooting
 
 ---
 

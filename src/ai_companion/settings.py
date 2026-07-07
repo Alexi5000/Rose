@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Application settings and configuration management.
 
 This module defines all configuration settings for the Rose the Healer Shaman
@@ -81,15 +80,28 @@ class Settings(BaseSettings):
     QDRANT_MAX_BACKOFF: float = 5.0
 
     # Model configurations
-    TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
-    SMALL_TEXT_MODEL_NAME: str = "llama-3.1-8b-instant"
-    STT_MODEL_NAME: str = "whisper-large-v3"
-    TTS_MODEL_NAME: str = "eleven_flash_v2_5"
-
-    # Rose-specific configuration
-    ROSE_VOICE_ID: str | None = None  # Optional: Override ELEVENLABS_VOICE_ID for Rose's specific voice
+    LLM_PROVIDER: str = "groq"
+    LLM_FALLBACK_PROVIDER: str | None = "openrouter"
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL_NAME: str = "openai/gpt-oss-120b"
+    OPENROUTER_APP_NAME: str = "Rose"
+    TEXT_MODEL_NAME: str = "openai/gpt-oss-120b"
+    SMALL_TEXT_MODEL_NAME: str = "openai/gpt-oss-20b"
+    STT_PROVIDER: str = "groq"
+    STT_MODEL_NAME: str = "whisper-large-v3-turbo"
+    DEEPGRAM_API_KEY: str | None = None
+    DEEPGRAM_MODEL_NAME: str = "nova-3"
+    DEEPGRAM_LANGUAGE: str = "en-US"
+    DEEPGRAM_AUDIO_MIMETYPE: str = "audio/webm"
+    DEEPGRAM_ENDPOINTING_MS: int = 300
+    DEEPGRAM_UTTERANCE_END_MS: int = 1000
+    TTS_PROVIDER: str = "elevenlabs"
+    TTS_MODEL_NAME: str = "eleven_turbo_v2_5"
 
     # Memory configuration
+    EMBEDDING_PROVIDER: str = "sentence_transformer"
+    MEMORY_PROVIDER: str = "long_term"
     MEMORY_TOP_K: int = 5
     TOTAL_MESSAGES_SUMMARY_TRIGGER: int = 30
     TOTAL_MESSAGES_AFTER_SUMMARY: int = 10
@@ -112,6 +124,9 @@ class Settings(BaseSettings):
     # Logging configuration
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     LOG_FORMAT: str = "json"  # json or console
+    LOG_SENSITIVE_CONTENT: bool = (
+        False  # Opt-in only: log transcripts, memory text, or other sensitive content previews
+    )
 
     # API Documentation configuration
     ENABLE_API_DOCS: bool = False  # Enable OpenAPI/Swagger documentation (set True in dev .env)
@@ -136,13 +151,17 @@ class Settings(BaseSettings):
     # Text-to-speech configuration
     TTS_CACHE_ENABLED: bool = True  # Enable TTS response caching
     TTS_CACHE_TTL_HOURS: int = 24  # Cache time-to-live in hours
-    TTS_VOICE_STABILITY: float = 0.75  # Voice stability (0.0-1.0)
-    TTS_VOICE_SIMILARITY: float = 0.5  # Voice similarity boost (0.0-1.0)
-    TTS_STREAMING_LATENCY_LEVEL: int = (
-        4  # 0 (highest quality) to 4 (lowest latency) - Phase 1: maximum speed optimization
+    TTS_VOICE_STABILITY: float = (
+        0.50  # Voice stability (0.0-1.0); 0.50 = natural conversational variation (retail-blend sweet spot)
     )
+    TTS_VOICE_SIMILARITY: float = (
+        0.75  # Voice similarity boost (0.0-1.0); 0.75 = consistent fidelity without over-clamping
+    )
+    TTS_VOICE_STYLE: float = 0.15  # Style exaggeration (0.0-1.0); 0.15 = subtle warmth without over-acting
+    TTS_VOICE_SPEED: float = 0.92  # Speech speed multiplier (0.7-1.2); 0.92 = slightly slower for calming delivery
     TTS_OUTPUT_FORMAT: str = "mp3_44100_128"  # ElevenLabs output encoding
     TTS_USE_SPEAKER_BOOST: bool = True  # Enable ElevenLabs speaker boost for warmth
+    TTS_LANGUAGE_CODE: str = "en"  # Language code for ElevenLabs language-specific acoustic tuning
     TTS_MAX_TEXT_LENGTH: int = 5000  # Maximum text length for TTS
 
     # Audio file cleanup configuration
@@ -157,8 +176,11 @@ class Settings(BaseSettings):
     # LLM timeout and retry configuration
     LLM_TIMEOUT_SECONDS: float = 30.0  # Timeout for LLM API calls
     LLM_MAX_RETRIES: int = 3  # Maximum retry attempts for LLM calls
-    LLM_TEMPERATURE_DEFAULT: float = 0.85  # Default temperature for LLM responses - higher for more natural variation
+    LLM_TEMPERATURE_DEFAULT: float = 0.72  # Default temperature for LLM responses - balanced warmth + consistency
     LLM_TEMPERATURE_MEMORY: float = 0.1  # Temperature for memory extraction
+
+    # Safety classification configuration
+    SAFETY_PROVIDER: str = "deterministic"
 
     # Monitoring and alerting configuration
     SENTRY_DSN: str | None = None  # Sentry DSN for error tracking
@@ -219,6 +241,96 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("LLM_PROVIDER")
+    @classmethod
+    def validate_llm_provider(cls, v: str) -> str:
+        """Validate the primary LLM provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"groq", "openrouter"}:
+            raise ValueError("LLM_PROVIDER must be one of: groq, openrouter")
+        return provider
+
+    @field_validator("LLM_FALLBACK_PROVIDER", mode="before")
+    @classmethod
+    def normalize_optional_provider(cls, v: Any) -> str | None:
+        """Treat empty optional provider env vars as disabled."""
+
+        if v is None:
+            return None
+        provider = str(v).strip().lower()
+        return provider or None
+
+    @field_validator("LLM_FALLBACK_PROVIDER")
+    @classmethod
+    def validate_llm_fallback_provider(cls, v: str | None) -> str | None:
+        """Validate the optional LLM fallback provider selector."""
+
+        if v is not None and v not in {"groq", "openrouter"}:
+            raise ValueError("LLM_FALLBACK_PROVIDER must be empty or one of: groq, openrouter")
+        return v
+
+    @field_validator("STT_PROVIDER")
+    @classmethod
+    def validate_stt_provider(cls, v: str) -> str:
+        """Validate the speech-to-text provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"groq", "deepgram", "deepgram_streaming"}:
+            raise ValueError("STT_PROVIDER must be one of: groq, deepgram, deepgram_streaming")
+        return provider
+
+    @field_validator("DEEPGRAM_ENDPOINTING_MS", "DEEPGRAM_UTTERANCE_END_MS")
+    @classmethod
+    def validate_deepgram_timing_ms(cls, v: int, info: Any) -> int:
+        """Validate Deepgram streaming timing controls."""
+
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive integer in milliseconds")
+        return v
+
+    @field_validator("TTS_PROVIDER")
+    @classmethod
+    def validate_tts_provider(cls, v: str) -> str:
+        """Validate the text-to-speech provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"elevenlabs", "elevenlabs_tts", "text_only", "text_only_tts", "browser_speech"}:
+            raise ValueError(
+                "TTS_PROVIDER must be one of: elevenlabs, elevenlabs_tts, text_only, text_only_tts, browser_speech"
+            )
+        return provider
+
+    @field_validator("EMBEDDING_PROVIDER")
+    @classmethod
+    def validate_embedding_provider(cls, v: str) -> str:
+        """Validate the embedding provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"sentence_transformer", "sentence-transformer", "local"}:
+            raise ValueError("EMBEDDING_PROVIDER must be one of: sentence_transformer, sentence-transformer, local")
+        return provider
+
+    @field_validator("MEMORY_PROVIDER")
+    @classmethod
+    def validate_memory_provider(cls, v: str) -> str:
+        """Validate the memory provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"long_term", "long_term_memory", "qdrant"}:
+            raise ValueError("MEMORY_PROVIDER must be one of: long_term, long_term_memory, qdrant")
+        return provider
+
+    @field_validator("SAFETY_PROVIDER")
+    @classmethod
+    def validate_safety_provider(cls, v: str) -> str:
+        """Validate the safety classifier provider selector."""
+
+        provider = v.strip().lower()
+        if provider not in {"deterministic", "deterministic_crisis", "local"}:
+            raise ValueError("SAFETY_PROVIDER must be one of: deterministic, deterministic_crisis, local")
+        return provider
+
     @field_validator("CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     @classmethod
     def validate_circuit_breaker_threshold(cls, v: int) -> int:
@@ -245,6 +357,7 @@ class Settings(BaseSettings):
         "LLM_TEMPERATURE_MEMORY",
         "TTS_VOICE_STABILITY",
         "TTS_VOICE_SIMILARITY",
+        "TTS_VOICE_STYLE",
         "SENTRY_TRACES_SAMPLE_RATE",
         "SENTRY_PROFILES_SAMPLE_RATE",
     )
@@ -267,15 +380,6 @@ class Settings(BaseSettings):
                 f"{info.field_name} must be between 0.0 and 1.0 (got {v}). "
                 "This controls randomness/sampling for the respective feature."
             )
-        return v
-
-    @field_validator("TTS_STREAMING_LATENCY_LEVEL")
-    @classmethod
-    def validate_tts_streaming_latency(cls, v: int) -> int:
-        """Validate streaming latency optimization level (0-4)."""
-
-        if v < 0 or v > 4:
-            raise ValueError("TTS_STREAMING_LATENCY_LEVEL must be between 0 (quality) and 4 (fastest)")
         return v
 
     @field_validator(
@@ -365,15 +469,15 @@ class Settings(BaseSettings):
             client = QdrantClient(url=self.QDRANT_URL, api_key=self.QDRANT_API_KEY, timeout=5)
             # Try to get collections to verify connectivity
             client.get_collections()
-            logger.info("✓ Qdrant connectivity validated successfully")
+            logger.info("Qdrant connectivity validated successfully")
         except Exception as e:
             logger.warning(
-                f"⚠ Qdrant connectivity check failed: {e}. "
+                f"Qdrant connectivity check failed: {e}. "
                 f"Memory features may not work correctly. "
                 f"Please verify QDRANT_URL ({self.QDRANT_URL}) is accessible and QDRANT_API_KEY is valid."
             )
 
-        logger.info("✓ Using SQLite database (no connectivity check needed)")
+        logger.info("Using SQLite database (no connectivity check needed)")
 
 
 def load_settings() -> Settings:
@@ -391,23 +495,19 @@ def load_settings() -> Settings:
 
     Example:
         >>> settings = load_settings()
-        >>> print(settings.TEXT_MODEL_NAME)
-        'llama-3.3-70b-versatile'
+        >>> settings.TEXT_MODEL_NAME
+        'openai/gpt-oss-120b'
     """
     try:
         return Settings()  # type: ignore[call-arg]  # Pydantic BaseSettings loads from environment variables
     except ValidationError as e:
-        lines = [
-            "Configuration Error: Missing or invalid environment variables",
-            "",
-            "Please ensure the following environment variables are set:",
-        ]
+        sys.stderr.write("Configuration error: missing or invalid environment variables\n")
+        sys.stderr.write("\nPlease ensure the following environment variables are set:\n")
         for error in e.errors():
             field = error["loc"][0]
             msg = error["msg"]
-            lines.append(f"  - {field}: {msg}")
-        lines.extend(["", "Refer to .env.example for required variables."])
-        sys.stderr.write("\n".join(lines) + "\n")
+            sys.stderr.write(f"  - {field}: {msg}\n")
+        sys.stderr.write("\nRefer to .env.example for required variables.\n")
         sys.exit(1)
 
 

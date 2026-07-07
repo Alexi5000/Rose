@@ -1,4 +1,3 @@
-<!-- Rose full repository refresh 2026-05-17 -->
 # API Quick Reference
 
 Quick reference guide for Rose the Healer Shaman API.
@@ -38,9 +37,53 @@ POST /api/v1/session/start
 ```json
 {
   "session_id": "123e4567-e89b-12d3-a456-426614174000",
-  "message": "Session initialized. Ready to begin your healing journey with Rose."
+  "message": "Session initialized. Rose is ready for emotional support when you are."
 }
 ```
+
+#### Read Memory Preferences
+```http
+GET /api/v1/session/{session_id}/memory-preferences
+```
+
+**Response:**
+```json
+{
+  "session_id": "123e4567-e89b-12d3-a456-426614174000",
+  "memory_mode": "enabled",
+  "long_term_memory_enabled": true,
+  "message": "Session memory preferences loaded."
+}
+```
+
+#### Update Memory Preferences
+```http
+POST /api/v1/session/{session_id}/memory-preferences
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "memory_mode": "session_only"
+}
+```
+
+Use `enabled` to allow long-term memory for the session, or `session_only` to prevent long-term memory storage and retrieval for that session.
+
+#### Export Session Memories
+```http
+GET /api/v1/session/{session_id}/memory/export
+```
+
+Exports text and metadata for memories tagged to the session. Embedding vectors are not returned.
+
+#### Forget Session Memories
+```http
+POST /api/v1/session/{session_id}/memory/forget
+```
+
+Deletes long-term memories tagged to the session and invalidates cached retrievals.
 
 ### Voice Processing
 
@@ -157,6 +200,11 @@ curl -X POST http://localhost:8000/api/v1/voice/process \
   -F "audio=@recording.mp3" \
   -F "session_id=$SESSION_ID"
 
+# Opt into session-only memory
+curl -X POST "http://localhost:8000/api/v1/session/$SESSION_ID/memory-preferences" \
+  -H "Content-Type: application/json" \
+  -d '{"memory_mode":"session_only"}'
+
 # Check health
 curl http://localhost:8000/api/v1/health
 ```
@@ -242,9 +290,9 @@ WORKFLOW_TIMEOUT_SECONDS=60
 
 Legacy endpoints without `/v1/` prefix are deprecated but still supported:
 
-- `/api/session/start` -> Use `/api/v1/session/start`
-- `/api/voice/process` -> Use `/api/v1/voice/process`
-- `/api/health` -> Use `/api/v1/health`
+- `/api/session/start` → Use `/api/v1/session/start`
+- `/api/voice/process` → Use `/api/v1/voice/process`
+- `/api/health` → Use `/api/v1/health`
 
 ## Support
 

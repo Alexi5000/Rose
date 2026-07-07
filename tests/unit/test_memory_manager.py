@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Unit tests for Memory Manager module.
 
 Tests memory extraction, storage, retrieval, and formatting operations
@@ -14,11 +13,36 @@ from ai_companion.modules.memory.long_term.memory_manager import (
     MemoryAnalysis,
     MemoryManager,
 )
+from ai_companion.settings import settings
+
+
+@pytest.fixture(autouse=True)
+def mock_memory_llm_factory():
+    """Keep MemoryManager unit tests off real provider constructors."""
+
+    with patch("ai_companion.modules.memory.long_term.memory_manager.get_structured_chat_model") as mock_factory:
+        mock_factory.return_value = AsyncMock()
+        yield mock_factory
 
 
 @pytest.mark.unit
 class TestMemoryExtraction:
     """Test memory extraction from HumanMessage."""
+
+    def test_memory_manager_uses_provider_routed_structured_llm(
+        self,
+        mock_qdrant_client,
+        mock_memory_llm_factory,
+    ):
+        """Test memory extraction uses the shared provider layer."""
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store"):
+            manager = MemoryManager()
+
+        assert manager.llm is mock_memory_llm_factory.return_value
+        mock_memory_llm_factory.assert_called_once()
+        assert mock_memory_llm_factory.call_args.args == (MemoryAnalysis,)
+        assert mock_memory_llm_factory.call_args.kwargs["temperature"] == pytest.approx(settings.LLM_TEMPERATURE_MEMORY)
+        assert mock_memory_llm_factory.call_args.kwargs["model_name"] == settings.SMALL_TEXT_MODEL_NAME
 
     @pytest.mark.asyncio
     async def test_extract_important_memory_from_human_message(self, mock_qdrant_client):
@@ -78,7 +102,12 @@ class TestMemoryExtraction:
     @pytest.mark.asyncio
     async def test_extract_emotional_state(self, mock_qdrant_client):
         """Test extraction of emotional state information."""
-        mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Experiencing anxiety and sadness")
+        mock_analysis = MemoryAnalysis(
+            is_important=True,
+            formatted_memory="Experiencing anxiety and sadness",
+            memory_type="emotional_note",
+            sensitivity="sensitive",
+        )
 
         with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
             mock_vs.return_value.find_similar_memory.return_value = None
@@ -94,6 +123,28 @@ class TestMemoryExtraction:
             # Verify the formatted memory was stored
             call_args = mock_vs.return_value.store_memory.call_args
             assert call_args[1]["text"] == "Experiencing anxiety and sadness"
+            assert call_args[1]["metadata"]["memory_type"] == "emotional_note"
+            assert call_args[1]["metadata"]["sensitivity"] == "sensitive"
+
+    @pytest.mark.asyncio
+    async def test_extract_memory_defaults_metadata_classification(self, mock_qdrant_client):
+        """Test older analysis outputs default to general, standard metadata."""
+        mock_analysis = MemoryAnalysis(is_important=True, formatted_memory="Name is Sarah, lives in Portland")
+
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
+            mock_vs.return_value.find_similar_memory.return_value = None
+            mock_vs.return_value.store_memory = MagicMock()
+
+            manager = MemoryManager()
+            manager.llm = AsyncMock()
+            manager.llm.ainvoke.return_value = mock_analysis
+
+            message = HumanMessage(content="My name is Sarah and I live in Portland")
+            await manager.extract_and_store_memories(message)
+
+            call_args = mock_vs.return_value.store_memory.call_args
+            assert call_args[1]["metadata"]["memory_type"] == "general_fact"
+            assert call_args[1]["metadata"]["sensitivity"] == "standard"
 
     @pytest.mark.asyncio
     async def test_extract_coping_mechanism(self, mock_qdrant_client):
@@ -279,6 +330,40 @@ class TestMemoryRetrieval:
             assert len(memories) == 2
             assert "guilt" in memories[1].lower()
 
+    def test_retrieve_memory_records_preserves_type_and_sensitivity(self, mock_qdrant_client):
+        """Test retrieving relevant memories with privacy categories preserved."""
+        from ai_companion.modules.memory.long_term.vector_store import Memory
+
+        mock_memories = [
+            Memory(
+                text="User prefers quiet ancestral rituals.",
+                metadata={"memory_type": "cultural_preference", "sensitivity": "standard"},
+                score=0.9,
+            ),
+            Memory(
+                text="Panic tends to spike at night.",
+                metadata={"memory_type": "health_note", "sensitivity": "sensitive"},
+                score=0.88,
+            ),
+        ]
+
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
+            mock_vs.return_value.search_memories.return_value = mock_memories
+
+            manager = MemoryManager()
+            records = manager.get_relevant_memory_records("night rituals")
+
+        assert records == [
+            {
+                "text": "User prefers quiet ancestral rituals.",
+                "metadata": {"memory_type": "cultural_preference", "sensitivity": "standard"},
+            },
+            {
+                "text": "Panic tends to spike at night.",
+                "metadata": {"memory_type": "health_note", "sensitivity": "sensitive"},
+            },
+        ]
+
 
 @pytest.mark.unit
 class TestMemoryFormatting:
@@ -323,3 +408,87 @@ class TestMemoryFormatting:
 
             assert formatted == "- Name is Emma, grieving loss of partner"
             assert "\n" not in formatted  # Single item, no newlines
+
+    def test_format_typed_memory_records_as_separated_prompt_sections(self, mock_qdrant_client):
+        """Test category-aware memory formatting for prompt injection."""
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store"):
+            manager = MemoryManager()
+
+            formatted = manager.format_memory_records_for_prompt(
+                [
+                    {
+                        "text": "Name is Emma.",
+                        "metadata": {"memory_type": "user_profile", "sensitivity": "standard"},
+                    },
+                    {
+                        "text": "Prefers ancestor language only when invited.",
+                        "metadata": {"memory_type": "cultural_preference", "sensitivity": "standard"},
+                    },
+                    {
+                        "text": "Grief spikes around anniversaries.",
+                        "metadata": {"memory_type": "emotional_note", "sensitivity": "sensitive"},
+                    },
+                    {
+                        "text": "Panic tends to spike at night.",
+                        "metadata": {"memory_type": "health_note", "sensitivity": "sensitive"},
+                    },
+                ]
+            )
+
+        assert "User profile:\n- Name is Emma." in formatted
+        assert "Cultural and spiritual preferences:\n- Prefers ancestor language only when invited." in formatted
+        assert "Emotional notes:\n- Grief spikes around anniversaries. (sensitive)" in formatted
+        assert "Health and wellbeing notes:\n- Panic tends to spike at night. (sensitive)" in formatted
+
+
+@pytest.mark.unit
+class TestMemoryPrivacyControls:
+    """Test manager-level memory export and deletion controls."""
+
+    def test_export_memories_for_session_excludes_vectors(self, mock_qdrant_client):
+        """Test exporting session memories through the manager."""
+        from ai_companion.modules.memory.long_term.vector_store import Memory
+
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
+            mock_vs.return_value.export_memories_for_session.return_value = [
+                Memory(
+                    text="User prefers quiet breathwork.",
+                    metadata={
+                        "id": "mem-1",
+                        "session_id": "session-123",
+                        "user_id": "user-123",
+                        "embedding": [0.1, 0.2],
+                        "api_key": "provider-key",
+                        "nested": {
+                            "vector": [0.3],
+                            "thread_id": "thread-123",
+                            "authorization": "Bearer token",
+                            "safe": "keep",
+                        },
+                    },
+                )
+            ]
+
+            manager = MemoryManager()
+            exported = manager.export_memories_for_session("session-123")
+
+        assert exported == [
+            {
+                "text": "User prefers quiet breathwork.",
+                "metadata": {"nested": {"safe": "keep"}},
+            }
+        ]
+        mock_vs.return_value.export_memories_for_session.assert_called_once_with(session_id="session-123")
+
+    def test_delete_memories_for_session_invalidates_session_cache(self, mock_qdrant_client):
+        """Test deletion clears cached retrievals for the session."""
+        with patch("ai_companion.modules.memory.long_term.memory_manager.get_vector_store") as mock_vs:
+            mock_vs.return_value.delete_memories_for_session.return_value = True
+
+            manager = MemoryManager()
+            manager._search_cache["context|session-123|3"] = (["cached"], 123.0)
+            deleted = manager.delete_memories_for_session("session-123")
+
+        assert deleted is True
+        assert manager._search_cache == {}
+        mock_vs.return_value.delete_memories_for_session.assert_called_once_with(session_id="session-123")

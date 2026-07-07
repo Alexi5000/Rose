@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Session cleanup utilities for managing old session data."""
 
 import sqlite3
@@ -7,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ai_companion.core.logging_config import get_logger
+from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log, session_id_for_log
 from ai_companion.settings import settings
 
 logger = get_logger(__name__)
@@ -125,7 +125,9 @@ class SessionCleanupManager:
                         sessions_deleted=stats["sessions_deleted"],
                         checkpoints_deleted=stats["checkpoints_deleted"],
                         sessions_remaining=sessions_before - stats["sessions_deleted"],
-                        thread_ids_deleted=list(thread_ids_to_delete)[:5],  # Log first 5 for debugging
+                        thread_ids_deleted=[
+                            session_id_for_log(thread_id) for thread_id in list(thread_ids_to_delete)[:5]
+                        ],
                     )
                 else:
                     logger.info(
@@ -142,11 +144,21 @@ class SessionCleanupManager:
             conn.close()
 
         except sqlite3.Error as e:
-            logger.error("session_cleanup_error", error=str(e), db_path=self.db_path)
-            stats["errors"].append(f"Database error: {str(e)}")
+            logger.error(
+                "session_cleanup_error",
+                error=exception_message_for_log(e),
+                error_type=type(e).__name__,
+                exc_info=exc_info_for_log(),
+            )
+            stats["errors"].append("Database error")
         except Exception as e:
-            logger.error("session_cleanup_unexpected_error", error=str(e), exc_info=True)
-            stats["errors"].append(f"Unexpected error: {str(e)}")
+            logger.error(
+                "session_cleanup_unexpected_error",
+                error=exception_message_for_log(e),
+                error_type=type(e).__name__,
+                exc_info=exc_info_for_log(),
+            )
+            stats["errors"].append("Unexpected error")
 
         return stats
 

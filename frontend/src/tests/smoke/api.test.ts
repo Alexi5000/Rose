@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 📤 API Client Smoke Tests
  *
@@ -6,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, sanitizeApiUrlForLog, voiceResponseLogSummary } from '@/lib/api';
 
 console.log('📤 Loading API client tests');
 
@@ -57,6 +56,50 @@ describe('📤 API Client', () => {
       expect(message).not.toContain('undefined');
 
       console.log('  ✅ Messages are user-friendly');
+    });
+  });
+
+  describe('privacy-safe logging helpers', () => {
+    it('redacts session identifiers from logged API URLs', () => {
+      const sanitizedPath = sanitizeApiUrlForLog(
+        '/api/v1/session/123e4567-e89b-12d3-a456-426614174000/memory/export'
+      );
+      const sanitizedQuery = sanitizeApiUrlForLog(
+        '/api/v1/voice/ws?session_id=123e4567-e89b-12d3-a456-426614174000'
+      );
+
+      expect(sanitizedPath).toBe('/api/v1/session/[session_id]/memory/export');
+      expect(sanitizedQuery).toBe('/api/v1/voice/ws?session_id=[session_id]');
+      expect(sanitizedPath).not.toContain('123e4567');
+      expect(sanitizedQuery).not.toContain('123e4567');
+    });
+
+    it('summarizes voice responses without raw transcript text', () => {
+      const privateUserText = 'I feel scared and I said a secret name.';
+      const privateRoseText = 'I am here with you. Let us take one breath.';
+
+      const summary = voiceResponseLogSummary({
+        text: privateRoseText,
+        user_text: privateUserText,
+        audio_url: '/api/v1/voice/audio/rose.mp3',
+        audio_data: 'base64-audio',
+        session_id: 'session-123',
+      });
+
+      const serialized = JSON.stringify(summary);
+      expect(summary).toEqual({
+        has_user_text: true,
+        user_text_length: privateUserText.length,
+        response_text_length: privateRoseText.length,
+        has_audio_url: true,
+        has_audio_data: true,
+        audio_streamed: false,
+        has_timings: false,
+      });
+      expect(serialized).not.toContain(privateUserText);
+      expect(serialized).not.toContain(privateRoseText);
+      expect(serialized).not.toContain('base64-audio');
+      expect(serialized).not.toContain('session-123');
     });
   });
 });

@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Mock client fixtures for external services."""
 
 from typing import Iterator
@@ -36,8 +35,12 @@ def mock_elevenlabs_client() -> Iterator[MagicMock]:
     """Mock ElevenLabs client for TTS testing."""
     mock_client = MagicMock()
 
-    # Mock text-to-speech generation
-    mock_client.generate.return_value = iter([b"fake_audio_chunk_1", b"fake_audio_chunk_2"])
+    # Mock current ElevenLabs SDK text-to-speech generation.
+    mock_client.text_to_speech.convert.return_value = iter([b"fake_audio_chunk_1", b"fake_audio_chunk_2"])
+    mock_client.text_to_speech.convert_as_stream.return_value = iter([b"fake_audio_chunk_1", b"fake_audio_chunk_2"])
+
+    # Legacy alias for older tests that still refer to client.generate.
+    mock_client.generate = mock_client.text_to_speech.convert
 
     yield mock_client
 

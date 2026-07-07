@@ -1,281 +1,264 @@
-<!-- Rose full repository refresh 2026-05-17 -->
-# Manual End-to-End Testing Guide: Voice-First Consistency
+# Manual End-to-End Testing Guide: Voice-First Web App
 
 ## Overview
-This guide provides step-by-step instructions for manually testing the voice-first consistency feature across all input types in the Chainlit interface.
+
+Use this guide to manually test the current Rose voice experience through the
+React and FastAPI web app. This guide is for the active WebSocket and HTTP voice
+paths, not the archived Chainlit, WhatsApp, or image-generation course flows.
 
 ## Prerequisites
-- Chainlit application running locally
-- Browser with audio playback enabled
-- Valid API keys configured in `.env`:
+
+- Python dependencies installed with `uv sync`
+- Frontend dependencies installed with `cd frontend && npm install`
+- Browser with microphone and audio playback enabled
+- Valid provider configuration in `.env`:
   - `GROQ_API_KEY`
   - `ELEVENLABS_API_KEY`
   - `ELEVENLABS_VOICE_ID` or `ROSE_VOICE_ID`
+  - `QDRANT_URL`
+  - `QDRANT_API_KEY` when using Qdrant Cloud
+
+Optional low-latency STT:
+
+- `STT_PROVIDER=deepgram`
+- `DEEPGRAM_API_KEY`
+- `uv sync --extra streaming-stt`
 
 ## Test Environment Setup
 
-### 1. Start Chainlit Application
+### 1. Start Rose In Development Mode
+
 ```bash
-# From project root
-uv run chainlit run src/ai_companion/interfaces/chainlit/app.py
+python scripts/run_dev_server.py
 ```
 
-### 2. Open Browser
-- Navigate to `http://localhost:8000`
-- Open browser developer console (F12)
-- Ensure audio is not muted
+Expected local services:
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API docs: http://localhost:8000/api/v1/docs
+
+### 2. Open Browser Tooling
+
+- Navigate to http://localhost:3000.
+- Grant microphone permission.
+- Open browser developer tools.
+- Keep the Console and Network tabs visible.
+- Confirm the WebSocket connects to `/api/v1/voice/ws?session_id=...`.
 
 ## Test Cases
 
-### Test 1: 10 Consecutive Text Messages with Voice
-**Requirement: 1.1, 3.4**
+### Test 1: Session Start And Safety Boundary
 
 **Steps:**
-1. Send the following text messages one by one:
-   - "Hello Rose"
+
+1. Load http://localhost:3000.
+2. Confirm the app creates or restores a session.
+3. Read the visible product boundary before speaking.
+
+**Expected Results:**
+
+- [ ] The page loads without red console errors.
+- [ ] The UI identifies Rose as AI emotional support, not clinical care.
+- [ ] A session ID is created or restored in browser storage.
+- [ ] The backend health endpoint responds at `/api/v1/health`.
+
+---
+
+### Test 2: Ten Consecutive Voice Turns
+
+**Steps:**
+
+1. Tap to start the voice session.
+2. Speak the following messages one at a time:
+   - "Hello Rose."
    - "How are you today?"
-   - "Tell me about healing"
-   - "What is mindfulness?"
-   - "Can you help me relax?"
-   - "I'm feeling stressed"
-   - "Tell me a calming story"
-   - "What should I focus on?"
-   - "How can I be more present?"
-   - "Thank you for your help"
+   - "Help me slow down for a minute."
+   - "I feel tense in my shoulders."
+   - "Can you guide a short breath?"
+   - "What should I notice right now?"
+   - "I am feeling a little lonely."
+   - "Tell me something grounding."
+   - "What can I do after this call?"
+   - "Thank you."
 
 **Expected Results:**
-- ✅ Each response includes audio element with "Rose's Voice"
-- ✅ Audio auto-plays for each response
-- ✅ No console errors
-- ✅ Text content is displayed alongside audio
 
-**Verification Checklist:**
-- [ ] All 10 responses have audio elements
-- [ ] Audio auto-plays without manual interaction
-- [ ] No JavaScript errors in console
-- [ ] Audio quality is clear and consistent
+- [ ] Rose responds with audio for every turn unless a tested fallback is active.
+- [ ] Transcript snippets appear for user speech and Rose responses.
+- [ ] Audio starts promptly and plays through without clipping.
+- [ ] The voice state returns to listening after each response.
+- [ ] No raw transcript text appears in server error logs when `LOG_SENSITIVE_CONTENT=false`.
 
 ---
 
-### Test 2: 10 Consecutive Voice Messages with Voice
-**Requirement: 1.2, 3.4**
+### Test 3: WebSocket Streaming And Timing Metadata
 
 **Steps:**
-1. Click the microphone icon to start recording
-2. Speak the following messages (one at a time):
-   - "Hello Rose"
-   - "How are you?"
-   - "Tell me about meditation"
-   - "What is breathing exercise?"
-   - "Can you guide me?"
-   - "I need help"
-   - "Tell me something calming"
-   - "What should I do?"
-   - "How can I improve?"
-   - "Thank you"
+
+1. Keep the Network tab open.
+2. Complete one normal voice turn.
+3. Inspect WebSocket messages.
+4. Open http://localhost:8000/api/v1/metrics.
 
 **Expected Results:**
-- ✅ Each response includes audio element with "Rose's Voice"
-- ✅ Audio auto-plays for each response
-- ✅ Transcription is accurate
-- ✅ No console errors
 
-**Verification Checklist:**
-- [ ] All 10 responses have audio elements
-- [ ] Audio auto-plays without manual interaction
-- [ ] Voice transcription is accurate
-- [ ] No JavaScript errors in console
+- [ ] Client sends `start_listening`, binary audio, then `stop_listening`.
+- [ ] Server sends `transcription`, `response` or `response_delta`, `audio_start`, binary audio, and `audio_end`.
+- [ ] The final `audio_end` message includes `timings`.
+- [ ] Metrics include voice timing histograms such as `ws_voice_mic_to_first_audio_ms` and `ws_voice_turn_total_ms`.
 
 ---
 
-### Test 3: Mixed Text and Voice Messages
-**Requirement: 1.1, 1.2, 3.4**
+### Test 4: Interruption And Barge-In
 
 **Steps:**
-1. Send text: "Hello Rose"
-2. Send voice: "How are you?"
-3. Send text: "Tell me about healing"
-4. Send voice: "What is mindfulness?"
-5. Send text: "Can you help me?"
-6. Send voice: "I'm feeling stressed"
-7. Send text: "Tell me a story"
-8. Send voice: "What should I focus on?"
-9. Send text: "How can I be present?"
-10. Send voice: "Thank you"
+
+1. Ask Rose for a longer grounding reflection.
+2. While Rose is speaking, tap or speak to interrupt.
+3. Ask a short follow-up: "Actually, just give me one breath."
 
 **Expected Results:**
-- ✅ All responses have audio regardless of input type
-- ✅ Audio auto-plays consistently
-- ✅ No difference in behavior between text and voice inputs
-- ✅ No console errors
 
-**Verification Checklist:**
-- [ ] All 10 responses have audio elements
-- [ ] No difference in audio behavior between input types
-- [ ] Audio auto-plays for both text and voice inputs
-- [ ] No JavaScript errors in console
+- [ ] Current playback stops or fades quickly.
+- [ ] The client sends an `interrupt` control message when WebSocket is connected.
+- [ ] Rose handles the follow-up as the next turn rather than continuing the old response.
+- [ ] No overlapping audio continues after interruption.
 
 ---
 
-### Test 4: Image with Text and Voice Response
-**Requirement: 1.3, 1.4**
+### Test 5: Incomplete Turn Recovery
 
 **Steps:**
-1. Click the attachment icon
-2. Upload an image (any image file)
-3. Add text: "What do you see in this image?"
-4. Send the message
+
+1. Start speaking and intentionally stop mid-thought, such as: "What I really wanted to say was..."
+2. Wait for Rose's response.
 
 **Expected Results:**
-- ✅ Response includes both image and audio elements
-- ✅ Audio auto-plays
-- ✅ Image is displayed inline
-- ✅ Rose describes the image with voice
 
-**Verification Checklist:**
-- [ ] Response has audio element
-- [ ] Response has image element
-- [ ] Audio auto-plays
-- [ ] Image description is relevant
-- [ ] No console errors
+- [ ] Rose asks for continuation instead of inventing the missing thought.
+- [ ] WebSocket sends `turn_incomplete` when the backend detects a dangling fragment.
+- [ ] Metrics increment `ws_voice_turn_incomplete_total`.
+- [ ] The conversation remains warm and natural.
 
 ---
 
-### Test 5: TTS Failure Graceful Degradation
-**Requirement: 1.5, 3.1, 3.2, 3.3**
-
-**Note:** This test requires simulating a failure condition. Options:
-- Temporarily set invalid `ELEVENLABS_API_KEY`
-- Disconnect network during message
-- Use network throttling in browser dev tools
+### Test 6: Memory Controls
 
 **Steps:**
-1. Simulate TTS failure condition
-2. Send text message: "Hello Rose"
-3. Observe response
+
+1. Turn on session-only memory in the UI.
+2. Speak one emotionally specific but non-secret preference, such as: "I like very short grounding prompts."
+3. Export session memories.
+4. Use the forget control.
 
 **Expected Results:**
-- ✅ Text response is displayed
-- ✅ No audio element (graceful degradation)
-- ✅ No user-facing error message
-- ✅ Error logged in server console
 
-**Verification Checklist:**
-- [ ] Text response received
-- [ ] No audio element present
-- [ ] No error message shown to user
-- [ ] Error logged in server logs
+- [ ] Session-only mode disables long-term memory for the session.
+- [ ] Export returns sanitized memory records without embedding vectors.
+- [ ] Forget deletes memories tagged to the session or reports that deletion could not be confirmed.
+- [ ] No raw audio files are retained beyond processing.
+
+API spot checks:
+
+```bash
+curl "http://localhost:8000/api/v1/session/$SESSION_ID/memory-preferences"
+curl "http://localhost:8000/api/v1/session/$SESSION_ID/memory/export"
+curl -X POST "http://localhost:8000/api/v1/session/$SESSION_ID/memory/forget"
+```
 
 ---
 
-### Test 6: Audio Auto-Play Verification
-**Requirement: 1.4**
+### Test 7: Crisis Safety Routing
+
+**Use synthetic test phrasing only. Do not run this with a person in active crisis.**
 
 **Steps:**
-1. Send text message: "Hello Rose"
-2. Observe audio element behavior
-3. Check audio element properties in browser inspector
+
+1. Speak a direct self-harm test phrase.
+2. Observe Rose's response.
+3. Speak a non-crisis false-positive phrase such as: "This deadline is killing me, but I am safe."
 
 **Expected Results:**
-- ✅ Audio starts playing automatically
-- ✅ Audio element has `autoplay` attribute
-- ✅ No manual play button click required
 
-**Verification Checklist:**
-- [ ] Audio plays without user interaction
-- [ ] Audio element has autoplay enabled
-- [ ] Audio controls are visible
-- [ ] Audio can be paused/replayed manually
+- [ ] Direct crisis language routes to the deterministic safety response.
+- [ ] U.S. crisis copy includes 988 and encourages immediate human help.
+- [ ] Rose does not provide therapy, diagnosis, or emergency-care claims.
+- [ ] False-positive phrasing recovers into a normal supportive response.
 
 ---
 
-### Test 7: Browser Console Error Check
-**Requirement: All**
+### Test 8: TTS Failure Graceful Degradation
 
 **Steps:**
-1. Keep browser console open during all tests
-2. Monitor for any errors or warnings
-3. Check for:
-   - JavaScript errors
-   - Network errors
-   - Audio playback errors
-   - CORS errors
+
+1. Temporarily use an invalid `ELEVENLABS_API_KEY`, or block the TTS request in dev tools.
+2. Restart the backend if `.env` changed.
+3. Complete one voice turn.
 
 **Expected Results:**
-- ✅ No JavaScript errors
-- ✅ No network errors (except during failure test)
-- ✅ No audio playback errors
-- ✅ No CORS errors
 
-**Verification Checklist:**
-- [ ] No red errors in console
-- [ ] No yellow warnings (except expected)
-- [ ] Network tab shows successful API calls
-- [ ] Audio elements load successfully
+- [ ] Rose still returns text.
+- [ ] The UI shows an audio-unavailable or browser-speech fallback state rather than crashing.
+- [ ] No provider secret or raw provider payload is shown to the user.
+- [ ] Server logs contain sanitized error details only.
+
+Restore the valid key after the test.
 
 ---
 
-### Test 8: Server Log Review
-**Requirement: 4.1, 4.2, 4.3, 4.4, 4.5**
+### Test 9: Browser Console And Network Review
 
 **Steps:**
-1. Review server logs during testing
-2. Look for TTS-related log entries
-3. Verify log structure and content
 
-**Expected Log Entries:**
-- ✅ "TTS generation successful" with metrics
-- ✅ Thread ID in all log messages
-- ✅ Duration, text length, audio size metrics
-- ✅ Circuit breaker state changes (if any)
-- ✅ Error logs with full context (during failure test)
+1. Run the full checklist with the Console and Network tabs open.
+2. Review failed requests and warnings.
 
-**Verification Checklist:**
-- [ ] Success logs include duration, text_length, audio_size
-- [ ] All logs include thread_id
-- [ ] Error logs include error_type and error message
-- [ ] Circuit breaker state logged when not CLOSED
-- [ ] No missing or malformed log entries
+**Expected Results:**
+
+- [ ] No unexpected red console errors.
+- [ ] No CORS errors.
+- [ ] No repeated reconnect loop.
+- [ ] HTTP fallback only appears when WebSocket is unavailable.
+- [ ] Audio chunks are not logged to the browser console.
 
 ---
+
+### Test 10: Latency Notes
+
+Record observed timing after at least five successful turns:
+
+- Browser: _____
+- STT provider: _____
+- P50 mic-to-first-audio: _____ ms
+- P95 mic-to-first-audio: _____ ms
+- P50 full turn: _____ ms
+- P95 full turn: _____ ms
+- Notes on audio clipping, interruption, or delayed playback:
 
 ## Test Results Summary
 
-### Overall Results
-- [ ] All text messages generate voice responses
-- [ ] All voice messages generate voice responses
-- [ ] All image messages generate voice responses
-- [ ] Audio auto-plays consistently
-- [ ] TTS failures degrade gracefully
-- [ ] No user-facing errors
-- [ ] Comprehensive logging present
-
-### Issues Found
-(Document any issues discovered during testing)
-
----
-
-### Performance Metrics
-(Record observed performance)
-
-- Average TTS generation time: _____ ms
-- Longest TTS generation time: _____ ms
-- TTS success rate: _____ %
-- Audio quality: _____ (1-5 scale)
-
----
+- [ ] Voice session starts reliably.
+- [ ] WebSocket voice path works.
+- [ ] HTTP voice fallback works when WebSocket is unavailable.
+- [ ] Rose gives short, voice-native responses.
+- [ ] Audio responses play consistently.
+- [ ] Barge-in works without overlapping audio.
+- [ ] Incomplete turns ask for continuation.
+- [ ] Crisis safety routing is deterministic.
+- [ ] Memory controls work and preserve privacy boundaries.
+- [ ] Logs avoid secrets, raw audio, and raw sensitive transcripts by default.
 
 ## Post-Testing Cleanup
 
-1. Stop Chainlit application (Ctrl+C)
-2. Review logs for any unexpected errors
-3. Document any issues or improvements needed
-4. Update task status in `.kiro/specs/voice-first-consistency/tasks.md`
-
----
+1. Stop the development server with Ctrl+C.
+2. Restore any temporarily invalid provider keys.
+3. Delete local test audio/temp files if any were manually saved outside the app.
+4. Record issues with browser, provider, exact transcript, and observed timing.
 
 ## Notes
-- Test in multiple browsers if possible (Chrome, Firefox, Safari)
-- Test with different network conditions
-- Test with different audio output devices
-- Document any browser-specific issues
+
+- Test in Chrome, Firefox, and Safari when possible.
+- Test on at least one mobile browser before claiming mobile reliability.
+- Use synthetic crisis prompts only for safety regression checks.
+- Keep archived Chainlit, WhatsApp, and image-generation behavior out of this active manual guide unless those features are intentionally revived.

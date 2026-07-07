@@ -1,4 +1,3 @@
-# Rose full repository refresh 2026-05-17
 """Health check endpoints."""
 
 import sqlite3
@@ -12,6 +11,7 @@ from slowapi.util import get_remote_address
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import track_performance
+from ai_companion.core.privacy_logging import exception_message_for_log
 from ai_companion.settings import settings
 
 logger = get_logger(__name__)
@@ -86,7 +86,7 @@ async def health_check(request: Request) -> HealthCheckResponse:
     Raises:
         HTTPException 429: Rate limit exceeded (60 requests/minute)
     """
-    logger.info("🏥 Health check requested")
+    logger.info("health_check_requested")
     services = {}
 
     # Check Groq API connectivity
@@ -96,9 +96,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
         client = Groq(api_key=settings.GROQ_API_KEY)
         # Simple check - if we can create client, API key is valid
         services["groq"] = "connected"
-        logger.debug("✅ Groq API connected")
+        logger.debug("health_service_connected", service="groq")
     except Exception as e:
-        logger.error("❌ Groq health check failed", error=str(e))
+        logger.error("health_service_failed", service="groq", error=exception_message_for_log(e))
         services["groq"] = "disconnected"
 
     # Check Qdrant connectivity
@@ -113,9 +113,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
         # Try to list collections as a connectivity test
         client.get_collections()
         services["qdrant"] = "connected"
-        logger.debug("✅ Qdrant connected")
+        logger.debug("health_service_connected", service="qdrant")
     except Exception as e:
-        logger.error("❌ Qdrant health check failed", error=str(e))
+        logger.error("health_service_failed", service="qdrant", error=exception_message_for_log(e))
         services["qdrant"] = "disconnected"
 
     # Check ElevenLabs connectivity
@@ -124,9 +124,9 @@ async def health_check(request: Request) -> HealthCheckResponse:
 
         client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
         services["elevenlabs"] = "connected"
-        logger.debug("✅ ElevenLabs connected")
+        logger.debug("health_service_connected", service="elevenlabs")
     except Exception as e:
-        logger.error("❌ ElevenLabs health check failed", error=str(e))
+        logger.error("health_service_failed", service="elevenlabs", error=exception_message_for_log(e))
         services["elevenlabs"] = "disconnected"
 
     # Check SQLite database connectivity
@@ -144,17 +144,17 @@ async def health_check(request: Request) -> HealthCheckResponse:
         conn.close()
 
         services["sqlite"] = "connected"
-        logger.debug("✅ SQLite connected")
+        logger.debug("health_service_connected", service="sqlite")
     except Exception as e:
-        logger.error("❌ SQLite health check failed", error=str(e))
+        logger.error("health_service_failed", service="sqlite", error=exception_message_for_log(e))
         services["sqlite"] = "disconnected"
 
     # Overall status
     status = "healthy" if all(s == "connected" for s in services.values()) else "degraded"
 
     if status == "healthy":
-        logger.info("✅ Health check complete - all services healthy", status=status, services=services)
+        logger.info("health_check_complete", status=status, services=services)
     else:
-        logger.warning("⚠️ Health check complete - degraded status", status=status, services=services)
+        logger.warning("health_check_degraded", status=status, services=services)
 
     return HealthCheckResponse(status=status, version="1.0.0", services=services)

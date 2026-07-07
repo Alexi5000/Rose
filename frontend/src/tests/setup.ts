@@ -1,4 +1,3 @@
-/* Rose full repository refresh 2026-05-17 */
 /**
  * 🧪 Test Setup and Mocks
  *
@@ -16,6 +15,7 @@ console.log('🧪 Test setup loaded');
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  localStorage.clear();
 });
 
 // Mock Web Audio API
@@ -231,14 +231,85 @@ global.Audio = MockAudio as any;
 
 // Mock requestAnimationFrame (for VAD loop and shader)
 let rafId = 1;
-global.requestAnimationFrame = vi.fn((cb: FrameRequestCallback) => {
+const rafTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
   const id = rafId++;
   // Execute callback asynchronously to simulate browser behavior
-  setTimeout(() => cb(performance.now()), 0);
+  const timer = setTimeout(() => {
+    rafTimers.delete(id);
+    cb(performance.now());
+  }, 0);
+  rafTimers.set(id, timer);
   return id;
 }) as any;
 
-global.cancelAnimationFrame = vi.fn();
+const cancelAnimationFrameMock = vi.fn((id: number) => {
+  const timer = rafTimers.get(id);
+  if (timer) {
+    clearTimeout(timer);
+    rafTimers.delete(id);
+  }
+});
+
+global.requestAnimationFrame = requestAnimationFrameMock;
+global.cancelAnimationFrame = cancelAnimationFrameMock as any;
+window.requestAnimationFrame = requestAnimationFrameMock;
+window.cancelAnimationFrame = cancelAnimationFrameMock as any;
+
+afterEach(() => {
+  rafTimers.forEach((timer) => clearTimeout(timer));
+  rafTimers.clear();
+});
+
+class MockWebSocket {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  static instances: MockWebSocket[] = [];
+
+  readyState = MockWebSocket.CONNECTING;
+  sent: Array<string | ArrayBufferLike | Blob | ArrayBufferView> = [];
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+
+  constructor(public url: string) {
+    MockWebSocket.instances.push(this);
+    queueMicrotask(() => {
+      this.readyState = MockWebSocket.OPEN;
+      this.onopen?.(new Event('open'));
+    });
+  }
+
+  send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
+    this.sent.push(data);
+  }
+
+  close(code = 1000, reason = '') {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.(new CloseEvent('close', { code, reason }));
+  }
+
+  addEventListener(eventName: string, callback: EventListener) {
+    if (eventName === 'open') this.onopen = callback as (event: Event) => void;
+    if (eventName === 'error') this.onerror = callback as (event: Event) => void;
+    if (eventName === 'close') this.onclose = callback as (event: CloseEvent) => void;
+    if (eventName === 'message') this.onmessage = callback as (event: MessageEvent) => void;
+  }
+
+  removeEventListener() {
+    // noop for tests
+  }
+}
+
+global.WebSocket = MockWebSocket as any;
+window.WebSocket = MockWebSocket as any;
+
+afterEach(() => {
+  MockWebSocket.instances.length = 0;
+});
 
 // Mock performance.now() for consistent timing
 let mockTime = 0;
