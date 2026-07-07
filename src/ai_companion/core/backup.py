@@ -1,6 +1,7 @@
 """Database backup utilities for Rose the Healer Shaman."""
 
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -13,13 +14,13 @@ logger = logging.getLogger(__name__)
 class BackupManager:
     """Manages database backups for SQLite and other data files."""
 
-    def __init__(self, backup_dir: str = "/app/data/backups"):
+    def __init__(self, backup_dir: str | None = None):
         """Initialize the backup manager.
 
         Args:
             backup_dir: Directory to store backups
         """
-        self.backup_dir = Path(backup_dir)
+        self.backup_dir = Path(backup_dir or os.getenv("BACKUP_DIR", "/app/data/backups"))
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Backup manager initialized")
 

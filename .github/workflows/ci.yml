@@ -50,7 +50,10 @@ jobs:
           ENVIRONMENT: ci
           LOG_LEVEL: WARNING
           LOG_SENSITIVE_CONTENT: "false"
+          BACKUP_DIR: ${{ github.workspace }}/data/backups
+          SHORT_TERM_MEMORY_DB_PATH: ${{ github.workspace }}/data/memory.db
         run: |
+          mkdir -p data/backups
           uv run pytest tests/unit tests/test_deployment.py tests/test_smoke.py \
             -m "not slow and not integration" \
             --cov=src \
