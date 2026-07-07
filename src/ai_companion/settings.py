@@ -1,6 +1,6 @@
 """Application settings and configuration management.
 
-This module defines all configuration settings for the Rose the Healer Shaman
+This module defines all configuration settings for the Rose
 application using Pydantic Settings. Settings are loaded from environment
 variables with validation and type checking.
 
@@ -187,7 +187,7 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1  # Percentage of transactions to trace (0.0-1.0)
     SENTRY_PROFILES_SAMPLE_RATE: float = 0.1  # Percentage of transactions to profile (0.0-1.0)
     ENVIRONMENT: str = "production"  # Environment name (development, staging, production)
-    APP_VERSION: str = "1.0.0"  # Application version for tracking
+    APP_VERSION: str = "2.1.0"  # Application version for tracking
 
     # Alert configuration
     ALERT_ERROR_RATE_ENABLED: bool = True  # Enable error rate alerts

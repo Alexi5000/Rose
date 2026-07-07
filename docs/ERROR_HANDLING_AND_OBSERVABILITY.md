@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document describes the error handling and observability improvements implemented for the Rose the Healer Shaman application. These improvements provide standardized error responses, performance tracking, application metrics, and configurable logging.
+This document describes the error handling and observability improvements implemented for the Rose application. These improvements provide standardized error responses, performance tracking, application metrics, and configurable logging.
 
 ## Implementation Summary
 

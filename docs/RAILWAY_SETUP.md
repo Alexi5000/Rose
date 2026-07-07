@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Railway Deployment Setup Guide
 
-This guide provides step-by-step instructions for deploying Rose the Healer Shaman to Railway with proper configuration for production readiness.
+This guide provides step-by-step instructions for deploying Rose to Railway with proper configuration for production readiness.
 
 ## Table of Contents
 
@@ -394,7 +394,7 @@ Sentry provides error tracking and performance monitoring:
    SENTRY_TRACES_SAMPLE_RATE=0.1
    SENTRY_PROFILES_SAMPLE_RATE=0.1
    ENVIRONMENT=production
-   APP_VERSION=1.0.0
+   APP_VERSION=2.1.0
    ```
 
 4. **Configure Alerts**:

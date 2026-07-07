@@ -1,6 +1,6 @@
 # API Quick Reference
 
-Quick reference guide for Rose the Healer Shaman API.
+Quick reference guide for Rose Voice Companion API.
 
 ## Base URL
 
@@ -124,7 +124,7 @@ GET /api/v1/health
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "services": {
     "groq": "connected",
     "qdrant": "connected",

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from ai_companion.config.server_config import APP_VERSION
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics
 from ai_companion.core.privacy_logging import exception_message_for_log, sensitive_text_for_log
@@ -106,7 +107,7 @@ class MonitoringSystem:
                         ),
                     ],
                     # Set release version
-                    release=os.getenv("APP_VERSION", "1.0.0"),
+                    release=os.getenv("APP_VERSION", APP_VERSION),
                     # Additional configuration
                     attach_stacktrace=True,
                     send_default_pii=False,  # Don't send PII

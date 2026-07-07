@@ -1,5 +1,5 @@
 # Rose full repository refresh 2026-05-17
-"""Performance and load testing for Rose the Healer Shaman."""
+"""Performance and load testing for Rose."""
 
 import time
 from concurrent.futures import ThreadPoolExecutor

@@ -1,4 +1,4 @@
-"""FastAPI application for Rose the Healer Shaman web interface."""
+"""FastAPI application for Rose web interface."""
 
 from contextlib import asynccontextmanager
 from pathlib import Path

@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
-# Deployment Guide: Rose the Healer Shaman
+# Deployment Guide: Rose
 
-This guide covers deploying Rose the Healer Shaman to various cloud platforms.
+This guide covers deploying Rose to various cloud platforms.
 
 ## Table of Contents
 

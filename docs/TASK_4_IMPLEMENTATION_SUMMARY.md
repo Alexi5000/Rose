@@ -121,7 +121,7 @@ request_id = request.state.request_id
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "services": {
     "groq": "connected",
     "elevenlabs": "connected",

@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/Alexi5000/Rose/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Alexi5000/Rose/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/Alexi5000/Rose/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Alexi5000/Rose?label=release" /></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2f855a.svg" /></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab.svg" />
   <img alt="React 19" src="https://img.shields.io/badge/react-19-61dafb.svg" />
@@ -28,7 +29,7 @@
 
 ## About Rose
 
-Rose is an open-source voice companion for emotional support, grounding, and reflective healing conversations. She combines a React and FastAPI voice interface, LangGraph orchestration, configurable AI providers, long-term memory controls, and deterministic crisis-safety handling.
+Rose is an open-source voice companion for emotional support, grounding, and reflective conversations. She combines a React and FastAPI voice interface, LangGraph orchestration, configurable AI providers, long-term memory controls, and deterministic crisis-safety handling.
 
 Rose is AI emotional support. She is not a therapist, doctor, emergency service, or replacement for professional care. She can support reflection, grounding, spiritual language by consent, and continuity across sessions, but she must stay honest that she is AI and must route crisis language toward human help.
 

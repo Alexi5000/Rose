@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document summarizes the deployment configuration improvements implemented for Rose the Healer Shaman, addressing task 10 of the deployment readiness review.
+This document summarizes the deployment configuration improvements implemented for Rose, addressing task 10 of the deployment readiness review.
 
 ## Implementation Date
 

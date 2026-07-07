@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Project Structure
 
-This document describes the organization of the Rose the Healer Shaman project.
+This document describes the organization of the Rose project.
 
 ## Root Directory
 

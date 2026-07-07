@@ -3,7 +3,7 @@
 
 ## Overview
 
-The Rose the Healer Shaman application uses GitHub Actions for continuous integration and continuous deployment (CI/CD). The pipeline automatically tests, validates, and deploys the application to Railway on every push to the main branch.
+The Rose application uses GitHub Actions for continuous integration and continuous deployment (CI/CD). The pipeline automatically tests, validates, and deploys the application to Railway on every push to the main branch.
 
 ## Pipeline Architecture
 

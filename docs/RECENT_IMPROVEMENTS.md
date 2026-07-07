@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Recent Improvements Summary
 
-This document summarizes the major improvements made to the Rose the Healer Shaman project.
+This document summarizes the major improvements made to the Rose project.
 
 ## Overview
 

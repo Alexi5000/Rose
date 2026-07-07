@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document summarizes the implementation of resource management optimizations for the Rose the Healer Shaman application. These optimizations ensure efficient resource usage, prevent memory leaks, and improve overall system performance.
+This document summarizes the implementation of resource management optimizations for the Rose application. These optimizations ensure efficient resource usage, prevent memory leaks, and improve overall system performance.
 
 ## Implemented Optimizations
 

@@ -52,7 +52,7 @@ curl http://localhost:8000/api/v1/health
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "services": {
     "groq": "connected",
     "qdrant": "connected",

@@ -62,7 +62,7 @@ class TestFrontendRendering:
     def test_page_loads(self, page: Page):
         '''Test that the main page loads successfully.'''
         page.goto("http://localhost:8080")
-        expect(page).to_have_title("Rose the Healer Shaman")
+        expect(page).to_have_title("Rose")
 
     def test_voice_button_visible(self, page: Page):
         '''Test that voice button is visible on page load.'''

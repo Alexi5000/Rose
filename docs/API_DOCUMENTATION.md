@@ -1,4 +1,4 @@
-# Rose the Healer Shaman - API Documentation
+# Rose - API Documentation
 
 ## Overview
 
@@ -10,7 +10,9 @@ emotional support companion and route crisis or medical needs to appropriate hum
 
 **Base URL:** `/api/v1`
 
-**API Version:** 1.0.0
+**Release Version:** 2.1.0
+
+**API Route Version:** v1
 
 **Interactive Documentation:**
 - Swagger UI: `/api/v1/docs`
@@ -56,7 +58,7 @@ Check system health and external service connectivity.
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "services": {
     "groq": "connected",
     "qdrant": "connected",
@@ -349,7 +351,11 @@ For issues or questions:
 
 ## Changelog
 
-### Version 1.0.0 (Current)
+### Version 2.1.0 (Current)
+- Public About metadata, release version, and health check examples now align.
+- API route namespace remains `/api/v1`.
+
+### Version 1.0.0
 - Initial API release
 - Session management endpoints
 - Voice processing with STT/TTS

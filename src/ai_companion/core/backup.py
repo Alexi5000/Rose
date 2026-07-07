@@ -1,4 +1,4 @@
-"""Database backup utilities for Rose the Healer Shaman."""
+"""Database backup utilities for Rose."""
 
 import logging
 import os

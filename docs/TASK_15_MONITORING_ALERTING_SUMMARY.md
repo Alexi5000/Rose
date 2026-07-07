@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document summarizes the implementation of comprehensive monitoring and alerting capabilities for the Rose the Healer Shaman application, completing Task 15 of the deployment readiness review.
+This document summarizes the implementation of comprehensive monitoring and alerting capabilities for the Rose application, completing Task 15 of the deployment readiness review.
 
 ## Implementation Date
 
@@ -64,7 +64,7 @@ SENTRY_DSN=https://your-key@sentry.io/project-id
 SENTRY_TRACES_SAMPLE_RATE=0.1  # 10% of transactions
 SENTRY_PROFILES_SAMPLE_RATE=0.1  # 10% of transactions
 ENVIRONMENT=production
-APP_VERSION=1.0.0
+APP_VERSION=2.1.0
 ```
 
 ### 5. Configuration Updates
@@ -81,7 +81,7 @@ SENTRY_DSN=
 SENTRY_TRACES_SAMPLE_RATE=0.1
 SENTRY_PROFILES_SAMPLE_RATE=0.1
 ENVIRONMENT=production
-APP_VERSION=1.0.0
+APP_VERSION=2.1.0
 
 # Alert Thresholds
 ALERT_ERROR_RATE_ENABLED=true

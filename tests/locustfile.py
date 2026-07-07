@@ -1,5 +1,5 @@
 # Rose full repository refresh 2026-05-17
-"""Locust load testing configuration for Rose the Healer Shaman.
+"""Locust load testing configuration for Rose.
 
 To run:
 1. Install locust: pip install locust

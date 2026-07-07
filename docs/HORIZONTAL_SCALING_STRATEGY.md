@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document outlines the strategy for scaling the Rose the Healer Shaman application horizontally to support multiple instances and higher user loads. The current architecture uses SQLite for conversation state persistence, which limits the application to a single instance. This document evaluates migration options and provides a roadmap for horizontal scaling.
+This document outlines the strategy for scaling the Rose application horizontally to support multiple instances and higher user loads. The current architecture uses SQLite for conversation state persistence, which limits the application to a single instance. This document evaluates migration options and provides a roadmap for horizontal scaling.
 
 ## Current Architecture Limitations
 

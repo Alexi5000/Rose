@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Monitoring and Alerting System
 
-This document describes the comprehensive monitoring and alerting system implemented for Rose the Healer Shaman application.
+This document describes the comprehensive monitoring and alerting system implemented for Rose application.
 
 ## Overview
 
@@ -148,7 +148,7 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 SENTRY_TRACES_SAMPLE_RATE=0.1  # 10% of transactions
 SENTRY_PROFILES_SAMPLE_RATE=0.1  # 10% of transactions
 ENVIRONMENT=production
-APP_VERSION=1.0.0
+APP_VERSION=2.1.0
 
 # Alert Configuration
 ALERT_ERROR_RATE_ENABLED=true

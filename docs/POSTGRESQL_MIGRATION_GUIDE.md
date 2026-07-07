@@ -3,7 +3,7 @@
 
 ## Overview
 
-This guide provides step-by-step instructions for migrating the Rose the Healer Shaman application from SQLite to PostgreSQL. This migration is necessary for horizontal scaling (running multiple instances) and improved reliability.
+This guide provides step-by-step instructions for migrating the Rose application from SQLite to PostgreSQL. This migration is necessary for horizontal scaling (running multiple instances) and improved reliability.
 
 ## Why Migrate?
 

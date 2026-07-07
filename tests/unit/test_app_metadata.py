@@ -7,7 +7,7 @@ from ai_companion.interfaces.web.app import create_app
 def test_api_metadata_uses_safe_non_clinical_positioning() -> None:
     """OpenAPI metadata should not over-claim clinical or emergency capabilities."""
 
-    assert APP_TITLE == "Rose the Healer Shaman API"
+    assert APP_TITLE == "Rose Voice Companion API"
     assert "emotional support companion" in APP_DESCRIPTION
     assert "crisis-safety" in APP_DESCRIPTION
     assert "memory controls" in APP_DESCRIPTION

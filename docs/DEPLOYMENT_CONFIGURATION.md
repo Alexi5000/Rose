@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Deployment Configuration Guide
 
-This document provides detailed information about deployment configuration for Rose the Healer Shaman, including environment-specific settings, resource limits, and optimization strategies.
+This document provides detailed information about deployment configuration for Rose, including environment-specific settings, resource limits, and optimization strategies.
 
 ## Table of Contents
 

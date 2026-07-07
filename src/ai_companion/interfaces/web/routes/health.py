@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ai_companion.config.server_config import APP_VERSION
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import track_performance
 from ai_companion.core.privacy_logging import exception_message_for_log
@@ -40,7 +41,7 @@ class HealthCheckResponse(BaseModel):
             "examples": [
                 {
                     "status": "healthy",
-                    "version": "1.0.0",
+                    "version": APP_VERSION,
                     "services": {
                         "groq": "connected",
                         "qdrant": "connected",
@@ -157,4 +158,4 @@ async def health_check(request: Request) -> HealthCheckResponse:
     else:
         logger.warning("health_check_degraded", status=status, services=services)
 
-    return HealthCheckResponse(status=status, version="1.0.0", services=services)
+    return HealthCheckResponse(status=status, version=APP_VERSION, services=services)

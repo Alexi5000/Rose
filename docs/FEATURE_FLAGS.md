@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document describes the feature flags system for the Rose the Healer Shaman application. Feature flags enable gradual rollouts, A/B testing, quick rollbacks, and environment-specific feature control without requiring code deployments.
+This document describes the feature flags system for the Rose application. Feature flags enable gradual rollouts, A/B testing, quick rollbacks, and environment-specific feature control without requiring code deployments.
 
 ## Architecture
 

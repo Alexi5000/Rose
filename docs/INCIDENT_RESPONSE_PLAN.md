@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document defines the incident response process for the Rose the Healer Shaman application. It provides a structured approach to detecting, responding to, and resolving production incidents while minimizing user impact.
+This document defines the incident response process for the Rose application. It provides a structured approach to detecting, responding to, and resolving production incidents while minimizing user impact.
 
 ## Incident Severity Levels
 

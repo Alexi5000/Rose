@@ -3,7 +3,7 @@
 
 ## Overview
 
-This document details the rate limits, quotas, and usage constraints for all external APIs used by the Rose the Healer Shaman application. Understanding these limits is critical for capacity planning, cost management, and incident response.
+This document details the rate limits, quotas, and usage constraints for all external APIs used by the Rose application. Understanding these limits is critical for capacity planning, cost management, and incident response.
 
 ## Summary Table
 

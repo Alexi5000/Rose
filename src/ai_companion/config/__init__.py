@@ -1,1 +1,1 @@
-"""Configuration module for Rose the Healer Shaman."""
+"""Configuration module for Rose."""

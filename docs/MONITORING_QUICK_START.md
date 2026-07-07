@@ -66,7 +66,7 @@ curl https://your-app.railway.app/api/v1/monitoring/status
 SENTRY_DSN=                          # Sentry project DSN
 SENTRY_TRACES_SAMPLE_RATE=0.1       # 10% transaction sampling
 ENVIRONMENT=production               # Environment name
-APP_VERSION=1.0.0                    # Release version
+APP_VERSION=2.1.0                    # Release version
 
 # Alerts
 ALERT_ERROR_RATE_ENABLED=true       # Enable error rate alerts

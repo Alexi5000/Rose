@@ -2,7 +2,7 @@
 
 ## Overview
 
-This index provides a comprehensive guide to all operational documentation for the Rose the Healer Shaman application. Use this as your starting point for deployment, operations, troubleshooting, and incident response.
+This index provides a comprehensive guide to all operational documentation for the Rose application. Use this as your starting point for deployment, operations, troubleshooting, and incident response.
 
 ---
 

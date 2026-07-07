@@ -1,4 +1,4 @@
-"""Server configuration constants for Rose the Healer Shaman.
+"""Server configuration constants for Rose.
 
 This module centralizes all magic numbers and configuration values used by the
 web interface, eliminating hardcoded values and improving maintainability.
@@ -131,13 +131,13 @@ ENABLE_REQUEST_ID_TRACKING = True  # Enable request ID middleware for tracing
 # =======================
 # Application information for API documentation
 
-APP_TITLE = "Rose the Healer Shaman API"
+APP_TITLE = "Rose Voice Companion API"
 APP_DESCRIPTION = (
     "Voice-first AI emotional support companion for grounding, reflection, "
-    "and consent-aware healing conversations. Provides voice processing, "
+    "and consent-aware conversations. Provides voice processing, "
     "provider routing, memory controls, and deterministic crisis-safety handling."
 )
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.1.0"
 
 # Development Configuration
 # ============================

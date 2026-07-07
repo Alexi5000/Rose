@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Data Persistence and Backup Guide
 
-This document explains how to configure data persistence for Rose the Healer Shaman application, including Railway volume setup, automatic backups, and disaster recovery procedures.
+This document explains how to configure data persistence for Rose application, including Railway volume setup, automatic backups, and disaster recovery procedures.
 
 ## Overview
 
@@ -17,7 +17,7 @@ Railway uses ephemeral storage by default, meaning all data is lost when the ser
 ### Step 1: Create a Volume in Railway Dashboard
 
 1. Open your Railway project dashboard
-2. Navigate to your service (Rose the Healer Shaman)
+2. Navigate to your service (Rose)
 3. Click on the **"Variables"** tab
 4. Scroll down to **"Volumes"** section
 5. Click **"+ New Volume"**

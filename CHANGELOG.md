@@ -3,6 +3,18 @@
 
 All notable changes to Rose are documented in this file.
 
+## v2.1.0 - Release Metadata And Public Identity Refresh
+
+Rose v2.1.0 aligns the public About surface, package metadata, runtime version, health responses, monitoring release fallback, and documentation examples around a single release version.
+
+| Area | What changed |
+|---|---|
+| Public identity | Updated stale legacy product labels to Rose or Rose Voice Companion API across source, tests, and docs. |
+| Version metadata | Normalized Python package, uv lock, frontend package, OpenAPI metadata, health responses, and production env examples to `2.1.0`. |
+| API documentation | Split release version from the stable `/api/v1` route namespace so docs no longer confuse app release with API route version. |
+| Frontend polish | Updated the browser title from the scaffold default to `Rose`. |
+| Release readiness | Added v2.1.0 release notes for GitHub release publication. |
+
 ## v2.0.0 - State-of-the-Art Rose Buildout
 
 Rose v2.0.0 modernizes the repository as a voice-first, memory-aware AI companion built around LangGraph orchestration, multimodal routing, and clear provider boundaries. This release manually ports the useful intent of five open community pull requests while preserving the current Python, FastAPI, Chainlit, Qdrant, and React stack.

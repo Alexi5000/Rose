@@ -1,4 +1,4 @@
-"""Structured logging configuration for Rose the Healer Shaman."""
+"""Structured logging configuration for Rose."""
 
 import logging
 import os

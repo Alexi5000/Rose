@@ -1,5 +1,5 @@
 <!-- Rose full repository refresh 2026-05-17 -->
-# Architecture Documentation: Rose the Healer Shaman
+# Architecture Documentation: Rose
 
 This document provides comprehensive architecture diagrams and explanations for the Rose application.
 

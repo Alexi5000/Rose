@@ -9,7 +9,7 @@ Rose is also inspired by the original [Ava WhatsApp Agent Course](https://github
 
 | Contributor | Contribution |
 |---|---|
-| [@Alexi5000](https://github.com/Alexi5000) | Rose maintainer, product direction, full v2.0.0 buildout, README refresh, release stewardship, and repository-wide polish. |
+| [@Alexi5000](https://github.com/Alexi5000) | Rose maintainer, product direction, full v2.0.0 buildout, v2.1.0 release metadata refresh, README stewardship, and repository-wide polish. |
 
 ## Source inspiration credits
 

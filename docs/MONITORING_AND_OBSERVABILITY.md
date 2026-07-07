@@ -1,7 +1,7 @@
 <!-- Rose full repository refresh 2026-05-17 -->
 # Monitoring and Observability Implementation
 
-This document describes the monitoring and observability features implemented for Rose the Healer Shaman application.
+This document describes the monitoring and observability features implemented for Rose application.
 
 ## Overview
 
@@ -122,7 +122,7 @@ cat logs.json | jq 'select(.request_id == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "services": {
     "groq": "connected",
     "elevenlabs": "connected",

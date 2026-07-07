@@ -1,1 +1,1 @@
-"""Web interface module for Rose the Healer Shaman."""
+"""Web interface module for Rose."""
