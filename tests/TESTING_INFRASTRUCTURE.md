@@ -142,6 +142,7 @@ Coverage is configured in `tests/pytest.ini`:
 ```python
 import pytest
 
+
 @pytest.mark.unit
 def test_memory_extraction(mock_groq_client):
     """Test memory extraction from user message."""
@@ -160,6 +161,7 @@ def test_memory_extraction(mock_groq_client):
 
 ```python
 import pytest
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio

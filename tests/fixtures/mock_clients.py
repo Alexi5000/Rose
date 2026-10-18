@@ -67,7 +67,7 @@ def mock_qdrant_client() -> Iterator[MagicMock]:
     mock_client.create_collection.return_value = None
 
     # Mock search operations
-    mock_client.search.return_value = [
+    mock_client.query_points.return_value.points = [
         MagicMock(
             id="test_id_1",
             score=0.95,

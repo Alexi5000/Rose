@@ -479,12 +479,12 @@ class VectorStore:
                 return []
 
             def _search() -> List[Any]:
-                return self.client.search(
+                return self.client.query_points(
                     collection_name=QDRANT_COLLECTION_NAME,
-                    query_vector=query_embedding.tolist(),
+                    query=query_embedding.tolist(),
                     limit=k,
                     query_filter=query_filter,  # Apply session filter if enabled
-                )
+                ).points
 
             # If guard indicates Qdrant is degraded, skip search immediately and return empty list
             if memory_guard.is_disabled():

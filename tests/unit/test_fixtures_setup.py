@@ -22,7 +22,7 @@ def test_mock_qdrant_client_fixture(mock_qdrant_client):
     assert mock_qdrant_client is not None
 
     # Test search mock
-    results = mock_qdrant_client.search()
+    results = mock_qdrant_client.query_points().points
     assert len(results) >= 1
     assert results[0].score > 0.8
 

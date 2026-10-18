@@ -150,7 +150,7 @@ class TestMemoryStorage:
         mock_collection = MagicMock()
         mock_collection.name = "long_term_memory"
         mock_client.get_collections.return_value.collections = [mock_collection]
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
         mock_client.upsert.side_effect = RuntimeError("qdrant echoed private grief memory payload")
 
         store = VectorStore()
@@ -209,7 +209,7 @@ class TestMemorySearch:
             "timestamp": "2024-01-14T15:20:00Z",
         }
 
-        mock_client.search.return_value = [mock_hit1, mock_hit2]
+        mock_client.query_points.return_value.points = [mock_hit1, mock_hit2]
 
         store = VectorStore()
         results = store.search_memories("I'm feeling anxious", k=2)
@@ -236,7 +236,7 @@ class TestMemorySearch:
         def _raise():
             raise Exception("OutputTooSmall: qdrant internal panic")
 
-        mock_client.search.side_effect = _raise
+        mock_client.query_points.side_effect = _raise
 
         store = VectorStore()
         results = store.search_memories("simulate error")
@@ -253,7 +253,7 @@ class TestMemorySearch:
         mock_collection = MagicMock()
         mock_collection.name = "long_term_memory"
         mock_client.get_collections.return_value.collections = [mock_collection]
-        mock_client.search.side_effect = RuntimeError("qdrant echoed private grief query")
+        mock_client.query_points.side_effect = RuntimeError("qdrant echoed private grief query")
 
         store = VectorStore()
 
@@ -276,13 +276,13 @@ class TestMemorySearch:
         mock_collections_response.collections = [mock_collection]
         mock_client.get_collections.return_value = mock_collections_response
 
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
 
         store = VectorStore()
         store.search_memories("test query", k=5)
 
         # Verify search was called with correct limit
-        call_args = mock_client.search.call_args
+        call_args = mock_client.query_points.call_args
         assert call_args[1]["limit"] == 5
 
     def test_search_memories_filters_to_session_when_provided(self, mock_vector_store_deps):
@@ -292,12 +292,12 @@ class TestMemorySearch:
         mock_collection = MagicMock()
         mock_collection.name = "long_term_memory"
         mock_client.get_collections.return_value.collections = [mock_collection]
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
 
         store = VectorStore()
         store.search_memories("privacy", session_id="session-123")
 
-        query_filter = mock_client.search.call_args[1]["query_filter"]
+        query_filter = mock_client.query_points.call_args[1]["query_filter"]
         assert query_filter.must[0].key == "session_id"
         assert query_filter.must[0].match.value == "session-123"
 
@@ -308,12 +308,12 @@ class TestMemorySearch:
         mock_collection = MagicMock()
         mock_collection.name = "long_term_memory"
         mock_client.get_collections.return_value.collections = [mock_collection]
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
 
         store = VectorStore()
         store.search_memories("privacy")
 
-        query_filter = mock_client.search.call_args[1]["query_filter"]
+        query_filter = mock_client.query_points.call_args[1]["query_filter"]
         assert query_filter.must[0].key == "session_id"
         assert query_filter.must[0].match.value == DEFAULT_SESSION_ID
 
@@ -352,7 +352,7 @@ class TestMemorySearch:
             "topic": "mindfulness",
         }
 
-        mock_client.search.return_value = [mock_hit]
+        mock_client.query_points.return_value.points = [mock_hit]
 
         store = VectorStore()
         results = store.search_memories("mindfulness")
@@ -477,7 +477,7 @@ class TestDuplicateDetection:
             "timestamp": "2024-01-01T00:00:00Z",
         }
 
-        mock_client.search.return_value = [mock_hit]
+        mock_client.query_points.return_value.points = [mock_hit]
 
         store = VectorStore()
         similar = store.find_similar_memory("Name is Sarah, lives in Portland")
@@ -498,7 +498,7 @@ class TestDuplicateDetection:
         mock_hit.score = 0.75  # Below threshold (0.9)
         mock_hit.payload = {"text": "Different memory content", "id": "other_mem"}
 
-        mock_client.search.return_value = [mock_hit]
+        mock_client.query_points.return_value.points = [mock_hit]
 
         store = VectorStore()
         similar = store.find_similar_memory("Name is Sarah, lives in Portland")
@@ -511,7 +511,7 @@ class TestDuplicateDetection:
         mock_client = mock_vector_store_deps["client"]
 
         mock_client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
 
         store = VectorStore()
         similar = store.find_similar_memory("New unique memory")
@@ -530,13 +530,13 @@ class TestDuplicateDetection:
         mock_collections_response.collections = [mock_collection]
         mock_client.get_collections.return_value = mock_collections_response
 
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value.points = []
 
         store = VectorStore()
         store.find_similar_memory("test")
 
         # Verify search was called with k=1
-        call_args = mock_client.search.call_args
+        call_args = mock_client.query_points.call_args
         assert call_args[1]["limit"] == 1
 
 
@@ -594,3 +594,20 @@ class TestVectorStoreSingleton:
 
         # Verify same instance
         assert store1 is store2
+
+
+def test_current_qdrant_query_api_preserves_session_isolation(mock_vector_store_deps):
+    from qdrant_client import QdrantClient
+
+    client = QdrantClient(location=":memory:")
+    store = VectorStore()
+    store.client = client
+    try:
+        store.store_memory("A calming walk", {"id": "00000000-0000-0000-0000-000000000001"}, session_id="session-a")
+        own = store.search_memories("calming", session_id="session-a")
+        other = store.search_memories("calming", session_id="session-b")
+        assert len(own) == 1
+        assert own[0].text == "A calming walk"
+        assert other == []
+    finally:
+        client.close()

@@ -27,7 +27,7 @@ def test_groq_chat(mock_groq_client):
 ```python
 def test_audio_transcription(sample_wav_file, mock_groq_client):
     """Test STT with sample WAV file."""
-    with open(sample_wav_file, 'rb') as audio:
+    with open(sample_wav_file, "rb") as audio:
         result = mock_groq_client.audio.transcriptions.create(file=audio)
         assert result.text
 ```

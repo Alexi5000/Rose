@@ -45,11 +45,7 @@ from src.ai_companion.graph.graph import create_graph
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_conversation_workflow(
-    mock_groq_client,
-    mock_qdrant_client,
-    sample_conversation_state
-):
+async def test_conversation_workflow(mock_groq_client, mock_qdrant_client, sample_conversation_state):
     """Test complete conversation workflow."""
     graph = create_graph()
     result = await graph.ainvoke(sample_conversation_state)

@@ -259,7 +259,7 @@ def audio_file_path(tmp_path: Path, sample_wav_audio: bytes) -> Path:
 ```python
 def test_file_processing(audio_file_path):
     """Test with audio file."""
-    with open(audio_file_path, 'rb') as f:
+    with open(audio_file_path, "rb") as f:
         data = f.read()
     assert len(data) > 0
 ```
@@ -284,6 +284,7 @@ def mp3_file_path(tmp_path: Path, sample_mp3_audio: bytes) -> Path:
 ```python
 from unittest.mock import AsyncMock, MagicMock, patch
 
+
 @pytest.fixture
 def mock_groq_client():
     """Mock Groq client for LLM and STT."""
@@ -291,9 +292,7 @@ def mock_groq_client():
         client = MagicMock()
 
         # Mock transcription
-        client.audio.transcriptions.create.return_value = MagicMock(
-            text="Transcribed text"
-        )
+        client.audio.transcriptions.create.return_value = MagicMock(text="Transcribed text")
 
         # Mock chat completion
         client.chat.completions.create.return_value = MagicMock(
@@ -340,17 +339,10 @@ def mock_qdrant_client():
         client = MagicMock()
 
         # Mock collection operations
-        client.get_collections.return_value.collections = [
-            MagicMock(name="long_term_memory")
-        ]
+        client.get_collections.return_value.collections = [MagicMock(name="long_term_memory")]
 
         # Mock search
-        client.search.return_value = [
-            MagicMock(
-                score=0.95,
-                payload={"text": "Memory text", "id": "mem_1"}
-            )
-        ]
+        client.search.return_value = [MagicMock(score=0.95, payload={"text": "Memory text", "id": "mem_1"})]
 
         mock.return_value = client
         yield client
@@ -393,6 +385,7 @@ def mock_circuit_breaker():
 ```python
 import pytest
 from unittest.mock import patch, MagicMock
+
 
 class TestModuleName:
     """Test suite for ModuleName."""
@@ -439,14 +432,12 @@ class TestModuleName:
 import pytest
 from langchain_core.messages import HumanMessage, AIMessage
 
+
 @pytest.mark.asyncio
 async def test_complete_workflow(mock_external_services):
     """Test complete workflow end-to-end."""
     # Arrange
-    initial_state = {
-        "messages": [HumanMessage(content="User input")],
-        "workflow_type": "conversation"
-    }
+    initial_state = {"messages": [HumanMessage(content="User input")], "workflow_type": "conversation"}
 
     # Act
     graph = create_workflow_graph().compile()
@@ -462,11 +453,14 @@ async def test_complete_workflow(mock_external_services):
 ### Parametrized Tests
 
 ```python
-@pytest.mark.parametrize("input_data,expected_output", [
-    ("test input 1", "output 1"),
-    ("test input 2", "output 2"),
-    ("test input 3", "output 3"),
-])
+@pytest.mark.parametrize(
+    "input_data,expected_output",
+    [
+        ("test input 1", "output 1"),
+        ("test input 2", "output 2"),
+        ("test input 3", "output 3"),
+    ],
+)
 def test_multiple_inputs(input_data, expected_output):
     """Test with multiple input/output pairs."""
     result = process(input_data)
@@ -498,6 +492,7 @@ async def test_async_function():
 
 ```python
 import time
+
 
 def test_operation_performance():
     """Test that operation completes within target time."""
@@ -532,10 +527,7 @@ def test_operation_performance():
 async def test_memory_workflow(mock_groq_client, mock_qdrant_client):
     """Test memory extraction and retrieval workflow."""
     # Step 1: Extract memory from message
-    initial_state = {
-        "messages": [HumanMessage(content="My name is Sarah")],
-        "workflow_type": "conversation"
-    }
+    initial_state = {"messages": [HumanMessage(content="My name is Sarah")], "workflow_type": "conversation"}
 
     graph = create_workflow_graph().compile()
     result = await graph.ainvoke(initial_state)
@@ -544,10 +536,7 @@ async def test_memory_workflow(mock_groq_client, mock_qdrant_client):
     mock_qdrant_client.upsert.assert_called()
 
     # Step 2: Retrieve memory in next conversation
-    next_state = {
-        "messages": [HumanMessage(content="What's my name?")],
-        "workflow_type": "conversation"
-    }
+    next_state = {"messages": [HumanMessage(content="What's my name?")], "workflow_type": "conversation"}
 
     result = await graph.ainvoke(next_state)
 
@@ -560,12 +549,13 @@ async def test_memory_workflow(mock_groq_client, mock_qdrant_client):
 ```python
 from fastapi.testclient import TestClient
 
+
 def test_api_endpoint(client: TestClient):
     """Test API endpoint."""
     response = client.post(
         "/api/voice/process",
         files={"audio": ("test.wav", audio_data, "audio/wav")},
-        data={"session_id": "test_session"}
+        data={"session_id": "test_session"},
     )
 
     assert response.status_code == 200
@@ -602,17 +592,20 @@ def test_feature_a():
     result = feature_a()
     assert result == expected_a
 
+
 def test_feature_b():
     """Test feature B in isolation."""
     setup_for_test_b()
     result = feature_b()
     assert result == expected_b
 
+
 # Bad ❌
 def test_feature_a():
     """Test feature A."""
     global shared_state
     shared_state = feature_a()
+
 
 def test_feature_b():
     """Test feature B - depends on test_feature_a."""
@@ -649,6 +642,7 @@ def test_with_minimal_mocking(mock_external_api):
     # Internal logic runs normally
     result = process_data(input_data)
     assert result is not None
+
 
 # Bad ❌
 def test_with_excessive_mocking():
