@@ -43,7 +43,7 @@ def test_mock_qdrant_client(mock_qdrant_client):
     assert exists is True
 
     # Test search
-    results = mock_qdrant_client.search(collection_name="test_collection", query_vector=[0.1] * 384, limit=5)
+    results = mock_qdrant_client.query_points(collection_name="test_collection", query=[0.1] * 384, limit=5).points
     assert len(results) > 0
     assert results[0].score > 0
     assert "payload" in dir(results[0])

@@ -11,13 +11,16 @@ from pathlib import Path
 
 import pytest
 
+for provider_key in ("OPENROUTER_API_KEY", "DEEPGRAM_API_KEY"):
+    os.environ.pop(provider_key, None)
+
 # Set test environment variables BEFORE any imports
 # This prevents settings validation errors during test collection
-os.environ.setdefault("GROQ_API_KEY", "test_groq_key")
-os.environ.setdefault("ELEVENLABS_API_KEY", "test_elevenlabs_key")
+os.environ["GROQ_API_KEY"] = "test_groq_key"
+os.environ["ELEVENLABS_API_KEY"] = "test_elevenlabs_key"
 os.environ.setdefault("ELEVENLABS_VOICE_ID", "test_voice_id")
 os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
-os.environ.setdefault("QDRANT_API_KEY", "test_qdrant_key")
+os.environ["QDRANT_API_KEY"] = "test_qdrant_key"
 
 # Add src directory to Python path for imports
 src_path = Path(__file__).parent.parent / "src"

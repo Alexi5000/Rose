@@ -180,7 +180,11 @@ class TestProductionReadiness:
         app = create_app()
 
         # Check that static file routes are configured
-        [route.path for route in app.routes]
+        from fastapi.testclient import TestClient
+
+        response = TestClient(app).get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
         # Should have catch-all route for React app
 
 
@@ -213,7 +217,7 @@ class TestAPIEndpoints:
 
         app = create_app()
         client = TestClient(app)
-        route_paths = {route.path for route in app.routes}
+        route_paths = set(app.openapi()["paths"])
 
         # Health check
         response = client.get("/api/v1/health")
