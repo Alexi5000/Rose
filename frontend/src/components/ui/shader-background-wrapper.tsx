@@ -51,7 +51,7 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
       return false;
     }
   });
-  const [memoryUpdating, setMemoryUpdating] = useState(false);
+  const [settledMemoryRequest, setSettledMemoryRequest] = useState<string | null>(null);
   const [memoryActionBusy, setMemoryActionBusy] = useState(false);
   const [memoryStatus, setMemoryStatus] = useState<string | null>(null);
 
@@ -119,9 +119,13 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
     onError: (error) => onError(error),
   });
 
-  // Keep refs current (not hooks, just assignments during render)
-  playAudioRef.current = roseAudio.playAudio;
-  notifyPlaybackEndRef.current = voiceSession.notifyPlaybackEnd;
+  React.useLayoutEffect(() => {
+    playAudioRef.current = roseAudio.playAudio;
+    notifyPlaybackEndRef.current = voiceSession.notifyPlaybackEnd;
+  }, [roseAudio.playAudio, voiceSession.notifyPlaybackEnd]);
+
+  const memoryRequest = voiceSession.sessionId ? `${voiceSession.sessionId}:${sessionOnlyMemory}` : null;
+  const memoryUpdating = memoryRequest !== null && settledMemoryRequest !== memoryRequest;
 
   const applyMemoryMode = useCallback(
     (nextSessionOnly: boolean) => {
@@ -142,15 +146,16 @@ const ShaderBackgroundWrapper: React.FC<ShaderBackgroundWrapperProps> = ({
     }
 
     const memoryMode: MemoryMode = sessionOnlyMemory ? 'session_only' : 'enabled';
-    setMemoryUpdating(true);
+    let cancelled = false;
     updateMemoryPreferences(voiceSession.sessionId, memoryMode)
       .catch(() => {
         onError('Could not update memory mode. Please try again.');
       })
       .finally(() => {
-        setMemoryUpdating(false);
+        if (!cancelled) setSettledMemoryRequest(memoryRequest);
       });
-  }, [onError, sessionOnlyMemory, voiceSession.sessionId]);
+    return () => { cancelled = true; };
+  }, [onError, sessionOnlyMemory, voiceSession.sessionId, memoryRequest]);
 
   const handleExportMemories = useCallback(async () => {
     if (!voiceSession.sessionId) {

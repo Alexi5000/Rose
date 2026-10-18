@@ -10,7 +10,7 @@
  * 6. 20s inactivity timeout OR tap to manually stop
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import {
   RMS_ACTIVATION_THRESHOLD,
   RMS_DEACTIVATION_THRESHOLD,
@@ -107,6 +107,8 @@ export function useVoiceSession({
   const [error, setError] = useState<string | null>(null);
 
   // Ref to always have current sessionId in callbacks
+  const stopSessionRef = useRef<() => void>(() => {});
+  const stopRecordingRef = useRef<() => void>(() => {});
   const sessionIdRef = useRef<string | null>(sessionId);
 
   // 🔧 Refs (persist across renders)
@@ -213,7 +215,7 @@ export function useVoiceSession({
 
     inactivityTimeoutRef.current = setTimeout(() => {
       console.log('⏰ Inactivity timeout reached - stopping session');
-      stopSession();
+      stopSessionRef.current();
     }, INACTIVITY_TIMEOUT_MS);
   }, []);
 
@@ -333,7 +335,7 @@ export function useVoiceSession({
     maxRecordingTimeoutRef.current = window.setTimeout(() => {
       if (mediaRecorder.state === 'recording') {
         console.log('⏱️ Max recording duration reached - stopping');
-        stopRecording();
+        stopRecordingRef.current();
       }
     }, MAX_RECORDING_DURATION_MS);
   }, [
@@ -348,7 +350,7 @@ export function useVoiceSession({
   /**
    * 🛑 Stop recording audio
    */
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(function finishRecording() {
     if (!utteranceActiveRef.current || !mediaRecorderRef.current) return;
 
     const duration = Date.now() - (recordingStartTimeRef.current || 0);
@@ -360,7 +362,7 @@ export function useVoiceSession({
         );
         deferredStopTimeoutRef.current = window.setTimeout(() => {
           deferredStopTimeoutRef.current = null;
-          stopRecording();
+          finishRecording();
         }, remaining);
       }
       return;
@@ -378,7 +380,9 @@ export function useVoiceSession({
   /**
    * 🔊 VAD analysis loop (runs at 60fps)
    */
-  const analyzeAudio = useCallback(() => {
+  useLayoutEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
+
+  const analyzeAudio = useCallback(function analyzeFrame() {
     // Early exit check with logging
     if (!analyserRef.current || stateRef.current !== 'listening') {
       if (vadStatusRef.current === 'active') {
@@ -459,7 +463,7 @@ export function useVoiceSession({
     }
 
     // Continue loop
-    animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+    animationFrameRef.current = requestAnimationFrame(analyzeFrame);
   }, [startRecording, stopRecording, resetInactivityTimer]);
 
   const startVadLoop = useCallback(() => {
@@ -752,6 +756,8 @@ export function useVoiceSession({
     clearMaxRecordingTimeout,
     setVoiceState,
   ]);
+
+  useLayoutEffect(() => { stopSessionRef.current = stopSession; }, [stopSession]);
 
   // Cleanup on unmount
   useEffect(() => {
