@@ -49,8 +49,7 @@ class TestCORSConfiguration:
         settings.ALLOWED_ORIGINS = "https://example.com,https://app.example.com"
 
         allowed = settings.get_allowed_origins()
-        assert "https://example.com" in allowed
-        assert "https://app.example.com" in allowed
+        assert allowed == ["https://example.com", "https://app.example.com"]
         assert len(allowed) == 2
 
         # Restore original
@@ -230,8 +229,7 @@ class TestSecurityConfiguration:
         settings.ALLOWED_ORIGINS = "https://example.com, https://app.example.com"
         origins = settings.get_allowed_origins()
         assert len(origins) == 2
-        assert "https://example.com" in origins
-        assert "https://app.example.com" in origins
+        assert origins == ["https://example.com", "https://app.example.com"]
 
         # Test with wildcard
         settings.ALLOWED_ORIGINS = "*"
