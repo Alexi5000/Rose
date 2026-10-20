@@ -51,3 +51,21 @@ def test_admin_read_routes_are_protected(monkeypatch, admin_client, path):
     client, _ = admin_client
     monkeypatch.setenv("ROSE_ADMIN_TOKEN", "x" * 32)
     assert client.get("/api/v1/admin/memory/" + path).status_code == 401
+
+
+def test_admin_token_loads_from_dotenv_without_diagnostic_exposure(monkeypatch, tmp_path, admin_client):
+    from ai_companion.interfaces.web import admin_auth
+    from ai_companion.settings import Settings
+
+    monkeypatch.delenv("ROSE_ADMIN_TOKEN", raising=False)
+    token = "dotenv-test-" * 4
+    env_file = tmp_path / ".env"
+    env_file.write_text("ROSE_ADMIN_TOKEN=" + token + "\n")
+    configured = Settings(_env_file=env_file)
+    monkeypatch.setattr(admin_auth, "settings", configured)
+    assert "ROSE_ADMIN_TOKEN" not in configured.model_dump()
+    assert token not in repr(configured)
+    client, effect = admin_client
+    response = client.post("/api/v1/admin/memory/guard/reset", headers={"Authorization": "Bearer " + token})
+    assert response.status_code == 200
+    effect.assert_called_once_with()
