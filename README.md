@@ -19,19 +19,23 @@
 </p>
 
 <p align="center">
-  <a href="#about-rose">About</a> |
+  <a href="#why-this-fork-exists">Why this fork exists</a> |
   <a href="#safety-boundary">Safety</a> |
   <a href="#architecture">Architecture</a> |
   <a href="#quick-start">Quick Start</a> |
   <a href="#documentation">Docs</a> |
-  <a href="#lineage">Lineage</a>
+  <a href="#upstream">Upstream</a>
 </p>
 
-## About Rose
+## Why this fork exists
 
-Rose is an open-source voice companion for emotional support, grounding, and reflective conversations. She combines a React and FastAPI voice interface, LangGraph orchestration, configurable AI providers, long-term memory controls, and deterministic crisis-safety handling.
+**What it does.** Rose is an open-source voice companion for emotional support, grounding, and reflective conversations. She combines a React and FastAPI voice interface, LangGraph orchestration, configurable AI providers (Groq, OpenRouter, Deepgram, ElevenLabs), Qdrant long-term memory with session-only, export, and forget controls, and deterministic crisis-safety routing that runs locally before any model call.
 
-Rose is AI emotional support. She is not a therapist, doctor, emergency service, or replacement for professional care. She can support reflection, grounding, spiritual language by consent, and continuity across sessions, but she must stay honest that she is AI and must route crisis language toward human help.
+**Who it serves.** People who want a calm, consent-aware voice conversation in the browser, and the developers or operators who run such a companion and need provider fallbacks, memory privacy controls, and safety rules that keep working when an external model provider fails. Rose is AI emotional support. She is not a therapist, doctor, emergency service, or replacement for professional care. She can support reflection, grounding, spiritual language by consent, and continuity across sessions, but she must stay honest that she is AI and must route crisis language toward human help.
+
+**Why Alex forked it.** Alex Cinovoj, Founder & CTO of TechTide AI, forked [neural-maze/ava-whatsapp-agent-course](https://github.com/neural-maze/ava-whatsapp-agent-course) on 2025-10-20 (GitHub API `created_at`). The first fork-only commit (`68a6b6d`, 2026-05-17: "Restore Rose v2 buildout on upstream main") states the intent: it "replays the recovered Rose v2 product README, contributor credits, release documentation, quality gates, assets, and upstream-compatible ElevenLabs SDK merge on top of the latest original upstream state". The fork moves the companion from the upstream WhatsApp channel to a browser voice loop; `src/ai_companion/settings.py` marks WhatsApp and image generation as frozen features, and [TECHTIDE.md](TECHTIDE.md) (commit `9902fe0`, 2026-07-07) records that TechTide uses Rose as a reference implementation for voice-first AI companions in healthcare-adjacent verticals. The 2026-10-18 to 2026-10-20 commits (#2 to #7) are security hardening: patched dependency APIs, exact allowed-origin checks, and administrator credentials on memory and monitoring routes.
+
+**Real-world use case (2025–2026 evidence).** **Verified in this repository.** A person opens the browser voice UI, speaks, and Rose answers by voice. If a turn contains U.S. crisis language, the deterministic local safety layer surfaces 988 and human help before any model generates text; memory stays session-only unless the person opts in, and raw transcripts stay out of logs. This loop is exercised by `tests/unit/test_crisis_safety.py` (12 tests), `tests/unit/test_voice_websocket.py` (22 tests), and `tests/unit/test_privacy_logging.py` (20 tests), which run in `.github/workflows/ci.yml` (latest `main` run 2026-10-20: success). External context: the FTC opened a 6(b) study of consumer-facing AI companion chatbots in September 2025, asking operators how they test for and mitigate harm and disclose risks, which is the bar Rose's safety boundary and privacy defaults are written against[^1]. WhatsApp's Business API terms bar AI assistants whose primary function is the AI itself from 2026-01-15, so a self-hosted browser voice loop rather than the upstream WhatsApp channel is the surface Rose ships today[^2]. ElevenLabs' Conversational AI 2.0 release documents the real-time turn-taking and interruption handling that voice agents now need, which Rose implements in its turn gate and WebSocket route[^3]. LangGraph reached 1.0 in October 2025 and is the orchestration runtime Rose pins (`langgraph==1.2.16` in `pyproject.toml`)[^4].
 
 ## What Rose Does
 
@@ -208,9 +212,23 @@ uv run pytest tests/unit/test_privacy_logging.py tests/unit/test_voice_websocket
 | [Upstream Lineage Research](docs/UPSTREAM_LINEAGE_RESEARCH.md) | Current upstream repository and PR review notes. |
 | [Contributing](CONTRIBUTING.md) | How to propose safe, focused, contributor-friendly PRs. |
 
-## Lineage
+## Upstream
 
-Rose is maintained from [Alexi5000/Rose](https://github.com/Alexi5000/Rose) and keeps visible credit to the Ava/Rose lineage from [neural-maze/ava-whatsapp-agent-course](https://github.com/neural-maze/ava-whatsapp-agent-course).
+| Item | Value |
+| --- | --- |
+| Upstream | [neural-maze/ava-whatsapp-agent-course](https://github.com/neural-maze/ava-whatsapp-agent-course), the Ava WhatsApp agent course by The Neural Maze |
+| Upstream license | MIT, Copyright (c) 2024 The Neural Maze. [LICENSE](LICENSE) keeps the upstream text and copyright unchanged; Rose is not relicensed. |
+| Fork created | 2025-10-20 (GitHub API `created_at`) |
+| Position vs upstream `main` | 11 commits ahead, 0 behind as of 2026-10-20 (`gh api repos/Alexi5000/Rose/compare/neural-maze:main...Alexi5000:main`) |
+
+**What changed in this fork.** `git log upstream/main..origin/main --oneline` lists 11 commits; `git diff --stat upstream/main origin/main` reports 405 files changed, 81,506 insertions, 5,961 deletions.
+
+- `68a6b6d`, `643434b` (2026-05-17): Rose v2 buildout replayed on upstream main (307 files): React voice frontend, FastAPI WebSocket voice route, safety and response-quality layer, provider interfaces, docs, assets, contributor credits, then a repository-wide refresh with Ava course credit.
+- `9902fe0`, `d691fed`, `9ef92e4` (2026-07-07): repo hygiene and docs closeout (#1), CI workspace data paths, v2.1.0 release metadata.
+- `55f6cf8`, `d0851fd`, `5162afb` (2026-10-18): frontend tooling migration and voice callback fixes (#2), memory and provider dependencies moved to patched APIs (#3), exact allowed-origin assertions in security tests (#4).
+- `f889ef5`, `ecd7fb0`, `7398699` (2026-10-20): `ROSE_ADMIN_TOKEN` required for administrative memory routes (#5), admin token loaded through application settings (#6), authorization on manual monitoring evaluation (#7).
+
+Rose is maintained from [Alexi5000/Rose](https://github.com/Alexi5000/Rose) and keeps visible credit to the Ava/Rose lineage.
 
 <p align="center">
   <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">
@@ -220,14 +238,6 @@ Rose is maintained from [Alexi5000/Rose](https://github.com/Alexi5000/Rose) and 
 
 The image above links to the original Ava course repository so the source lineage remains visible. Rose also keeps integrated guidance from community pull requests in the original Ava course repository, with contributor notes in [CONTRIBUTORS.md](CONTRIBUTORS.md) and [upstream PR integration notes](docs/UPSTREAM_PR_INTEGRATION.md).
 
-## License
-
-Rose is released under the [MIT License](LICENSE).
-
-<p align="center">
-  <sub>Maintained by <a href="https://github.com/Alexi5000">Alexi5000</a>. Inspired by the original <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">Ava course</a> and its source authors.</sub>
-</p>
-
 ## Administrative access
 
 Set `ROSE_ADMIN_TOKEN` to an independently generated secret of at least 32 characters on the server.
@@ -236,3 +246,18 @@ administrative access (503); missing or incorrect credentials return 401 before 
 Keep this token out of browser bundles and use TLS for network requests. All `/api/v1/admin/*` memory status,
 collection and reset routes require this token, as does manual monitoring threshold evaluation. Existing
 ordinary application operations retain their current access behavior.
+
+Vulnerability reports: see [SECURITY.md](SECURITY.md).
+
+## License
+
+Rose is released under the [MIT License](LICENSE).
+
+<p align="center">
+  <sub>Maintained by <a href="https://github.com/Alexi5000">Alexi5000</a>. Inspired by the original <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">Ava course</a> and its source authors.</sub>
+</p>
+
+[^1]: Federal Trade Commission, "FTC Launches Inquiry into AI Chatbots Acting as Companions", published 2025-09-11. https://www.ftc.gov/news-events/news/press-releases/2025/09/ftc-launches-inquiry-ai-chatbots-acting-companions
+[^2]: TechCrunch, "WhatsApp changes its terms to bar general-purpose chatbots from its platform", published 2025-10-18. https://techcrunch.com/2025/10/18/whatssapp-changes-its-terms-to-bar-general-purpose-chatbots-from-its-platform/
+[^3]: ElevenLabs, "Introducing ElevenLabs Conversational AI 2.0", published 2025-05-30. https://elevenlabs.io/blog/conversational-ai-2-0
+[^4]: LangChain, "LangChain and LangGraph Agent Frameworks Reach v1.0 Milestones", published 2025-10-22. https://www.langchain.com/blog/langchain-langgraph-1dot0
