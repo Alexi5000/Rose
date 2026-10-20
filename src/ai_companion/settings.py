@@ -23,7 +23,7 @@ Note:
 import sys
 from typing import Any
 
-from pydantic import ValidationError, field_validator, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_companion.config.server_config import (
@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_file_encoding="utf-8")
+
+    ROSE_ADMIN_TOKEN: str = Field(default="", repr=False, exclude=True)
 
     # Required API keys
     GROQ_API_KEY: str
