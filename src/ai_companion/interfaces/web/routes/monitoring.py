@@ -6,13 +6,14 @@ and alert information.
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.metrics import metrics
 from ai_companion.core.monitoring import monitoring
 from ai_companion.core.privacy_logging import exception_message_for_log
+from ai_companion.interfaces.web.admin_auth import require_admin
 
 logger = get_logger(__name__)
 
@@ -151,7 +152,7 @@ async def get_alerts(request: Request, hours: int = 24) -> list[AlertResponse]:
         raise HTTPException(status_code=500, detail="Failed to retrieve alerts")
 
 
-@router.post("/evaluate")
+@router.post("/evaluate", dependencies=[Depends(require_admin)])
 async def evaluate_thresholds(request: Request) -> Dict[str, Any]:
     """Manually trigger threshold evaluation.
 

@@ -69,3 +69,21 @@ def test_admin_token_loads_from_dotenv_without_diagnostic_exposure(monkeypatch, 
     response = client.post("/api/v1/admin/memory/guard/reset", headers={"Authorization": "Bearer " + token})
     assert response.status_code == 200
     effect.assert_called_once_with()
+
+
+def test_monitoring_evaluation_requires_admin_before_effect(monkeypatch):
+    from fastapi import FastAPI
+
+    from ai_companion.interfaces.web.routes import monitoring
+
+    app = FastAPI()
+    app.include_router(monitoring.router, prefix="/api/v1")
+    evaluate = Mock(return_value=[])
+    monkeypatch.setattr(monitoring.monitoring, "evaluate_thresholds", evaluate)
+    monkeypatch.setenv("ROSE_ADMIN_TOKEN", "x" * 32)
+    client = TestClient(app)
+    path = "/api/v1/api/monitoring/evaluate"
+    assert client.post(path).status_code == 401
+    evaluate.assert_not_called()
+    assert client.post(path, headers={"Authorization": "Bearer " + "x" * 32}).status_code == 200
+    evaluate.assert_called_once_with()
