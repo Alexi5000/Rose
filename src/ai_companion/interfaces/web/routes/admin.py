@@ -3,11 +3,12 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ai_companion.core.logging_config import get_logger
 from ai_companion.core.privacy_logging import exc_info_for_log, exception_message_for_log
+from ai_companion.interfaces.web.admin_auth import require_admin
 from ai_companion.modules.memory.long_term.constants import (
     DEFAULT_SESSION_ID,
     EMBEDDING_MODEL_NAME,
@@ -19,7 +20,7 @@ from ai_companion.modules.memory.long_term.vector_store import get_vector_store
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 class MemorySystemStatus(BaseModel):

@@ -227,3 +227,12 @@ Rose is released under the [MIT License](LICENSE).
 <p align="center">
   <sub>Maintained by <a href="https://github.com/Alexi5000">Alexi5000</a>. Inspired by the original <a href="https://github.com/neural-maze/ava-whatsapp-agent-course">Ava course</a> and its source authors.</sub>
 </p>
+
+## Administrative access
+
+Set `ROSE_ADMIN_TOKEN` to an independently generated secret of at least 32 characters on the server.
+Administrative requests must include `Authorization: Bearer <secret>`. Missing or short configuration disables
+administrative access (503); missing or incorrect credentials return 401 before any administrative effect.
+Keep this token out of browser bundles and use TLS for network requests. All `/api/v1/admin/*` memory status,
+collection and reset routes require this token. Existing ordinary application operations retain their current
+access behavior.
