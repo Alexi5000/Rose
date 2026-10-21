@@ -249,6 +249,8 @@ ordinary application operations retain their current access behavior.
 
 Vulnerability reports: see [SECURITY.md](SECURITY.md).
 
+Dependency and code-scanning status as of 2026-10-21: 0 open Dependabot alerts and 0 critical or high code-scanning alerts. The CI workflow pins the third-party `astral-sh/setup-uv` action by commit SHA and runs with read-only token permissions.
+
 ## License
 
 Rose is released under the [MIT License](LICENSE).
