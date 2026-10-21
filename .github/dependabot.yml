@@ -1,0 +1,7 @@
+# Dependabot version updates are intentionally disabled; dependency upgrades are
+# handled manually in reviewed pull requests (see README). Keeping this file
+# present makes GitHub run its configured dependency-graph update for uv.lock on
+# every push, so Dependabot security alerts reconcile against the current lock.
+version: 2
+enable-beta-ecosystems: false
+updates: []
