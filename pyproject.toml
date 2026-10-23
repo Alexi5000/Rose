@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiofiles==25.1.0",
+    "certifi>=2026.10.19",
     "elevenlabs==2.73.1",
     "fastapi[standard]==0.143.3",
     "groq>=0.30.0,<1.0.0",
